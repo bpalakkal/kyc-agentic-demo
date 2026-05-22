@@ -1,63 +1,57 @@
-import { AlertTriangle, Clock, ChevronRight, Sparkles, Paperclip, Maximize2, MessageSquare, FileText, Globe, ArrowUpRight, ArrowDownRight, Timer } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Paperclip, Maximize2, MessageSquare, FileText, Bot, ArrowUpRight, ArrowDownRight, Timer, CheckCircle2, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 
+type FilterKey = "all" | "attention" | "urgent" | "complete";
+
 const priorityCases = [
-  { priority: "High", id: "KYC-30214", entity: "Brevan Howard Asset Management LLP", note: "PSC nature-of-control change undisclosed — Companies House filing overdue.", due: "2 hrs", est: "45 min" },
-  { priority: "High", id: "KYC-30188", entity: "Marshall Wace LLP", note: "FCA permission scope change pending evidence — SLA closes today.", due: "Today", est: "30 min" },
-  { priority: "Medium", id: "KYC-30201", entity: "Brevan Howard Asset Management LLP", note: "Jersey-domiciled corporate member triggers EDD review.", due: "Tomorrow", est: "20 min" },
-  { priority: "Medium", id: "KYC-30207", entity: "Marshall Wace LLP", note: "AUM disclosure 2025 not yet reconciled with FCA Gabriel return.", due: "Friday", est: "1.5 hrs" },
-  { priority: "Low", id: "KYC-30222", entity: "Brevan Howard Asset Management LLP", note: "Previous company name 'Rivage Capital' chain-of-title verification.", due: "Next Week", est: "15 min" },
-] as const;
-
-const pieData = [
-  { name: "Not Started", value: 20, color: "hsl(var(--chart-3))" },
-  { name: "In Progress", value: 30, color: "hsl(var(--chart-1))" },
-  { name: "Pending Feedback", value: 30, color: "hsl(var(--chart-2))" },
-  { name: "Complete", value: 20, color: "hsl(var(--chart-4))" },
-];
-
-const casesOverTime = [
-  { day: "Mon", new: 14, completed: 12, overdue: 4 },
-  { day: "Tue", new: 18, completed: 11, overdue: 5 },
-  { day: "Wed", new: 13, completed: 15, overdue: 4 },
-  { day: "Thu", new: 20, completed: 17, overdue: 6 },
-  { day: "Fri", new: 16, completed: 14, overdue: 5 },
-  { day: "Sat", new: 11, completed: 13, overdue: 3 },
-  { day: "Sun", new: 14, completed: 16, overdue: 4 },
-];
-
-const responseTrend = [
-  { day: "Mon", v: 3.8 }, { day: "Tue", v: 3.4 }, { day: "Wed", v: 3.5 },
-  { day: "Thu", v: 3.6 }, { day: "Fri", v: 3.1 }, { day: "Sat", v: 3.0 }, { day: "Sun", v: 3.2 },
-];
+  { priority: "High", id: "KYC-30214", entity: "Brevan Howard Asset Management LLP", note: "PSC nature-of-control change undisclosed — Companies House filing overdue.", due: "2 hrs", est: "45 min", status: "open" },
+  { priority: "High", id: "KYC-30188", entity: "Marshall Wace LLP", note: "FCA permission scope change pending evidence — SLA closes today.", due: "Today", est: "30 min", status: "open" },
+  { priority: "Medium", id: "KYC-30201", entity: "Brevan Howard Asset Management LLP", note: "Jersey-domiciled corporate member triggers EDD review.", due: "Tomorrow", est: "20 min", status: "open" },
+  { priority: "Medium", id: "KYC-30207", entity: "Marshall Wace LLP", note: "AUM disclosure 2025 not yet reconciled with FCA Gabriel return.", due: "Friday", est: "1.5 hrs", status: "open" },
+  { priority: "Low", id: "KYC-30222", entity: "Brevan Howard Asset Management LLP", note: "Previous company name 'Rivage Capital' chain-of-title verification.", due: "Next Week", est: "15 min", status: "open" },
+] as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
 
 const aiActions = [
-  { dot: "alert", title: "Sign off on KYC-30214", sub: "Brevan Howard · PSC filing overdue", chip: "Recommended" },
-  { dot: "alert", title: "Escalate KYC-30188 FCA scope", sub: "Marshall Wace · SLA breach today" },
-  { dot: "warning", title: "Run EDD on Jersey corporate member", sub: "BH Partnership Holdings Limited" },
-  { dot: "muted", title: "Reconcile Marshall Wace AUM", sub: "FCA Gabriel vs CRM mismatch" },
+  { dot: "alert", title: "Sign off on KYC-30214", sub: "Brevan Howard · PSC filing overdue", chip: "Recommended", reason: "All exceptions have been resolved." },
+  { dot: "alert", title: "Escalate KYC-30188 FCA scope", sub: "Marshall Wace · SLA breach today", reason: "SLA breaches in <4 hours with no client response." },
+  { dot: "warning", title: "Run EDD on Jersey corporate member", sub: "BH Partnership Holdings Limited", reason: "Jurisdiction matches EDD policy POL-EDD-23." },
+  { dot: "warning", title: "Reconcile Marshall Wace AUM", sub: "FCA Gabriel vs CRM mismatch", reason: "AUM delta of £180m detected between sources." },
+  { dot: "muted", title: "Backfill 'Rivage Capital' name alias", sub: "Brevan Howard · CRM history sync", reason: "Companies House name history not yet in CRM." },
+  { dot: "muted", title: "Request AIFMD Article 23 pack", sub: "Marshall Wace · client outreach", reason: "New 'Managing an AIF' permission added on 02/11/2026." },
+  { dot: "muted", title: "Add cleared name pair to sanctions allowlist", sub: "Marshall Wace PSC · false positive", reason: "Identity divergence on DOB and nationality confirmed." },
 ];
 
-const collab = [
-  { icon: MessageSquare, title: "Quinn Doe commented on Brevan Howard case file", time: "Today, 7:08 AM" },
-  { icon: Globe, title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM" },
-  { icon: FileText, title: 'You confirmed PSC for Marshall Wace LLP', time: "April 22, 2026, 7:18 AM" },
-  { icon: MessageSquare, title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM" },
+type CollabType = "comment" | "ai" | "document" | "action";
+const collab: { type: CollabType; title: string; time: string }[] = [
+  { type: "comment", title: "Quinn Doe commented on Brevan Howard case file", time: "Today, 7:08 AM" },
+  { type: "ai", title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM" },
+  { type: "action", title: "You confirmed PSC for Marshall Wace LLP", time: "April 22, 2026, 7:18 AM" },
+  { type: "comment", title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM" },
+  { type: "document", title: "Form CS01 uploaded to KYC-30214", time: "April 21, 2026, 4:40 PM" },
+  { type: "ai", title: "AI Agent auto-cleared 1 sanctions false positive", time: "April 21, 2026, 2:11 PM" },
 ];
 
-const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick }: {
+const collabMeta: Record<CollabType, { label: string; icon: typeof MessageSquare; tone: string }> = {
+  comment: { label: "Comments", icon: MessageSquare, tone: "bg-info-soft text-primary" },
+  ai: { label: "AI actions", icon: Bot, tone: "bg-success-soft text-success" },
+  document: { label: "Documents", icon: FileText, tone: "bg-warning-soft text-warning" },
+  action: { label: "User actions", icon: CheckCircle2, tone: "bg-secondary text-foreground" },
+};
+
+const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, active }: {
   label: string; value: string; unit?: string; trend?: { dir: "up" | "down"; text: string };
-  accent?: "alert"; icon?: React.ReactNode; soft?: boolean; onClick?: () => void;
+  accent?: "alert"; icon?: React.ReactNode; soft?: boolean; onClick?: () => void; active?: boolean;
 }) => (
   <button
     type="button"
     onClick={onClick}
     className={cn(
       "group rounded-xl border bg-card p-5 flex items-start justify-between gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
-      soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border"
+      soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border",
+      active && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
     )}>
     <div className="min-w-0">
       <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">{label}</p>
@@ -75,7 +69,8 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick }
     {icon && (
       <div className={cn(
         "size-10 rounded-lg grid place-items-center shrink-0 transition-colors",
-        soft ? "bg-alert/10 text-alert" : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+        soft ? "bg-alert/10 text-alert" : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
+        active && "bg-primary/10 text-primary"
       )}>{icon}</div>
     )}
   </button>
@@ -84,10 +79,37 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick }
 const dotColor = (k: string) =>
   k === "alert" ? "bg-alert" : k === "warning" ? "bg-warning" : "bg-muted-foreground/40";
 
+const filterLabel: Record<FilterKey, string> = {
+  all: "All priority cases",
+  attention: "Cases requiring attention (High priority)",
+  urgent: "Cases due today or within hours",
+  complete: "Resolved cases",
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const goQueue = () => navigate("/work-queue");
   const goReview = () => navigate("/work-queue/review");
+  const [priorityExpanded, setPriorityExpanded] = useState(false);
+  const [actionsExpanded, setActionsExpanded] = useState(false);
+  const [kpiFilter, setKpiFilter] = useState<FilterKey>("all");
+  const [collabFilters, setCollabFilters] = useState<Record<CollabType, boolean>>({
+    comment: true, ai: true, document: true, action: true,
+  });
+
+  const toggleKpi = (k: FilterKey) => setKpiFilter((prev) => (prev === k ? "all" : k));
+
+  const filteredCases = useMemo(() => {
+    switch (kpiFilter) {
+      case "attention": return priorityCases.filter((c) => c.priority === "High");
+      case "urgent": return priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today");
+      case "complete": return priorityCases.filter((c) => c.status === "complete");
+      default: return priorityCases;
+    }
+  }, [kpiFilter]);
+
+  const filteredCollab = collab.filter((c) => collabFilters[c.type]);
+
   return (
     <div className="px-6 py-6 grid grid-cols-12 gap-6">
       {/* Main column */}
@@ -109,7 +131,8 @@ const Dashboard = () => {
             unit="cases"
             trend={{ dir: "up", text: "+2 since yesterday" }}
             icon={<AlertTriangle className="size-5" />}
-            onClick={goQueue}
+            onClick={() => toggleKpi("attention")}
+            active={kpiFilter === "attention"}
           />
           <Stat
             label="Avg Response Time"
@@ -117,12 +140,16 @@ const Dashboard = () => {
             unit="days"
             trend={{ dir: "up", text: "0.4d vs yesterday" }}
             icon={<Clock className="size-5" />}
-            onClick={goQueue}
+            onClick={() => toggleKpi("urgent")}
+            active={kpiFilter === "urgent"}
           />
           <button
             type="button"
-            onClick={goQueue}
-            className="group rounded-xl border border-border bg-card p-5 flex items-start justify-between transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40">
+            onClick={() => toggleKpi("complete")}
+            className={cn(
+              "group rounded-xl border border-border bg-card p-5 flex items-start justify-between transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
+              kpiFilter === "complete" && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
+            )}>
             <div>
               <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">Cases Complete</p>
               <div className="mt-2 flex items-baseline gap-1">
@@ -144,27 +171,62 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Second stat row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Stat soft accent="alert" label="Compliance Alerts" value="2" icon={<AlertTriangle className="size-5" />} onClick={goQueue} />
-          <Stat label="Decision Support" value="13" icon={<Sparkles className="size-5" />} onClick={goQueue} />
-          <Stat label="Next to Complete" value="5" icon={<Timer className="size-5" />} onClick={goQueue} />
-          <Stat label="Client Responses" value="3" icon={<MessageSquare className="size-5" />} onClick={goQueue} />
+        {/* Second stat row — compact secondary metrics */}
+        <div className="rounded-xl border border-border bg-card divide-y md:divide-y-0 md:divide-x divide-border grid grid-cols-2 md:grid-cols-4 overflow-hidden">
+          {[
+            { label: "Compliance Alerts", value: "2", icon: <AlertTriangle className="size-4" />, accent: true },
+            { label: "Decision Support", value: "13", icon: <Sparkles className="size-4" /> },
+            { label: "Next to Complete", value: "5", icon: <Timer className="size-4" /> },
+            { label: "Client Responses", value: "3", icon: <MessageSquare className="size-4" /> },
+          ].map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={goQueue}
+              className="text-left px-4 py-3 hover:bg-secondary/40 transition-colors focus:outline-none focus:bg-secondary/60 flex items-center gap-3"
+            >
+              <span className={cn(
+                "size-8 rounded-lg grid place-items-center shrink-0",
+                s.accent ? "bg-alert/10 text-alert" : "bg-secondary text-muted-foreground"
+              )}>{s.icon}</span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium tracking-wide uppercase text-muted-foreground">{s.label}</p>
+                <p className={cn("text-lg font-semibold tabular-nums leading-tight", s.accent && "text-alert")}>{s.value}</p>
+              </div>
+            </button>
+          ))}
         </div>
 
-        {/* Priority + Pie */}
+
+        {/* Priority Cases + Recommended Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Priority */}
+          {/* Priority Cases — 3 by default, expand to scroll */}
           <section className="rounded-xl border border-border bg-card p-5">
-            <header className="flex items-center justify-between mb-4">
+            <header className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-semibold">Priority Cases</h2>
                 <Chip variant="high"><AlertTriangle className="size-3 mr-1" />2 High</Chip>
               </div>
-              <button className="text-xs font-medium text-primary flex items-center gap-1 hover:underline">
-                View all <ChevronRight className="size-3" />
+              <button
+                onClick={() => setPriorityExpanded((v) => !v)}
+                className="text-xs font-medium text-primary flex items-center gap-1 hover:underline"
+              >
+                {priorityExpanded ? "Show less" : `Show all (${filteredCases.length})`}
+                <ChevronDown className={cn("size-3 transition-transform", priorityExpanded && "rotate-180")} />
               </button>
             </header>
+
+            {kpiFilter !== "all" && (
+              <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-primary/30 bg-info-soft px-2.5 py-1.5">
+                <span className="text-[11px] text-primary font-medium truncate">Filtered: {filterLabel[kpiFilter]}</span>
+                <button
+                  onClick={() => setKpiFilter("all")}
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1 shrink-0"
+                >
+                  Clear <X className="size-3" />
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-[80px_1fr_auto] text-[10px] font-medium uppercase tracking-wide text-muted-foreground pb-2 border-b border-border">
               <span>Priority</span>
@@ -172,8 +234,14 @@ const Dashboard = () => {
               <span className="text-right">Due</span>
             </div>
 
-            <ul className="divide-y divide-border">
-              {priorityCases.map((c) => (
+            <ul className={cn(
+              "divide-y divide-border",
+              priorityExpanded && "max-h-[300px] overflow-y-auto pr-1 -mr-1"
+            )}>
+              {filteredCases.length === 0 && (
+                <li className="py-6 text-center text-xs text-muted-foreground">No cases match this filter.</li>
+              )}
+              {(priorityExpanded ? filteredCases : filteredCases.slice(0, 3)).map((c) => (
                 <li key={c.id}>
                   <Link
                     to="/work-queue/review"
@@ -204,96 +272,53 @@ const Dashboard = () => {
             </ul>
           </section>
 
-          {/* Pie */}
+          {/* Recommended Actions — 3 by default, expand to scroll */}
           <section className="rounded-xl border border-border bg-card p-5">
-            <header className="flex items-start justify-between mb-2">
-              <div>
-                <h2 className="text-[15px] font-semibold">Cases by Status</h2>
-                <p className="text-xs text-muted-foreground">Operational workload distribution</p>
+            <header className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-[15px] font-semibold flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" /> Recommended Actions
+                </h2>
+                <Chip variant="high">{aiActions.filter((a) => a.dot === "alert").length} Urgent</Chip>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total Active</p>
-                <p className="text-2xl font-semibold">8</p>
-              </div>
+              <button
+                onClick={() => setActionsExpanded((v) => !v)}
+                className="text-xs font-medium text-primary flex items-center gap-1 hover:underline"
+              >
+                {actionsExpanded ? "Show less" : `Show all (${aiActions.length})`}
+                <ChevronDown className={cn("size-3 transition-transform", actionsExpanded && "rotate-180")} />
+              </button>
             </header>
 
-            <div className="h-[260px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" innerRadius={0} outerRadius={100} stroke="hsl(var(--card))" strokeWidth={2}
-                    label={({ value }) => `${value}%`} labelLine={false}>
-                    {pieData.map((d) => <Cell key={d.name} fill={d.color} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="mt-2 space-y-1.5">
-              {pieData.map((d) => (
-                <li key={d.name} className="grid grid-cols-[1fr_auto_48px] items-center text-xs">
-                  <span className="flex items-center gap-2 text-foreground">
-                    <span className="size-2 rounded-full" style={{ background: d.color }} />
-                    {d.name}
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">{Math.round((d.value / 100) * 10)}</span>
-                  <span className="text-right text-muted-foreground tabular-nums">{d.value}%</span>
+            <ul className={cn(
+              "divide-y divide-border",
+              actionsExpanded && "max-h-[400px] overflow-y-auto pr-1 -mr-1"
+            )}>
+              {(actionsExpanded ? aiActions : aiActions.slice(0, 3)).map((a) => (
+                <li key={a.title}>
+                  <button
+                    type="button"
+                    onClick={goReview}
+                    className="w-full text-left py-3 flex items-start gap-3 hover:bg-secondary/30 -mx-2 px-2 rounded-md transition-colors"
+                  >
+                    <span className={cn("mt-1.5 size-2 rounded-full shrink-0", dotColor(a.dot))} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium leading-tight">{a.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{a.sub}</p>
+                      <p className="text-[11px] text-muted-foreground/90 mt-1 italic line-clamp-1">
+                        <span className="not-italic font-medium text-foreground/70">Reason:</span> {a.reason}
+                      </p>
+                    </div>
+                    {a.chip && <Chip variant="high" className="shrink-0">{a.chip}</Chip>}
+                    <ChevronRight className="size-4 text-muted-foreground shrink-0 mt-1" />
+                  </button>
                 </li>
               ))}
             </ul>
           </section>
         </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="rounded-xl border border-border bg-card p-5">
-            <header className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-[15px] font-semibold">Cases Over Time</h2>
-                <p className="text-xs text-muted-foreground">New, completed, and overdue</p>
-              </div>
-              <button className="text-xs border border-border rounded-md px-2.5 py-1 text-muted-foreground">Last 7 Days ▾</button>
-            </header>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={casesOverTime} margin={{ top: 5, right: 8, bottom: 0, left: -20 }}>
-                  <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} domain={[0, 24]} ticks={[0,6,12,18,24]} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="new" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="completed" stroke="hsl(var(--chart-4))" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="overdue" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center gap-4 text-xs mt-2">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-chart-1"/>New Cases</span>
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-chart-4"/>Completed</span>
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-muted-foreground/60"/>Overdue</span>
-            </div>
-          </section>
 
-          <section className="rounded-xl border border-border bg-card p-5">
-            <header className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-[15px] font-semibold">Response Time Trend</h2>
-                <p className="text-xs text-muted-foreground">Avg days vs SLA target</p>
-              </div>
-              <span className="text-xs text-muted-foreground">---- SLA</span>
-            </header>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={responseTrend} margin={{ top: 5, right: 8, bottom: 0, left: -20 }}>
-                  <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} />
-                  <YAxis tickLine={false} axisLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }} domain={[2.65, 4.5]} ticks={[2.65,3.3,4.5]} />
-                  <ReferenceLine y={3.0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Line type="monotone" dataKey="v" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 3, fill: "hsl(var(--chart-1))" }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-        </div>
       </div>
 
       {/* Right column: AI + collab */}
@@ -303,24 +328,6 @@ const Dashboard = () => {
             You currently have <span className="font-semibold text-foreground">5 cases</span> within a 48-hour SLA across the <span className="font-semibold text-foreground">London Alternatives DRG</span>, and <span className="font-semibold text-foreground">2 unresolved compliance alerts</span> requiring action.
           </p>
 
-          <div className="mt-5 mb-2 flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <Sparkles className="size-3.5 text-primary" />
-            AI-Recommended Actions
-          </div>
-
-          <ul className="divide-y divide-border">
-            {aiActions.map((a) => (
-              <li key={a.title} className="py-3 flex items-start gap-3">
-                <span className={cn("mt-1.5 size-2 rounded-full shrink-0", dotColor(a.dot))} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium leading-tight">{a.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{a.sub}</p>
-                </div>
-                {a.chip && <Chip variant="high" className="shrink-0">{a.chip}</Chip>}
-                <ChevronRight className="size-4 text-muted-foreground shrink-0 mt-1" />
-              </li>
-            ))}
-          </ul>
 
           <div className="mt-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Ask a follow-up</p>
@@ -342,18 +349,50 @@ const Dashboard = () => {
             <h3 className="text-[15px] font-semibold">Collaboration &amp; Insights</h3>
             <button className="text-muted-foreground hover:text-foreground"><Maximize2 className="size-4" /></button>
           </header>
+
+          {/* Filter chips */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {(Object.keys(collabMeta) as CollabType[]).map((t) => {
+              const meta = collabMeta[t];
+              const Icon = meta.icon;
+              const active = collabFilters[t];
+              return (
+                <button
+                  key={t}
+                  onClick={() => setCollabFilters((p) => ({ ...p, [t]: !p[t] }))}
+                  className={cn(
+                    "inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] font-medium transition-colors",
+                    active
+                      ? "border-primary/40 bg-info-soft text-primary"
+                      : "border-border bg-card text-muted-foreground hover:bg-secondary/40"
+                  )}
+                >
+                  <Icon className="size-3" />
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+
           <ul className="space-y-3">
-            {collab.map((c, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className="size-7 rounded-md bg-secondary grid place-items-center text-muted-foreground shrink-0">
-                  <c.icon className="size-3.5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[13px] leading-tight">{c.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{c.time}</p>
-                </div>
-              </li>
-            ))}
+            {filteredCollab.length === 0 && (
+              <li className="text-xs text-muted-foreground italic text-center py-3">No events match the selected filters.</li>
+            )}
+            {filteredCollab.map((c, i) => {
+              const meta = collabMeta[c.type];
+              const Icon = meta.icon;
+              return (
+                <li key={i} className="flex items-start gap-3">
+                  <span className={cn("size-7 rounded-md grid place-items-center shrink-0", meta.tone)}>
+                    <Icon className="size-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] leading-tight">{c.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{c.time}</p>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       </aside>

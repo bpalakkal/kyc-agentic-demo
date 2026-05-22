@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
-  ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Lock, Settings2, Building2,
+  ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Lock, Settings2, Building2, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId } from "@/components/AgentSystem";
@@ -301,6 +301,79 @@ const exceptions: Exc[] = [
   },
 ];
 
+// ---------- Side-by-side comparison data per exception ----------
+type CompareRow = { field: string; a: string; b: string; conflict?: boolean };
+type Compare = { aLabel: string; bLabel: string; rows: CompareRow[] };
+
+const COMPARISONS: Record<string, Compare> = {
+  e1: {
+    aLabel: "Companies House PSC Register",
+    bLabel: "Form CS01 (03/14/2026)",
+    rows: [
+      { field: "PSC Name", a: "Mr Alan Eldad Howard", b: "Mr Alan Eldad Howard" },
+      { field: "Correspondence Address", a: "82 Baker Street, London W1U 6AE", b: "27 Hill Street, London W1J 5LP", conflict: true },
+      { field: "PSC02 Notification (14-day window)", a: "Not received", b: "Not filed", conflict: true },
+      { field: "Date of Birth", a: "1963-09", b: "1963-09" },
+    ],
+  },
+  e2: {
+    aLabel: "Companies House Officer Record",
+    bLabel: "EDD Policy POL-EDD-23",
+    rows: [
+      { field: "Corporate Member", a: "BH Partnership Holdings Limited", b: "BH Partnership Holdings Limited" },
+      { field: "Jurisdiction", a: "Jersey, Channel Islands", b: "Jersey listed — EDD required", conflict: true },
+      { field: "EDD Pack on File", a: "Not present", b: "Required (SOW + UBO chart)", conflict: true },
+      { field: "UBO Resolution", a: "Unresolved at corporate layer", b: "Required to natural persons", conflict: true },
+    ],
+  },
+  e3: {
+    aLabel: "Companies House",
+    bLabel: "Internal CRM",
+    rows: [
+      { field: "Current Name", a: "Brevan Howard Asset Management LLP", b: "Brevan Howard Asset Management LLP" },
+      { field: "Previous Name", a: "Rivage Capital Management LLP (until 2007)", b: "— (not stored)", conflict: true },
+      { field: "Company Number", a: "OC302636", b: "OC302636" },
+      { field: "FCA FRN Continuity", a: "Continuous since 2003", b: "Lineage gap at 2007 name change", conflict: true },
+    ],
+  },
+  e4: {
+    aLabel: "FCA Register (04/19/2026)",
+    bLabel: "CRM Permission Set (11/02/2025)",
+    rows: [
+      { field: "FRN", a: "211088", b: "211088" },
+      { field: "Investment Management", a: "Active", b: "Active" },
+      { field: "Managing an AIF", a: "Active · eff. 2026-02-11", b: "Not present", conflict: true },
+      { field: "AIFMD Scope", a: "In-scope (Art. 23 disclosure)", b: "Out-of-scope", conflict: true },
+    ],
+  },
+  e5: {
+    aLabel: "HMT Consolidated List entry",
+    bLabel: "Client Identity on File",
+    rows: [
+      { field: "Name", a: "Paul Marshall", b: "Sir Paul Marshall" },
+      { field: "Date of Birth", a: "1971", b: "1959", conflict: true },
+      { field: "Nationality", a: "Zimbabwean", b: "British", conflict: true },
+      { field: "Status", a: "De-listed (Zimbabwe regime)", b: "Active KYC · knighted 2016" },
+      { field: "Passport", a: "—", b: "HMRC-verified on file" },
+    ],
+  },
+};
+
+const getSla = (title: string, recommended?: boolean): string => {
+  const t = title.toLowerCase();
+  if (t.includes("escalate")) return "24 hours";
+  if (t.includes("request") || t.includes("outreach")) return "7 business days";
+  if (t.includes("defer")) return "Until evidence received";
+  if (recommended) return "2 business days";
+  return "5 business days";
+};
+
+const severityFromConfidence = (c: number): { label: "High" | "Medium" | "Low"; ring: string; text: string } => {
+  if (c >= 90) return { label: "High", ring: "stroke-alert", text: "text-alert" };
+  if (c >= 85) return { label: "Medium", ring: "stroke-warning", text: "text-warning" };
+  return { label: "Low", ring: "stroke-success", text: "text-success" };
+};
+
 const buildHeaderMeta = (addressed: number, total: number) => [
   { label: "Exceptions", value: `${addressed}/${total}`, suffix: "addressed" },
   { label: "Due Date", value: "Apr 25, 2026" },
@@ -315,6 +388,7 @@ const selectedEntities = [
 ];
 
 
+
 type ResolvedInfo = { resolutionId: string; resolutionTitle: string; agentLabel: string };
 
 const ExceptionReview = () => {
@@ -322,17 +396,67 @@ const ExceptionReview = () => {
   const [openAgent, setOpenAgent] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<string | null>(null);
   const [resolvedMap, setResolvedMap] = useState<Record<string, ResolvedInfo>>({});
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
+  const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
+  const [rightPaneOpen, setRightPaneOpen] = useState(false);
+  
   const { runAgents, isRunning, currentLabel, runs } = useAgents();
 
   const active = exceptions.find((e) => e.id === activeId)!;
 
+  const openEvidence = (ev: Evidence) => {
+    const lower = ev.name.toLowerCase();
+    const kind: AttrDocKind =
+      lower.includes("passport") ? "passport"
+      : lower.includes("letter") ? "letter"
+      : lower.includes("register") || lower.includes("fca") ? "register"
+      : lower.includes("screenshot") || lower.includes("crm") ? "screenshot"
+      : "filing";
+    const doc: AttrDoc = {
+      id: `${active.id}-${ev.name}`,
+
+      title: ev.name,
+      source: ev.sub.split("·")[0]?.trim() || ev.sub,
+      date: new Date().toISOString().slice(0, 10),
+      kind,
+      pages: 1,
+      fields: [
+        { label: "Document", value: ev.name },
+        { label: "Reference", value: ev.sub, highlight: true },
+        { label: "Entity", value: active.entity },
+        { label: "Case", value: active.kyc },
+      ],
+      body: [
+        `This document is cited as supporting evidence for the exception "%%${active.title}%%".`,
+        ``,
+        active.evidenceRationale,
+        ``,
+        `Flagged finding: ${active.flagText}`,
+      ],
+    };
+    const attr: EntityAttr = { label: active.category, value: ev.sub, source: "Forge", status: "warn" };
+    setEvidenceDoc({ doc, attr, entity: active.entity });
+  };
+
+  // Reset disclosures when switching exception
+  useEffect(() => {
+    setShowReasoning(false);
+    setShowEvidence(false);
+  }, [activeId]);
+
+
+
+  const isResolved = !!resolvedMap[active.id];
+
   const handleResolutionClick = (id: string) => {
-    if (selectedResolution === id) {
-      setSelectedResolution(null);
-      return;
-    }
-    setSelectedResolution(id);
-    const cfg = active.resolutions.find((r) => r.id === id);
+    if (isResolved || isRunning) return;
+    setSelectedResolution(selectedResolution === id ? null : id);
+  };
+
+  const handleConfirmRun = () => {
+    if (!selectedResolution || isResolved || isRunning) return;
+    const cfg = active.resolutions.find((r) => r.id === selectedResolution);
     if (cfg) runAgents(cfg.agents, cfg.agentLabel);
   };
 
@@ -421,9 +545,15 @@ const ExceptionReview = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-[260px_1fr_420px] gap-5">
+      
+      <div
+        className="grid gap-6"
+        style={{
+          gridTemplateColumns: `260px ${rightPaneOpen ? "44px" : "minmax(0,1fr)"} ${rightPaneOpen ? "minmax(0,1fr)" : "44px"}`,
+        }}
+      >
         {/* Exceptions list */}
-        <aside>
+        <aside className="border-r border-border pr-6">
           <div className="flex items-center gap-2 mb-3">
             <Settings2 className="size-3.5 text-muted-foreground" />
             <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({exceptions.length})</span>
@@ -449,9 +579,29 @@ const ExceptionReview = () => {
                       <span className="text-[13px] font-semibold leading-tight">{e.title}</span>
                       {isResolved ? (
                         <CheckCircle2 className="size-4 text-success shrink-0" />
-                      ) : (
-                        <span className="text-[11px] text-success font-medium shrink-0 tabular-nums">{e.confidence}%</span>
-                      )}
+                      ) : (() => {
+                        const sev = severityFromConfidence(e.confidence);
+                        return (
+                          <span
+                            className="relative size-7 shrink-0"
+                            title={`${sev.label} severity · ${e.confidence}% confidence`}
+                          >
+                            <svg viewBox="0 0 36 36" className="size-7 -rotate-90">
+                              <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--secondary))" strokeWidth="4" />
+                              <circle
+                                cx="18" cy="18" r="15.9" fill="none"
+                                className={sev.ring}
+                                strokeWidth="4"
+                                strokeDasharray={`${e.confidence} 100`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className={cn("absolute inset-0 grid place-items-center text-[8px] font-semibold tabular-nums", sev.text)}>
+                              {e.confidence}
+                            </span>
+                          </span>
+                        );
+                      })()}
                     </div>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{e.category}</p>
                     <p className="text-[11px] mt-1 flex items-center gap-1">
@@ -479,7 +629,25 @@ const ExceptionReview = () => {
           </ul>
         </aside>
 
-        {/* Center: Exception summary */}
+        {/* Center: Exception summary — auto-collapses when either right pane opens */}
+        {rightPaneOpen ? (
+          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
+            <button
+              onClick={() => { setRightPaneOpen(false); }}
+              className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+              title="Expand exception summary"
+            >
+              <ChevronDown className="size-3.5 -rotate-90" />
+            </button>
+            <button
+              onClick={() => { setRightPaneOpen(false); }}
+              className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              title="Expand exception summary"
+            >
+              <Settings2 className="size-3" /> Exception Summary
+            </button>
+          </aside>
+        ) : (
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <header className="flex items-center justify-between mb-3 pb-3 border-b border-border">
             <div className="flex items-center gap-3 flex-wrap">
@@ -498,92 +666,229 @@ const ExceptionReview = () => {
             </div>
           </header>
 
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Why this exception exists</p>
               <div className="rounded-lg border border-warning-soft-border bg-warning-soft/50 p-3 flex items-start gap-2 mb-3">
                 <AlertTriangle className="size-4 text-warning mt-0.5 shrink-0" />
                 <p className="text-[13px]">{active.flagText}</p>
               </div>
-              <p className="text-[13px] text-muted-foreground leading-relaxed">
-                {active.narrative}
-              </p>
-              <ol className="mt-3 space-y-1.5 text-[13px] text-muted-foreground">
-                {active.reasoningSteps.map((s, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="size-5 rounded-full bg-secondary text-foreground grid place-items-center text-[11px] font-medium shrink-0">{i+1}</span>
-                    <span>{s}</span>
-                  </li>
-                ))}
-              </ol>
-
-            </div>
-
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Why this evidence was selected</p>
-              <p className="text-[12px] text-muted-foreground italic leading-relaxed mb-3">
-                {active.evidenceRationale}
-              </p>
-              <div className="grid grid-cols-3 gap-3">
-                {active.evidence.map((d) => (
-                  <div key={d.name} className="rounded-lg border border-border p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText className="size-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-medium truncate">{d.name}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{d.sub}</p>
+              {(() => {
+                const cmp = COMPARISONS[active.id];
+                if (!cmp) {
+                  return (
+                    <p className={cn("text-[13px] text-muted-foreground leading-relaxed", !showReasoning && "line-clamp-2")}>
+                      {active.narrative}
+                    </p>
+                  );
+                }
+                return (
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="grid grid-cols-[160px_1fr_1fr] text-[10px] font-medium uppercase tracking-wide bg-secondary/60">
+                      <div className="px-3 py-2 text-muted-foreground">Field</div>
+                      <div className="px-3 py-2 border-l border-border">
+                        <span className="text-muted-foreground">Source A · </span>
+                        <span className="text-foreground normal-case font-semibold tracking-normal">{cmp.aLabel}</span>
+                      </div>
+                      <div className="px-3 py-2 border-l border-border">
+                        <span className="text-muted-foreground">Source B · </span>
+                        <span className="text-foreground normal-case font-semibold tracking-normal">{cmp.bLabel}</span>
                       </div>
                     </div>
-                    <button className="text-[11px] px-3 py-1 rounded-full border border-primary text-primary hover:bg-info-soft">View</button>
+                    {cmp.rows.map((r) => (
+                      <div
+                        key={r.field}
+                        className={cn(
+                          "grid grid-cols-[160px_1fr_1fr] text-[12px] border-t border-border",
+                          r.conflict && "bg-warning-soft/40"
+                        )}
+                      >
+                        <div className="px-3 py-2 text-muted-foreground flex items-center gap-1.5">
+                          {r.conflict && <AlertTriangle className="size-3 text-warning shrink-0" />}
+                          <span>{r.field}</span>
+                        </div>
+                        <div className={cn("px-3 py-2 border-l border-border", r.conflict && "font-bold text-foreground")}>{r.a}</div>
+                        <div className={cn("px-3 py-2 border-l border-border", r.conflict && "font-bold text-foreground")}>{r.b}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                );
+              })()}
+              {showReasoning && (
+                <p className="mt-3 text-[12px] text-muted-foreground leading-relaxed italic">
+                  {active.narrative}
+                </p>
+              )}
+
+              {showReasoning && (
+                <ol className="mt-3 space-y-1.5 text-[13px] text-muted-foreground">
+                  {active.reasoningSteps.map((s, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span className="size-5 rounded-full bg-secondary text-foreground grid place-items-center text-[11px] font-medium shrink-0">{i+1}</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              <button
+                onClick={() => setShowReasoning((v) => !v)}
+                className="mt-2 text-[12px] font-medium text-primary hover:underline inline-flex items-center gap-1"
+              >
+                {showReasoning ? "Show less" : `Show full reasoning (${active.reasoningSteps.length} steps)`}
+                <ChevronDown className={cn("size-3.5 transition-transform", showReasoning && "rotate-180")} />
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Supporting Evidence</p>
+                <button
+                  onClick={() => setShowEvidence((v) => !v)}
+                  className="text-[12px] font-medium text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  {showEvidence ? "Hide" : `Show ${active.evidence.length} document${active.evidence.length === 1 ? "" : "s"}`}
+                  <ChevronDown className={cn("size-3.5 transition-transform", showEvidence && "rotate-180")} />
+                </button>
               </div>
+              {showEvidence && (
+                <>
+                  <p className="text-[12px] text-muted-foreground italic leading-relaxed mb-3">
+                    {active.evidenceRationale}
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {active.evidence.map((d) => (
+                      <button
+                        key={d.name}
+                        type="button"
+                        onClick={() => openEvidence(d)}
+                        className="text-left rounded-lg border border-border p-3 flex items-center justify-between hover:border-primary hover:bg-info-soft/40 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="size-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-medium truncate">{d.name}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{d.sub}</p>
+                          </div>
+                        </div>
+                        <span className="text-[11px] px-3 py-1 rounded-full border border-primary text-primary shrink-0">View</span>
+                      </button>
+                    ))}
+
+                  </div>
+                </>
+              )}
             </div>
 
 
-            <div className="pt-2 border-t border-border">
+            <div className="pt-4 border-t border-border">
               <p className="text-[13px] font-semibold mb-1">Resolution &amp; Next Actions</p>
               <p className="text-[12px] text-muted-foreground leading-relaxed mb-1">
                 <span className="font-semibold text-foreground">Why this may be acceptable:</span> {active.acceptability}
               </p>
               <p className="text-[12px] italic text-muted-foreground mb-3">Choose one of the items below to continue</p>
 
-              <div className="space-y-2">
+
+              <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-3", isResolved && "opacity-60")}>
                 {active.resolutions.map((opt) => {
-
                   const sel = selectedResolution === opt.id;
+                  const sla = getSla(opt.title, opt.recommended);
+                  const disabled = isResolved || isRunning;
                   return (
-                    <div key={opt.id}>
-                      <button
-                        onClick={() => handleResolutionClick(opt.id)}
-
-                        className={cn(
-                          "w-full text-left rounded-lg border p-3 flex items-start gap-3 transition-colors",
-                          sel ? "border-primary bg-info-soft/40" : "border-border hover:bg-secondary/40"
-                        )}
-                      >
-                        {sel ? (
-                          <CheckCircle2 className="size-4 text-primary mt-0.5 shrink-0" />
-                        ) : (
-                          <span className="size-4 rounded-full border border-border mt-0.5 shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium">{opt.title}</p>
-                          <p className="text-[12px] text-muted-foreground mt-1">{opt.desc}</p>
+                    <button
+                      key={opt.id}
+                      onClick={() => handleResolutionClick(opt.id)}
+                      disabled={disabled}
+                      aria-disabled={disabled}
+                      className={cn(
+                        "text-left rounded-xl p-4 flex flex-col gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary/40",
+                        !disabled && "hover:shadow-md",
+                        disabled && "cursor-not-allowed",
+                        opt.recommended && !sel && "border-2 border-success bg-gradient-to-br from-success-soft to-card shadow-sm",
+                        sel && "border-2 border-primary bg-info-soft shadow-md",
+                        !opt.recommended && !sel && "border border-border bg-card",
+                        !opt.recommended && !sel && !disabled && "hover:bg-secondary/40",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {opt.recommended ? (
+                            <Sparkles className={cn("size-4 shrink-0", sel ? "text-primary" : "text-success")} />
+                          ) : sel ? (
+                            <CheckCircle2 className="size-4 text-primary shrink-0" />
+                          ) : (
+                            <span className="size-4 rounded-full border border-border shrink-0" />
+                          )}
+                          <p className="text-[13px] font-bold leading-tight">{opt.title}</p>
                         </div>
-                        {opt.recommended && !sel && (
-                          <span className="px-2 py-0.5 rounded-full bg-success-soft text-success border border-success-soft-border text-[11px] font-medium shrink-0">Recommended</span>
-                        )}
-                        {sel && (
-                          <span className="px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[11px] font-medium shrink-0">Selected</span>
-                        )}
-                      </button>
-
-                      {sel && <AgentReasoningBlock exception={active} resolution={opt} />}
-                    </div>
+                        {isResolved && sel ? (
+                          <span className="px-2 py-0.5 rounded-full bg-success text-success-foreground text-[10px] font-semibold uppercase tracking-wide shrink-0 inline-flex items-center gap-1">
+                            <CheckCircle2 className="size-2.5" /> Resolved
+                          </span>
+                        ) : opt.recommended && !sel ? (
+                          <span className="px-2 py-0.5 rounded-full bg-success text-success-foreground text-[10px] font-semibold uppercase tracking-wide shrink-0">Best</span>
+                        ) : sel ? (
+                          <span className="px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold uppercase tracking-wide shrink-0">Selected</span>
+                        ) : null}
+                      </div>
+                      <p className="text-[12px] text-muted-foreground leading-snug">{opt.desc}</p>
+                      <div className="mt-auto pt-2 flex items-center gap-3 text-[11px] border-t border-border/60">
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <Clock className="size-3" /> SLA: <span className="font-medium text-foreground">{sla}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <Sparkles className="size-3" /> {opt.agents.length} agents
+                        </span>
+                      </div>
+                    </button>
                   );
                 })}
               </div>
+
+              {/* Confirm trigger bar */}
+              {selectedResolution && !isResolved && (() => {
+                const sel = active.resolutions.find((o) => o.id === selectedResolution)!;
+                return (
+                  <div className="mt-3 rounded-lg border border-primary/30 bg-info-soft/60 p-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="text-[12px] text-foreground min-w-0">
+                      <span className="font-semibold">Ready to run:</span>{" "}
+                      <span className="text-muted-foreground">{sel.title}</span>
+                      <span className="text-muted-foreground"> · {sel.agents.length} agents · SLA {getSla(sel.title, sel.recommended)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setSelectedResolution(null)}
+                        disabled={isRunning}
+                        className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-secondary disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleConfirmRun}
+                        disabled={isRunning}
+                        className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 inline-flex items-center gap-1.5"
+                      >
+                        <Play className="size-3" />
+                        {isRunning ? "Running agents…" : "Confirm & run agents"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {isResolved && (
+                <div className="mt-3 rounded-lg border border-success/40 bg-success-soft/60 p-3 text-[12px] flex items-center gap-2">
+                  <CheckCircle2 className="size-4 text-success shrink-0" />
+                  <span><span className="font-semibold">Resolved.</span> Agents have completed this resolution — actions are locked.</span>
+                </div>
+              )}
+
+              {active.resolutions.filter((o) => selectedResolution === o.id).map((opt) => (
+                <div key={opt.id} className="mt-3">
+                  <AgentReasoningBlock exception={active} resolution={opt} />
+                </div>
+              ))}
+
 
 
               <div className="mt-3 rounded-lg border border-border p-3">
@@ -597,27 +902,65 @@ const ExceptionReview = () => {
             </div>
           </div>
         </section>
+        )}
 
-        {/* Right: Attributes / Tree */}
-        <aside className="rounded-xl border border-border bg-card p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4 border-b border-border">
-            <div className="flex items-center gap-4">
-              <button className="pb-2 text-sm font-medium border-b-2 border-primary -mb-px flex items-center gap-1.5"><Settings2 className="size-3.5" /> Attributes</button>
-              <button className="pb-2 text-sm text-muted-foreground flex items-center gap-1.5 hover:text-foreground transition-colors"><FileText className="size-4" /> Document View</button>
+        {/* Right: Attributes / Tree — collapsible */}
+        {rightPaneOpen ? (
+          <aside className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4 border-b border-border">
+              <div className="flex items-center gap-4">
+                <button className="pb-2 text-sm font-medium border-b-2 border-primary -mb-px flex items-center gap-1.5"><Settings2 className="size-3.5" /> Attributes</button>
+                <button className="pb-2 text-sm text-muted-foreground flex items-center gap-1.5 hover:text-foreground transition-colors"><FileText className="size-4" /> Document View</button>
+              </div>
+              <div className="flex items-center gap-1">
+                <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Plus className="size-3.5" /></button>
+                <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Minus className="size-3.5" /></button>
+                <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Maximize2 className="size-3" /></button>
+                <span className="text-xs text-muted-foreground ml-1 tabular-nums">84%</span>
+                <button
+                  onClick={() => setRightPaneOpen(false)}
+                  className="ml-2 size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+                  title="Collapse attribute pane"
+                >
+                  <ChevronRight className="size-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Plus className="size-3.5" /></button>
-              <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Minus className="size-3.5" /></button>
-              <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Maximize2 className="size-3" /></button>
-              <span className="text-xs text-muted-foreground ml-1 tabular-nums">84%</span>
-            </div>
-          </div>
 
-          <AttributeTree />
-        </aside>
+            <AttributeTree />
+          </aside>
+        ) : (
+          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
+            <button
+              onClick={() => setRightPaneOpen(true)}
+              className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+              title="Expand attribute pane"
+            >
+              <ChevronDown className="size-3.5 rotate-90" />
+            </button>
+            <button
+              onClick={() => setRightPaneOpen(true)}
+              className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              title="Expand attribute pane"
+            >
+              <Settings2 className="size-3" /> Attributes
+            </button>
+          </aside>
+        )}
+
       </div>
 
+
       {openAgent && <AgentReviewModal onClose={() => setOpenAgent(false)} />}
+      {evidenceDoc && (
+        <DocumentViewerModal
+          doc={evidenceDoc.doc}
+          attr={evidenceDoc.attr}
+          entity={evidenceDoc.entity}
+          onClose={() => setEvidenceDoc(null)}
+        />
+      )}
+
     </div>
   );
 };
@@ -1026,10 +1369,22 @@ TRACE_DOCS["Designated Members"] = [
 ];
 
 
+
+
+
+
+
 const AttributeTree = () => {
   const [selected, setSelected] = useState<string | null>("Persons with Significant Control");
   const [openEntity, setOpenEntity] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
+  const [traceStepsOpen, setTraceStepsOpen] = useState(false);
+  const [traceDocsOpen, setTraceDocsOpen] = useState(false);
+  const [expandedEntities, setExpandedEntities] = useState<Record<string, boolean>>({});
+  // Reset disclosures when switching attribute
+  useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); }, [selected]);
+
+
   const { runAgents } = useAgents();
 
   const trace = selected ? ATTRIBUTE_TRACES[selected] : null;
@@ -1084,6 +1439,8 @@ const AttributeTree = () => {
         ))}
       </div>
 
+
+
       <p className="text-[10px] text-muted-foreground mt-3 italic">Tip: click an entity name to view its full attribute set & case file.</p>
 
       {trace && (
@@ -1106,24 +1463,6 @@ const AttributeTree = () => {
             </span>
           </div>
 
-          <ol className="space-y-2.5 mb-3">
-            {trace.agents.map((a, i) => (
-              <li key={a.id} className="relative pl-7">
-                <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-medium">{i + 1}</span>
-                {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <p className="text-[12px] font-medium">{a.name}</p>
-                  <ChevronRight className="size-3 text-muted-foreground" />
-                  <p className="text-[12px] text-muted-foreground">{a.action}</p>
-                </div>
-                <p className="text-[12px] text-muted-foreground leading-snug italic">"{a.thought}"</p>
-                <p className="text-[10px] text-primary mt-1 flex items-center gap-1">
-                  <Database className="size-2.5" /> {a.source}
-                </p>
-              </li>
-            ))}
-          </ol>
-
           <div className="rounded-lg border border-border bg-card p-3 mb-3">
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
               <ShieldCheck className="size-3 text-success" /> Verification Conclusion
@@ -1131,34 +1470,73 @@ const AttributeTree = () => {
             <p className="text-[12px] leading-snug">{trace.conclusion}</p>
           </div>
 
-          {traceDocs.length > 0 && (
-            <div className="rounded-lg border border-border bg-card p-3 mb-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1">
-                <Paperclip className="size-3 text-primary" /> Source Documents ({traceDocs.length})
-              </p>
-              <div className="space-y-1.5">
-                {traceDocs.map(({ doc, attr, entity }) => {
-                  const meta = DOC_KIND_META[doc.kind];
-                  return (
-                    <button
-                      key={`${entity}-${doc.id}`}
-                      onClick={() => setViewDoc({ doc, attr, entity })}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-primary hover:bg-info-soft/40 text-left transition-colors group"
-                    >
-                      <FileText className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[12px] font-medium truncate">{doc.title}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{entity} · {doc.source} · {doc.date}</p>
-                      </div>
-                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
-                        {meta.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <button
+            onClick={() => setTraceStepsOpen((v) => !v)}
+            className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 mb-2 hover:bg-secondary/40 transition-colors"
+          >
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <Sparkles className="size-3 text-primary" /> Reasoning steps ({trace.agents.length})
+            </span>
+            <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
+          </button>
+          {traceStepsOpen && (
+            <ol className="space-y-2.5 mb-3 px-1">
+              {trace.agents.map((a, i) => (
+                <li key={a.id} className="relative pl-7">
+                  <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-medium">{i + 1}</span>
+                  {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <p className="text-[12px] font-medium">{a.name}</p>
+                    <ChevronRight className="size-3 text-muted-foreground" />
+                    <p className="text-[12px] text-muted-foreground">{a.action}</p>
+                  </div>
+                  <p className="text-[12px] text-muted-foreground leading-snug italic">"{a.thought}"</p>
+                  <p className="text-[10px] text-primary mt-1 flex items-center gap-1">
+                    <Database className="size-2.5" /> {a.source}
+                  </p>
+                </li>
+              ))}
+            </ol>
           )}
+
+          {traceDocs.length > 0 && (
+            <>
+              <button
+                onClick={() => setTraceDocsOpen((v) => !v)}
+                className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 mb-2 hover:bg-secondary/40 transition-colors"
+              >
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <Paperclip className="size-3 text-primary" /> Source documents ({traceDocs.length})
+                </span>
+                <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
+              </button>
+              {traceDocsOpen && (
+                <div className="space-y-1.5 mb-3">
+                  {traceDocs.map(({ doc, attr, entity }) => {
+                    const meta = DOC_KIND_META[doc.kind];
+                    return (
+                      <button
+                        key={`${entity}-${doc.id}`}
+                        onClick={() => setViewDoc({ doc, attr, entity })}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-primary hover:bg-info-soft/40 text-left transition-colors group"
+                      >
+                        <FileText className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-medium truncate">{doc.title}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{entity} · {doc.source} · {doc.date}</p>
+                        </div>
+                        <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
+                          {meta.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+
 
 
           <div className="flex items-center justify-between">
@@ -1507,9 +1885,21 @@ const DocumentViewerModal = ({ doc, attr, entity, onClose }: { doc: AttrDoc; att
             <button className="text-[11px] px-3 py-1.5 rounded-full border border-border hover:bg-secondary flex items-center gap-1.5">
               <Paperclip className="size-3" /> Attach to case
             </button>
-            <button className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5">
+            <a
+              href={`/sample-docs/${
+                doc.kind === "passport" ? "passport-scan" :
+                doc.kind === "register" ? "fca-register" :
+                doc.kind === "screenshot" ? "crm-screenshot" :
+                doc.kind === "letter" ? "fca-name-change-letter" :
+                "companies-house-psc"
+              }.html`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5"
+            >
               <FileText className="size-3" /> Open original
-            </button>
+            </a>
+
           </div>
         </div>
       </div>
