@@ -17,7 +17,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/kyc-agentic2">
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
