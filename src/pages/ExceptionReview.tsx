@@ -555,6 +555,143 @@ const exceptions: Exc[] = [
       },
     ],
   },
+  // ===== Brookfield Asset Management PIC US, LLC (KYC-30216) =====
+  {
+    id: "b1",
+    title: "Risk Rating Discrepancy",
+    category: "Classification & Risk",
+    confidence: 82,
+    status: "Pending",
+    entity: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216",
+    flagText: "System-generated High Risk classification triggered by Cayman-domiciled ownership entities conflicts with initial Low Risk assessment and prior UK policy closure (January 2026).",
+    narrative: "During onboarding, the addition of Cayman-domiciled ownership entities automatically triggered a High Risk classification. The entity was previously classified as Low Risk under another division's UK policy closure in January 2026 — no material adverse factors were identified at that time. Cayman jurisdiction alone is not considered a high-risk trigger under UK standards. The ultimate beneficial owner is a reputable and known entity. The client has demonstrated full cooperation throughout the process.",
+    reasoningSteps: [
+      "Entity previously classified as Low Risk at UK policy closure in January 2026 — no adverse factors identified.",
+      "Introduction of Cayman-domiciled ownership entities triggered automatic High Risk classification.",
+      "Cayman jurisdiction alone is not a high-risk indicator under UK standards; ultimate beneficial owner is reputable and known.",
+      "Late-stage threshold changes (25% → 10%) would negatively impact client experience without commensurate risk benefit.",
+    ],
+    evidenceRationale: "Internal risk model output and prior classification history are the primary sources. Client cooperation and UBO reputation are mitigating factors.",
+    evidence: [
+      { name: "Internal Risk Model Output", sub: "High Risk triggered · Cayman ownership entities" },
+      { name: "Prior UK Policy Closure (Jan 2026)", sub: "Low Risk — no adverse factors identified" },
+      { name: "Client KYC File", sub: "Full cooperation on record throughout process" },
+    ],
+    acceptability: "A risk rating override is supportable where the trigger is jurisdiction-based and the UBO is a known, reputable entity with no adverse indicators. Compliance sign-off and documented rationale are required.",
+    resolutions: [
+      { id: "r1", title: "Seek Compliance confirmation for 25% ownership threshold", desc: "Request Compliance to confirm that a 25% ownership drilldown threshold is appropriate given the prior low-risk classification, reputable UBO, and jurisdiction-specific interpretation of Cayman exposure.", recommended: true,
+        agents: ["regulatory", "beneficial-owner", "audit"], agentLabel: "Confirm threshold with Compliance",
+        postRunSummary: "Compliance confirmed 25% ownership drilldown threshold is appropriate. Risk rating retained with documented rationale. No additional documentation requests required.",
+        updates: [
+          { attr: "Ownership Threshold", before: "10% (system-triggered)", after: "25% (Compliance-confirmed)" },
+          { attr: "Risk Rating", before: "High (system-generated)", after: "Low (Compliance-approved override)" },
+          { attr: "Rationale Memo", before: "—", after: "MEMO-30216-RISK · Compliance sign-off attached" },
+        ],
+      },
+      { id: "r2", title: "Request formal risk rating override from Compliance", desc: "Request a risk rating exception or override from Compliance to align the entity back to Low/Medium risk, supported by historical assessment, absence of new adverse risk indicators, and client cooperation.",
+        agents: ["regulatory", "risk-scoring", "audit"], agentLabel: "Request risk rating override",
+        postRunSummary: "Risk rating override request submitted to Compliance with supporting rationale. Awaiting Compliance decision.",
+        updates: [
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — Compliance override decision pending" },
+          { attr: "Override Request", before: "—", after: "Submitted to Compliance · MEMO-30216-OVR" },
+        ],
+      },
+      { id: "r3", title: "Escalate to Sales / Coverage for client context", desc: "Engage Sales and Coverage teams to provide client relationship context and support justification for the 25% threshold to avoid additional documentation requests that could disrupt onboarding.",
+        agents: ["outreach", "audit"], agentLabel: "Escalate to Sales and Coverage",
+        postRunSummary: "Sales and Coverage teams engaged for client relationship context. Supporting memo attached to case for Compliance review.",
+        updates: [
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — Sales/Coverage stakeholder input pending" },
+          { attr: "Outreach Log", before: "—", after: "Coverage team notified · Template STAKE_ESCALATE_v1" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "b2",
+    title: "CIP Classification / NAICS Code Discrepancy",
+    category: "Classification & Risk",
+    confidence: 75,
+    status: "Pending",
+    entity: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216",
+    flagText: "Client confirmed entity as NFIE (Non-Financial Entity) but internal due diligence trigger classifies it as a financial/investment entity based on 'Investment adviser / asset manager' NAICS mapping.",
+    narrative: "During onboarding the client confirmed the entity as a Non-Financial Entity (NFIE), indicating it does not consider itself engaged in regulated financial institution activities. The internal trigger is driven by the 'Investment adviser / asset manager' nature of business, commonly associated with financial investment activity. The entity's activities — described by the client as a holding company / financing vehicle — require validation to determine whether they extend beyond intra-group purposes to third-party investment or financial services activity.",
+    reasoningSteps: [
+      "Client explicitly classified entity as Non-Financial Entity (NFIE) during onboarding.",
+      "Internal CIP trigger fired on 'Investment adviser / asset manager' nature-of-business code, typically linked to financial/investment entity classification.",
+      "Resolution requires validation of whether entity activities are strictly intra-group or extend to third-party investment services.",
+      "Outcome determines whether entity remains NFIE or is reclassified as Financial Entity (Investment Entity).",
+    ],
+    evidenceRationale: "Form ADV and client onboarding form are the primary sources. The classification discrepancy requires Legal or Compliance determination.",
+    evidence: [
+      { name: "Form ADV (SEC)", sub: "Nature of business: Investment adviser / asset manager" },
+      { name: "Client Onboarding Response", sub: "Self-classified as NFIE · holding company / financing vehicle" },
+      { name: "Internal CIP Classification Policy", sub: "Financial activity flag triggered by NAICS mapping" },
+    ],
+    acceptability: "NFIE classification is supportable if the entity's activities are strictly intra-group and do not constitute regulated financial services for third parties. Legal review or targeted client outreach is required to substantiate.",
+    resolutions: [
+      { id: "r1", title: "Request Legal team review of NFIE classification", desc: "Engage Legal to assess the appropriateness of the NFIE classification based on nature of business, derivatives access, and whether activities extend to third parties.", recommended: true,
+        agents: ["regulatory", "identity", "audit"], agentLabel: "Legal review of NFIE classification",
+        postRunSummary: "Legal review completed. Entity confirmed as NFIE — activities limited to intra-group financing and advisory services. Classification retained as Non-Financial Entity.",
+        updates: [
+          { attr: "CIP Classification", before: "Exception — Financial activity flag raised", after: "NFIE — confirmed by Legal · MEMO-30216-CIP" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Resolved — Legal-confirmed NFIE classification" },
+        ],
+      },
+      { id: "r2", title: "Targeted client outreach for activity clarification", desc: "Contact client to confirm whether entity performs investment or financial activities for third parties vs strictly intra-group, and clarify the basis for their NFIE classification.",
+        agents: ["outreach", "document", "audit"], agentLabel: "Client outreach for CIP clarification",
+        postRunSummary: "Client outreach sent requesting clarification on nature of activities and basis for NFIE classification. Case held pending client response.",
+        updates: [
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client — CIP clarification requested" },
+          { attr: "Outreach Log", before: "—", after: "Email queued · Template CIP_CLARIFY_v1 · SLA 7 business days" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "b3",
+    title: "Acting Person — Authority Documentation Gap",
+    category: "Beneficial Ownership",
+    confidence: 88,
+    status: "Pending",
+    entity: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216",
+    flagText: "Acting Person identified is not a member of the Vorstand / Executive Management Board. No Power of Attorney or authorised signatory list provided to evidence delegated authority.",
+    narrative: "An Acting Person (AP) has been identified for the entity; however, the individual is not a member of the Vorstand (Executive Management Board) or equivalent governing body. Per KYC guidance, where the Acting Person is not part of the governing body, the individual must have documented authority — evidenced through a Power of Attorney (PoA) or inclusion in an authorised signatory list. No such documentation has been provided, creating a KYC control gap.",
+    reasoningSteps: [
+      "KYC guidance requires Acting Persons not on the governing board to provide explicit delegated authority documentation.",
+      "Acceptable evidence: formal Power of Attorney document, or an authorised signatory list naming the individual.",
+      "No PoA or authorised signatory evidence has been provided or identified in the document locker.",
+      "Without such documentation there is insufficient evidence to validate the individual's authority to act on behalf of the entity.",
+    ],
+    evidenceRationale: "Form ADV Schedule A identifies the Acting Person. Absence of PoA or signatory list is confirmed from the document locker review.",
+    evidence: [
+      { name: "Form ADV Schedule A", sub: "Acting Person identified — not on governing board" },
+      { name: "Client Submitted Documents", sub: "No PoA or authorised signatory list on file" },
+      { name: "KYC Authority Documentation Policy", sub: "PoA or signatory list required for non-board APs" },
+    ],
+    acceptability: "Acting Person designation without supporting authority documentation is not acceptable under current KYC policy. The gap must be resolved before case closure.",
+    resolutions: [
+      { id: "r1", title: "Request Power of Attorney documentation from client", desc: "Reach out to the client to obtain a valid PoA document or authorised signatory list confirming the individual's authority to act on behalf of the entity.", recommended: true,
+        agents: ["outreach", "document", "audit"], agentLabel: "Request PoA from client",
+        postRunSummary: "Client outreach sent requesting Power of Attorney or authorised signatory list. Case held pending receipt of documentation.",
+        updates: [
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client — PoA documentation requested" },
+          { attr: "Outreach Log", before: "—", after: "Email queued · Template POA_REQUEST_v1 · SLA 7 business days" },
+          { attr: "Acting Person Authority", before: "Not evidenced", after: "Pending — PoA requested" },
+        ],
+      },
+      { id: "r2", title: "Revalidate Acting Person — replace with board member", desc: "Request client confirmation on whether the identified Acting Person should be replaced with a Vorstand / Executive Management Board member, or confirm current AP with formal authority documentation.",
+        agents: ["identity", "document", "audit"], agentLabel: "Revalidate Acting Person selection",
+        postRunSummary: "Client confirmed Acting Person selection and provided updated signatory documentation. Case updated with evidenced authority.",
+        updates: [
+          { attr: "Acting Person", before: "Unconfirmed — no authority documentation", after: "Confirmed — PoA / authorised signatory on file" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Resolved — authority documented" },
+        ],
+      },
+    ],
+  },
 ];
 
 // ---------- Side-by-side comparison data per exception ----------
@@ -655,6 +792,34 @@ const COMPARISONS: Record<string, Compare> = {
       { field: "25%+ Beneficial Owner", a: "Long Focus Holdings LLC (100%) — entity, not individual", b: "Chain terminates at Long Focus Holdings LLC; no further public data", conflict: true },
       { field: "FinCEN BOI Filing", a: "Not provided by client", b: "n/a", conflict: true },
       { field: "Companies House (UK branch)", a: "No PSC at >25%", b: "n/a" },
+    ],
+  },
+  b1: {
+    aLabel: "Internal Risk Model Output",
+    bLabel: "Prior UK Policy Closure (Jan 2026)",
+    rows: [
+      { field: "Risk Rating", a: "High (Cayman ownership triggered)", b: "Low (no adverse factors)", conflict: true },
+      { field: "Ownership Threshold Applied", a: "10% (system-triggered)", b: "25% (prior assessment)", conflict: true },
+      { field: "UBO", a: "Brookfield Asset Management group", b: "Brookfield Asset Management group" },
+      { field: "Client Cooperation", a: "Full cooperation on record", b: "Full cooperation on record" },
+    ],
+  },
+  b2: {
+    aLabel: "Form ADV (SEC)",
+    bLabel: "Client Onboarding Response",
+    rows: [
+      { field: "Nature of Business", a: "Investment adviser / asset manager", b: "Holding company / financing vehicle (intra-group)", conflict: true },
+      { field: "CIP Classification", a: "Financial Entity (Investment Entity) — system-triggered", b: "NFIE (Non-Financial Entity) — client confirmed", conflict: true },
+      { field: "Third-Party Activity", a: "Indicates financial investment activity", b: "Intra-group only (per client)", conflict: true },
+    ],
+  },
+  b3: {
+    aLabel: "Form ADV Schedule A",
+    bLabel: "Client Submitted Documents",
+    rows: [
+      { field: "Acting Person Classification", a: "Identified — not on governing board", b: "No authority documentation provided", conflict: true },
+      { field: "Power of Attorney Evidence", a: "Not on file", b: "Not provided", conflict: true },
+      { field: "Authorised Signatory List", a: "Not referenced", b: "Not provided", conflict: true },
     ],
   },
 };
@@ -2140,10 +2305,52 @@ const ENTITY_PROFILES: Record<string, EntityProfile> = {
       { label: "Source of Funds Verified", value: "Yes — management & performance fees", source: "Forge", status: "ok" },
       { label: "EIN / TIN Verified", value: "98-7654321 · IRS verified", source: "3rd", status: "ok" },
     ],
-    caseFile: `# Long Focus Capital Management, LLC\n\n**KYC ID:** KYC-30215  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware) with UK branch  \n**Client Risk Rating:** Medium-High  \n**Open Exceptions:** 5\n\n## Entity Summary\nDelaware-incorporated LLC operating as a SEC-registered investment adviser with a UK branch (FCA #123456). Founded 2012 (previously Focus Capital Partners LLC). Runs long/short equity strategies; AUM $2.4B.\n\n## Registered Particulars\n- **Legal Form:** Limited Liability Company  \n- **Incorporated:** 2012-05-10 · Delaware, USA  \n- **Registered Office:** 1209 Orange Street, Wilmington, DE 19801  \n- **Regulator:** SEC (CRD pending reconciliation — see exception 1)  \n- **GIIN:** 987XYZ.654ABC.AB.123  \n- **US Tax ID:** 98-7654321\n\n## Key People\n| Role | Name |\n|------|------|\n| CEO / Authorized Signatory | Michael J. Anderson |\n| Board Director | Sarah K. Lee |\n| Chief Compliance Officer | Sarah Chen *(attestation outstanding)* |\n\n## Open Exceptions (5)\n1. **US Registration Number Mismatch** — 801-12345 vs 801-67890 (IAPD)\n2. **Outstanding LEI Code** — no GLEIF match\n3. **Principal Place of Business Mismatch** — website vs Form ADV\n4. **Missing Compliance Officer Attestation** — Sarah Chen, signature missing\n5. **Beneficial Ownership Not Identified** — chain ends at Long Focus Holdings LLC\n\n## Next Actions\n1. Verify CRD via SEC IAPD and update to 801-67890.\n2. Request LEI from client (or confirm no reportable derivatives activity).\n3. Adopt Form ADV principal address (456 Broad Avenue).\n4. Send DocuSign attestation to CCO Sarah Chen.\n5. Issue formal FinCEN BOI report request to client.`,
+    caseFile: `# Long Focus Capital Management, LLC\n\n**KYC ID:** KYC-30215  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware) with UK branch  \n**Client Risk Rating:** High  \n**Open Exceptions:** 5\n\n## Entity Summary\nDelaware-incorporated LLC operating as a SEC-registered investment adviser with a UK branch (FCA #123456). Founded 2012 (previously Focus Capital Partners LLC). Runs long/short equity strategies; AUM $2.4B.\n\n## Registered Particulars\n- **Legal Form:** Limited Liability Company  \n- **Incorporated:** 2012-05-10 · Delaware, USA  \n- **Registered Office:** 1209 Orange Street, Wilmington, DE 19801  \n- **Regulator:** SEC (CRD pending reconciliation — see exception 1)  \n- **GIIN:** 987XYZ.654ABC.AB.123  \n- **US Tax ID:** 98-7654321\n\n## Key People\n| Role | Name |\n|------|------|\n| CEO / Authorized Signatory | Michael J. Anderson |\n| Board Director | Sarah K. Lee |\n| Chief Compliance Officer | Sarah Chen *(attestation outstanding)* |\n\n## Open Exceptions (5)\n1. **US Registration Number Mismatch** — 801-12345 vs 801-67890 (IAPD)\n2. **Outstanding LEI Code** — no GLEIF match\n3. **Principal Place of Business Mismatch** — website vs Form ADV\n4. **Missing Compliance Officer Attestation** — Sarah Chen, signature missing\n5. **Beneficial Ownership Not Identified** — chain ends at Long Focus Holdings LLC\n\n## Next Actions\n1. Verify CRD via SEC IAPD and update to 801-67890.\n2. Request LEI from client (or confirm no reportable derivatives activity).\n3. Adopt Form ADV principal address (456 Broad Avenue).\n4. Send DocuSign attestation to CCO Sarah Chen.\n5. Issue formal FinCEN BOI report request to client.`,
+  },
+  "Brookfield Asset Management PIC US, LLC": {
+    name: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216",
+    attrs: [
+      { label: "Entity Name", value: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", source: "CRM", status: "ok" },
+      { label: "Legal Entity Type", value: "Limited Liability Company", source: "3rd", status: "ok" },
+      { label: "Country of Incorporation", value: "United States (Delaware)", source: "3rd", status: "ok" },
+      { label: "Date of Incorporation", value: "2009-07-22", source: "3rd", status: "ok" },
+      { label: "LEI Code", value: "549300FML6EDDNTAVG88", source: "3rd", status: "ok" },
+      { label: "Trading Names", value: "BAM PIC US", source: "CRM", status: "ok" },
+      { label: "Previous Names", value: "None", source: "CRM", status: "ok" },
+      { label: "Verification of Existence", value: "Active — SEC registered investment adviser + Delaware entity", source: "3rd", status: "ok" },
+      { label: "US Registration Number", value: "CRD: 151599 / SEC#: 801-72031", source: "3rd", status: "ok" },
+      { label: "UK Registration Number", value: "Not applicable", source: "CRM", status: "ok" },
+      { label: "Regulator", value: "U.S. SEC (registered investment adviser)", source: "3rd", status: "ok" },
+      { label: "Listing Status", value: "Not listed (private LLC)", source: "3rd", status: "ok" },
+      { label: "Legal Registered Address", value: "C/O Corporation Service Company, 251 Little Falls Drive, Wilmington, DE 19808, USA", source: "3rd", status: "ok" },
+      { label: "Principal Place of Business", value: "225 Liberty Street, 8th Floor, New York, NY 10281-1023, USA", source: "3rd", status: "ok" },
+      { label: "Website", value: "www.brookfield.com", source: "3rd", status: "ok" },
+      { label: "Entity Classification", value: "Investment adviser / asset manager", source: "Forge", status: "alert" },
+      { label: "Entity Risk Rating", value: "High (system) vs Low (initial classification Jan 2026)", source: "Forge", status: "alert" },
+      { label: "CIP Classification", value: "NFIE (client-confirmed) vs Financial Entity (system-flagged)", source: "Forge", status: "alert" },
+      { label: "Nature of Business", value: "Investment advisory services — private funds, pooled vehicles, institutional accounts", source: "CRM", status: "ok" },
+      { label: "Sole Proprietorship", value: "No", source: "CRM", status: "ok" },
+      { label: "Parent Listed on US Exchange", value: "Yes — Brookfield Asset Management group", source: "CRM", status: "ok" },
+      { label: "Other Business Activity", value: "Multi-sector alternatives — real estate, infrastructure, energy, private equity", source: "CRM", status: "ok" },
+      { label: "Source of Funds", value: "Institutional investor capital (pooled vehicles, funds)", source: "CRM", status: "ok" },
+      { label: "Source of Wealth", value: "Investment management earnings / fund structures", source: "CRM", status: "ok" },
+      { label: "Assets Under Management", value: "~USD 105.3B (regulatory AUM, Dec 31 2025)", source: "CRM", status: "ok" },
+      { label: "Transacting With", value: "Third-party client funds", source: "CRM", status: "ok" },
+      { label: "Sub-Advisor Name", value: "Fairfield Realty Advisors LLC, Thayer Lodging Group LLC", source: "CRM", status: "ok" },
+      { label: "Key Controller", value: "Brookfield Asset Management group", source: "3rd", status: "ok" },
+      { label: "Beneficial Owner (25%+)", value: "Brookfield Asset Management group", source: "3rd", status: "ok" },
+      { label: "Acting Person", value: "Identified — authority documentation pending (PoA required)", source: "Forge", status: "alert" },
+      { label: "Power of Attorney", value: "Not provided", source: "CRM", status: "warn" },
+      { label: "Sanctions Screening", value: "Cleared — 2026-05-20 (OFAC/EU/UN/HMT)", source: "3rd", status: "ok" },
+      { label: "PEP Screening", value: "No Match", source: "3rd", status: "ok" },
+      { label: "Adverse Media Screening", value: "No Material Adverse Media", source: "3rd", status: "ok" },
+      { label: "Last KYC Refresh", value: "2026-01-15 (UK policy closure)", source: "Forge", status: "ok" },
+      { label: "Next KYC Refresh Due", value: "2027-01-15 (Annual)", source: "Forge", status: "ok" },
+    ],
+    caseFile: `# Brookfield Asset Management PIC US, LLC\n\n**KYC ID:** KYC-30216  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware)  \n**Client Risk Rating:** Low (initial) / High (system — Cayman entities)  \n**Open Exceptions:** 3\n\n## Entity Summary\nDelaware-incorporated LLC operating as a SEC-registered investment adviser under the Brookfield Asset Management group. Provides investment advisory services to private funds, pooled vehicles, and institutional accounts across real estate and alternative assets. Regulatory AUM approximately USD 105.3B (Dec 2025).\n\n## Registered Particulars\n- **Legal Form:** Limited Liability Company  \n- **Incorporated:** 2009-07-22 · Delaware, USA  \n- **Registered Office:** C/O Corporation Service Company, 251 Little Falls Drive, Wilmington, DE 19808  \n- **Principal Office:** 225 Liberty Street, 8th Floor, New York, NY 10281-1023  \n- **Regulator:** U.S. SEC · CRD 151599 / SEC# 801-72031  \n- **LEI:** 549300FML6EDDNTAVG88  \n- **Parent:** Brookfield Asset Management group (publicly listed)\n\n## Sub-Advisers\n- Fairfield Realty Advisors LLC\n- Thayer Lodging Group LLC\n\n## Open Exceptions (3)\n1. **Risk Rating Discrepancy** — System High vs initial Low (Cayman ownership trigger)\n2. **CIP Classification / NAICS Code** — Client confirmed NFIE vs system Financial Entity flag\n3. **Acting Person Authority Documentation Gap** — PoA or signatory list required\n\n## Next Actions\n1. Seek Compliance confirmation for 25% ownership drilldown threshold.\n2. Engage Legal to assess NFIE vs Financial Entity classification.\n3. Request Power of Attorney or authorised signatory list from client.`,
   },
 };
-
 
 const TRACE_ALIAS: Record<string, string[]> = {
   "Persons of Significant Control": ["Persons with Significant Control"],
@@ -2274,6 +2481,25 @@ const CASE_DOCUMENTS: CaseDoc[] = [
     kyc: "KYC-30215", source: "longfocuscapital.com (archived)", kind: "screenshot", date: "2026-05-18", size: "—",
     url: "/sample-docs/crm-snapshot-mw.pdf",
     linkedAttrs: ["Principal Place of Business"],
+  },
+  // ===== Brookfield Asset Management PIC US, LLC =====
+  {
+    id: "d14", title: "SEC Form ADV Part 1A", entity: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216", source: "SEC IAPD", kind: "filing", date: "2026-03-31", size: "—",
+    url: "/sample-docs/cs01-brevan-howard.pdf",
+    linkedAttrs: ["US Registration Number", "Entity Classification", "Principal Place of Business"],
+  },
+  {
+    id: "d15", title: "Delaware Entity Registry — Active Status", entity: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216", source: "Delaware Division of Corporations", kind: "register", date: "2026-05-20", size: "—",
+    url: "/sample-docs/psc-register-brevan-howard.pdf",
+    linkedAttrs: ["Legal Entity Type", "Date of Incorporation", "Legal Registered Address"],
+  },
+  {
+    id: "d16", title: "Internal Risk Classification Record", entity: "Brookfield Asset Management PIC US, LLC",
+    kyc: "KYC-30216", source: "Forge · Risk Engine", kind: "screenshot", date: "2026-05-15", size: "—",
+    url: "/sample-docs/crm-snapshot-mw.pdf",
+    linkedAttrs: ["Entity Risk Rating", "CIP Classification"],
   },
 ];
 
@@ -2437,6 +2663,10 @@ const ENTITY_GROUPS: Record<string, { drg: string; attrs: string[] }> = {
   "Long Focus Capital Management, LLC": {
     drg: "US Private Equity DRG",
     attrs: ["US Registration Number", "LEI Code", "Principal Place of Business", "Compliance Officer Attestation", "Beneficial Owner (25%+)"],
+  },
+  "Brookfield Asset Management PIC US, LLC": {
+    drg: "US Private Equity DRG",
+    attrs: ["Entity Risk Rating", "CIP Classification", "Acting Person", "Entity Classification"],
   },
 };
 
@@ -3716,6 +3946,14 @@ const COMMENTS_BY_KYC: Record<string, CaseComment[]> = {
     { author: "Document Agent", initials: "AI", role: "AI · auto-note", time: "April 20, 2026, 4:30 PM", kind: "ai",
       body: "Pulled Form ADV Part 1A from SEC IAPD. Compliance officer attestation date precedes last refresh." },
   ],
+  "KYC-30216": [
+    { author: "Priya Patel", initials: "PP", role: "Approver · L3", time: "Today, 9:15 AM", kind: "comment",
+      body: "Risk rating discrepancy needs Compliance sign-off before we can proceed. Escalating to the risk committee." },
+    { author: "Risk Agent", initials: "AI", role: "AI · auto-note", time: "Yesterday, 11:30 AM", kind: "ai",
+      body: "Cayman-domiciled ownership entities detected in submitted structure chart. Risk model auto-triggered High classification per jurisdiction matrix." },
+    { author: "Dana Ortiz", initials: "DO", role: "US Compliance", time: "May 20, 2026, 3:45 PM", kind: "comment",
+      body: "Reviewing NFIE vs Investment Entity classification — awaiting Legal's position on the nature-of-business trigger." },
+  ],
 };
 
 const kindTone: Record<CaseComment["kind"], string> = {
@@ -3741,6 +3979,11 @@ const TASKS_BY_KYC: Record<string, CaseTask[]> = {
     { title: "Obtain GLEIF LEI re-issue confirmation", assignee: "Marcus Lee", due: "Apr 29", status: "Open" },
     { title: "Re-verify Form ADV compliance officer attestation", assignee: "You", due: "May 03", status: "Open" },
   ],
+  "KYC-30216": [
+    { title: "Obtain Compliance sign-off on 25% threshold", assignee: "Priya Patel", due: "Jun 15", status: "In Progress" },
+    { title: "Request Power of Attorney from client", assignee: "You", due: "Jun 10", status: "Open" },
+    { title: "Legal review — NFIE vs Financial Entity classification", assignee: "Dana Ortiz", due: "Jun 20", status: "Open" },
+  ],
 };
 
 type Watcher = { name: string; initials: string; role: string };
@@ -3757,6 +4000,11 @@ const WATCHERS_BY_KYC: Record<string, Watcher[]> = {
   "KYC-30215": [
     { name: "Marcus Lee", initials: "ML", role: "Reviewer · L2" },
     { name: "Dana Ortiz", initials: "DO", role: "US Compliance" },
+  ],
+  "KYC-30216": [
+    { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
+    { name: "Dana Ortiz", initials: "DO", role: "US Compliance" },
+    { name: "Quinn Doe", initials: "QD", role: "Reviewer · L2" },
   ],
 };
 

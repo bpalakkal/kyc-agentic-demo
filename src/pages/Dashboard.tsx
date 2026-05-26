@@ -11,6 +11,7 @@ const priorityCases = [
   { priority: "High", id: "KYC-30188", entity: "Marshall Wace LLP", note: "FCA permission scope change pending evidence — SLA closes today.", due: "Today", est: "30 min", status: "open" },
   { priority: "Medium", id: "KYC-30201", entity: "Brevan Howard Asset Management LLP", note: "Jersey-domiciled corporate member triggers EDD review.", due: "Tomorrow", est: "20 min", status: "open" },
   { priority: "Medium", id: "KYC-30207", entity: "Marshall Wace LLP", note: "AUM disclosure 2025 not yet reconciled with FCA Gabriel return.", due: "Friday", est: "1.5 hrs", status: "open" },
+  { priority: "Medium", id: "KYC-30216", entity: "Brookfield Asset Management PIC US, LLC", note: "Risk rating discrepancy — Cayman ownership triggered High vs initial Low. Compliance sign-off pending.", due: "Jun 30", est: "30 min", status: "open" },
   { priority: "Low", id: "KYC-30222", entity: "Brevan Howard Asset Management LLP", note: "Previous company name 'Rivage Capital' chain-of-title verification.", due: "Next Week", est: "15 min", status: "open" },
 ] as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
 

@@ -39,6 +39,7 @@ const groups: Group[] = [
     priorityTone: "medium",
     rows: [
       { id: "r10", name: "Long Focus Capital Management, LLC", kyc: "KYC-30215", due: "Jul 02, 2026", confidence: "93%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE / UK", priority: "High", risk: "Elevated", exc: 5, status: "In Progress", action: "Periodic Refresh", selectable: true },
+      { id: "r18", name: "Brookfield Asset Management PIC US, LLC", kyc: "KYC-30216", due: "Jun 30, 2026", confidence: "91%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE", priority: "Medium", risk: "Moderate", exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true },
       { id: "r11", name: "Apollo Capital Management LP", due: "Jul 02, 2026", confidence: "94%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE", priority: "Medium", risk: "Moderate", exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true },
       { id: "r12", name: "Silver Lake Management Co. LLC", due: "Jul 15, 2026", confidence: "91%", customerType: "Registered Investment Adviser", jurisdiction: "US — CA", priority: "Medium", risk: "Moderate", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
       { id: "r17", name: "Vista Equity Partners Management LLC", due: "Jul 21, 2026", confidence: "96%", customerType: "Registered Investment Adviser", jurisdiction: "US — TX", priority: "Low", risk: "Minimal", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
