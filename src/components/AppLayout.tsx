@@ -7,7 +7,6 @@ const tabs = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/work-queue", label: "Work Queue" },
   { to: "/reports", label: "Reports" },
-  { to: "/evidence-locker", label: "Evidence Locker" },
 ];
 
 const AppLayout = () => {

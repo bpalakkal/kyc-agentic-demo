@@ -25,13 +25,19 @@ const aiActions = [
 ];
 
 type CollabType = "comment" | "ai" | "document" | "action";
-const collab: { type: CollabType; title: string; time: string }[] = [
-  { type: "comment", title: "Quinn Doe commented on Brevan Howard case file", time: "Today, 7:08 AM" },
-  { type: "ai", title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM" },
-  { type: "action", title: "You confirmed PSC for Marshall Wace LLP", time: "April 22, 2026, 7:18 AM" },
-  { type: "comment", title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM" },
-  { type: "document", title: "Form CS01 uploaded to KYC-30214", time: "April 21, 2026, 4:40 PM" },
-  { type: "ai", title: "AI Agent auto-cleared 1 sanctions false positive", time: "April 21, 2026, 2:11 PM" },
+type CaseRef = { name: string; kyc: string };
+const BREVAN: CaseRef = { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" };
+const MW: CaseRef = { name: "Marshall Wace LLP", kyc: "KYC-30188" };
+const LONG_FOCUS: CaseRef = { name: "Long Focus Capital Management, LLC", kyc: "KYC-30215" };
+
+const collab: { type: CollabType; title: string; time: string; case: CaseRef; snippet?: string }[] = [
+  { type: "comment", title: "Quinn Doe commented on Brevan Howard case file", time: "Today, 7:08 AM", case: BREVAN, snippet: "PSC02 should land within SLA — sent reminder to client compliance." },
+  { type: "ai", title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM", case: BREVAN, snippet: "Auto-refreshed CS01 + PSC register for OC302636." },
+  { type: "action", title: "You confirmed PSC for Marshall Wace LLP", time: "April 22, 2026, 7:18 AM", case: MW },
+  { type: "comment", title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM", case: BREVAN, snippet: "BH Partnership Holdings (Jersey) needs source-of-funds before sign-off." },
+  { type: "document", title: "Form CS01 uploaded to KYC-30214", time: "April 21, 2026, 4:40 PM", case: BREVAN },
+  { type: "ai", title: "AI Agent auto-cleared 1 sanctions false positive", time: "April 21, 2026, 2:11 PM", case: MW, snippet: "DOB + nationality divergence confirmed, cleared by sanctions agent." },
+  { type: "comment", title: "Marcus Lee left a note on Long Focus Capital", time: "April 21, 2026, 11:02 AM", case: LONG_FOCUS, snippet: "LEI mismatch with GLEIF — need re-issue confirmation from client." },
 ];
 
 const collabMeta: Record<CollabType, { label: string; icon: typeof MessageSquare; tone: string }> = {
@@ -382,14 +388,28 @@ const Dashboard = () => {
               const meta = collabMeta[c.type];
               const Icon = meta.icon;
               return (
-                <li key={i} className="flex items-start gap-3">
-                  <span className={cn("size-7 rounded-md grid place-items-center shrink-0", meta.tone)}>
-                    <Icon className="size-3.5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[13px] leading-tight">{c.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{c.time}</p>
-                  </div>
+                <li key={i}>
+                  <Link
+                    to="/work-queue/review"
+                    state={{ entities: [c.case] }}
+                    className="flex items-start gap-3 -mx-2 px-2 py-1.5 rounded-md hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className={cn("size-7 rounded-md grid place-items-center shrink-0", meta.tone)}>
+                      <Icon className="size-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] leading-tight">{c.title}</p>
+                      {c.snippet && (
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 italic">"{c.snippet}"</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground/80 mt-1 flex items-center gap-1.5">
+                        <span className="font-medium text-foreground/70">{c.case.kyc}</span>
+                        <span>·</span>
+                        <span className="truncate">{c.case.name}</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground/70 mt-0.5">{c.time}</p>
+                    </div>
+                  </Link>
                 </li>
               );
             })}

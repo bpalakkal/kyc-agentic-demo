@@ -4,7 +4,7 @@ import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Lock, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId } from "@/components/AgentSystem";
@@ -699,11 +699,39 @@ const ExceptionReview = () => {
     [navState],
   );
   const selectedKycSet = useMemo(() => new Set(selectedEntities.map((e) => e.kyc)), [selectedEntities]);
+  const selectedNameSet = useMemo(() => new Set(selectedEntities.map((e) => e.name)), [selectedEntities]);
   const filteredExceptions = useMemo(
-    () => exceptions.filter((e) => selectedKycSet.has(e.kyc)),
-    [selectedKycSet],
+    () => exceptions.filter((e) => selectedKycSet.has(e.kyc) || selectedNameSet.has(e.entity)),
+    [selectedKycSet, selectedNameSet],
   );
-  const initialActiveId = filteredExceptions[0]?.id ?? exceptions[0].id;
+
+  // Build a placeholder exception for a selected entity that has no curated exceptions
+  const buildStubException = (ent: { name: string; kyc: string }): Exc => ({
+    id: `stub-${ent.kyc || ent.name}`,
+    title: "No open exceptions",
+    category: "Review",
+    confidence: 100,
+    status: "Addressed",
+    entity: ent.name,
+    kyc: ent.kyc,
+    flagText: `No outstanding exceptions are currently flagged for ${ent.name}. Review attributes and documents in the right pane.`,
+    narrative: `${ent.name} (${ent.kyc}) has no open exception items in this case. All curated checks have either been resolved or are not applicable. Use the Attributes and Document Locker panels to inspect the underlying data.`,
+    reasoningSteps: [
+      `Loaded entity profile for ${ent.name}.`,
+      "No exception rows matched the selection in the curated exception set.",
+      "Rendering an informational placeholder so the detail view reflects the selected case.",
+    ],
+    evidenceRationale: "No evidence required — informational placeholder.",
+    evidence: [],
+    acceptability: "Acceptable — no action required.",
+    resolutions: [],
+  });
+
+  const effectiveExceptions = useMemo(
+    () => (filteredExceptions.length > 0 ? filteredExceptions : selectedEntities.map(buildStubException)),
+    [filteredExceptions, selectedEntities],
+  );
+  const initialActiveId = effectiveExceptions[0]?.id ?? exceptions[0].id;
 
   const [activeId, setActiveId] = useState(initialActiveId);
   const [openAgent, setOpenAgent] = useState(false);
@@ -713,21 +741,21 @@ const ExceptionReview = () => {
   const [showEvidence, setShowEvidence] = useState(false);
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"attrs" | "locker">("attrs");
+  const [rightTab, setRightTab] = useState<"attrs" | "locker" | "collab">("attrs");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
   
   
   const { runAgents, isRunning, currentLabel, runs } = useAgents();
 
-  // If selection changes and current active is no longer in filtered set, reset
+  // If selection changes and current active is no longer in the effective set, reset
   useEffect(() => {
-    if (!filteredExceptions.find((e) => e.id === activeId)) {
-      setActiveId(filteredExceptions[0]?.id ?? exceptions[0].id);
+    if (!effectiveExceptions.find((e) => e.id === activeId)) {
+      setActiveId(effectiveExceptions[0]?.id ?? exceptions[0].id);
     }
-  }, [filteredExceptions, activeId]);
+  }, [effectiveExceptions, activeId]);
 
-  const active = (filteredExceptions.find((e) => e.id === activeId) ?? exceptions.find((e) => e.id === activeId))!;
+  const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0] ?? exceptions[0])!;
 
   const openEvidence = (ev: Evidence) => {
     const lower = ev.name.toLowerCase();
@@ -801,8 +829,8 @@ const ExceptionReview = () => {
     }
   }, [isRunning, runs, currentLabel, selectedResolution, active]);
 
-  const addressedCount = Object.keys(resolvedMap).filter((id) => filteredExceptions.find((e) => e.id === id)).length;
-  const headerMeta = buildHeaderMeta(addressedCount, filteredExceptions.length);
+  const addressedCount = Object.keys(resolvedMap).filter((id) => effectiveExceptions.find((e) => e.id === id)).length;
+  const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length);
 
 
 
@@ -915,10 +943,10 @@ const ExceptionReview = () => {
         <aside className="border-r border-border pr-6">
           <div className="flex items-center gap-2 mb-3">
             <Settings2 className="size-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({filteredExceptions.length})</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({effectiveExceptions.length})</span>
           </div>
           <ul className="space-y-2">
-            {filteredExceptions.map((e) => {
+            {effectiveExceptions.map((e) => {
               const isActive = e.id === activeId;
               const resolved = resolvedMap[e.id];
               const isResolved = Boolean(resolved);
@@ -1291,6 +1319,18 @@ const ExceptionReview = () => {
                   <FileText className="size-4" /> Document Locker
                   <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length}</span>
                 </button>
+                <button
+                  onClick={() => setRightTab("collab")}
+                  className={cn(
+                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                    rightTab === "collab"
+                      ? "font-medium border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <MessageSquare className="size-3.5" /> Collaboration
+                  <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{(COMMENTS_BY_KYC[active.kyc]?.length ?? 0)}</span>
+                </button>
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -1303,23 +1343,39 @@ const ExceptionReview = () => {
               </div>
             </div>
 
-            {rightTab === "attrs" ? <AttributeTree selectedEntities={selectedEntities} /> : <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
+            {rightTab === "attrs" && <AttributeTree selectedEntities={selectedEntities} />}
+            {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
+            {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
           </aside>
         ) : (
-          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
+          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-3">
             <button
               onClick={() => setRightPaneOpen(true)}
               className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
-              title="Expand attribute pane"
+              title="Expand right pane"
             >
               <ChevronDown className="size-3.5 rotate-90" />
             </button>
             <button
-              onClick={() => setRightPaneOpen(true)}
-              className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
-              title="Expand attribute pane"
+              onClick={() => { setRightPaneOpen(true); setRightTab("attrs"); }}
+              className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              title="Attributes"
             >
               <Settings2 className="size-3" /> Attributes
+            </button>
+            <button
+              onClick={() => { setRightPaneOpen(true); setRightTab("locker"); }}
+              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              title="Document Locker"
+            >
+              <FileText className="size-3" /> Documents
+            </button>
+            <button
+              onClick={() => { setRightPaneOpen(true); setRightTab("collab"); }}
+              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              title="Collaboration"
+            >
+              <MessageSquare className="size-3" /> Collaboration
             </button>
           </aside>
         )}
@@ -2076,35 +2132,175 @@ const ENTITY_GROUPS: Record<string, { drg: string; attrs: string[] }> = {
   },
 };
 
+// Attribute category taxonomy — ordered; first category is expanded by default
+const ATTR_CATEGORY_ORDER = [
+  "Entity Identification",
+  "Registration & Regulatory",
+  "Address & Operations",
+  "Classification & Risk",
+  "Financial Profile",
+  "Officers & Signatories",
+  "Ownership & Control",
+] as const;
+type AttrCategory = (typeof ATTR_CATEGORY_ORDER)[number];
+
+const ATTR_CATEGORY_MAP: Record<string, AttrCategory> = {
+  // Entity Identification
+  "Entity Name": "Entity Identification",
+  "Legal Form": "Entity Identification",
+  "Legal Entity Type": "Entity Identification",
+  "Company Number": "Entity Identification",
+  "US Registration Number": "Entity Identification",
+  "UK Registration Number": "Entity Identification",
+  "Country of Incorporation": "Entity Identification",
+  "Incorporated On": "Entity Identification",
+  "Date of Incorporation": "Entity Identification",
+  "Company Status": "Entity Identification",
+  "Trading Names": "Entity Identification",
+  "Previous Names": "Entity Identification",
+  "Previous Company Names": "Entity Identification",
+  "LEI Code": "Entity Identification",
+  "Entity GIIN": "Entity Identification",
+  "US Tax ID": "Entity Identification",
+  "UK Tax ID": "Entity Identification",
+  "EIN / TIN Verified": "Entity Identification",
+  "Verification of Existence": "Entity Identification",
+  "Constituent Entities": "Entity Identification",
+  "Entity Count": "Entity Identification",
+  "Jurisdiction": "Entity Identification",
+  // Registration & Regulatory
+  "Primary Regulator": "Registration & Regulatory",
+  "Regulator": "Registration & Regulatory",
+  "FCA Permissions": "Registration & Regulatory",
+  "FCA Regulatory Permissions": "Registration & Regulatory",
+  "Listing Status": "Registration & Regulatory",
+  "Section 13 / 15d Indicator": "Registration & Regulatory",
+  "CFTC Registered": "Registration & Regulatory",
+  "AML Policy Version": "Registration & Regulatory",
+  "KYC Refresh Cycle": "Registration & Regulatory",
+  "Last KYC Refresh": "Registration & Regulatory",
+  "Next KYC Refresh Due": "Registration & Regulatory",
+  "Wolfsberg Questionnaire": "Registration & Regulatory",
+  "CIP Status": "Registration & Regulatory",
+  "Compliance Officer Attestation": "Registration & Regulatory",
+  "MLRO / Equivalent": "Registration & Regulatory",
+  // Address & Operations
+  "Registered Office": "Address & Operations",
+  "Legal Registered Address": "Address & Operations",
+  "Principal Place of Business": "Address & Operations",
+  "Foreign Branches": "Address & Operations",
+  "Sub-Advisor Address": "Address & Operations",
+  "Nature of Business": "Address & Operations",
+  "Other Business Activity": "Address & Operations",
+  "Sole Proprietorship": "Address & Operations",
+  "Parent Listed on US Exchange": "Address & Operations",
+  "List of Subsidiaries": "Address & Operations",
+  // Classification & Risk
+  "Entity Classification": "Classification & Risk",
+  "Entity Risk Rating": "Classification & Risk",
+  "CIP Classification": "Classification & Risk",
+  "Customer Type": "Classification & Risk",
+  "Risk Tier": "Classification & Risk",
+  "Cross-Border Exposure": "Classification & Risk",
+  "Open Exceptions": "Classification & Risk",
+  "Sanctions Screening": "Classification & Risk",
+  "PEP Screening": "Classification & Risk",
+  "PEP Exposure": "Classification & Risk",
+  "Adverse Media Screening": "Classification & Risk",
+  "Tax Residency": "Classification & Risk",
+  "FATCA Classification": "Classification & Risk",
+  "CRS Classification": "Classification & Risk",
+  // Financial Profile
+  "AUM Disclosed": "Financial Profile",
+  "Assets Under Management": "Financial Profile",
+  "Source of Funds": "Financial Profile",
+  "Source of Funds Verified": "Financial Profile",
+  "Source of Wealth": "Financial Profile",
+  "Transacting With": "Financial Profile",
+  // Officers & Signatories
+  "Corporate Officer": "Officers & Signatories",
+  "Board Directors": "Officers & Signatories",
+  "Designated Members": "Officers & Signatories",
+  "Authorized Signatory": "Officers & Signatories",
+  "Power of Attorney": "Officers & Signatories",
+  "PSC Date of Birth": "Officers & Signatories",
+  "PSC Nationality": "Officers & Signatories",
+  // Ownership & Control
+  "Controllers": "Ownership & Control",
+  "Persons of Significant Control": "Ownership & Control",
+  "Persons with Significant Control": "Ownership & Control",
+  "Key Controller": "Ownership & Control",
+  "Beneficial Owner (25%+)": "Ownership & Control",
+  "Trustee": "Ownership & Control",
+};
+
+const categoryOf = (label: string): AttrCategory =>
+  ATTR_CATEGORY_MAP[label] ?? "Entity Identification";
+
+type SelectedAttr = { label: string; entity: string };
+
 const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string; kyc: string }[] }) => {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<SelectedAttr | null>(null);
   const [openEntity, setOpenEntity] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [traceStepsOpen, setTraceStepsOpen] = useState(false);
   const [traceDocsOpen, setTraceDocsOpen] = useState(false);
-  const [expandedEntities, setExpandedEntities] = useState<Record<string, boolean>>({});
-  const [showAllAttrs, setShowAllAttrs] = useState(false);
+  const [showOnlyPending, setShowOnlyPending] = useState(false);
+  // entity::category -> open
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
   // Reset disclosures when switching attribute
   useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); }, [selected]);
 
 
   const { runAgents } = useAgents();
 
-  const trace = selected ? ATTRIBUTE_TRACES[selected] : null;
-  const traceDocs = selected ? TRACE_DOCS[selected] ?? [] : [];
+  // Resolve trace — preferring the curated ATTRIBUTE_TRACES, falling back to a
+  // synthesized trace from the entity profile so every clicked attribute shows
+  // provenance information.
+  const trace = useMemo(() => {
+    if (!selected) return null;
+    const curated = ATTRIBUTE_TRACES[selected.label];
+    if (curated) return curated;
+    const pa = ENTITY_PROFILES[selected.entity]?.attrs.find((x) => x.label === selected.label);
+    if (!pa) return null;
+    const agent = SOURCE_AGENT[pa.source];
+    const status: "verified" | "flagged" = pa.status === "ok" ? "verified" : "flagged";
+    return {
+      value: pa.value,
+      status,
+      confidence: pa.status === "ok" ? 96 : pa.status === "warn" ? 82 : 64,
+      agents: [
+        { id: "document" as AgentId, name: agent.name, action: "Resolved attribute value", thought: `Returned "${pa.value}" from ${agent.system} for ${selected.entity}.`, source: agent.system },
+        { id: "audit" as AgentId, name: "Audit Agent", action: "Stamped provenance entry", thought: "Wrote retrieval snapshot and source citation to the immutable audit log.", source: `Audit Log · ${selected.entity}` },
+      ],
+      conclusion:
+        pa.status === "ok"
+          ? "Attribute resolved cleanly against record-of-truth; no divergence detected."
+          : pa.status === "warn"
+          ? "Attribute resolved but a deviation was detected against linked sources — analyst review queued."
+          : "Attribute violates policy threshold or required check — routed to exception queue for analyst action.",
+    } as AttrTrace;
+  }, [selected]);
+
+  const traceDocs = useMemo(() => {
+    if (!selected) return [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[];
+    const pa = ENTITY_PROFILES[selected.entity]?.attrs.find((x) => x.label === selected.label);
+    if (pa?.docs?.length) return pa.docs.map((d) => ({ entity: selected.entity, attr: pa, doc: d }));
+    return (TRACE_DOCS[selected.label] ?? []).filter((d) => d.entity === selected.entity);
+  }, [selected]);
 
 
-  const attrNode = (name: string, flagged = false) => {
-    const isSel = selected === name;
+  const attrNode = (label: string, entity: string, flagged: boolean) => {
+    const isSel = selected?.label === label && selected?.entity === entity;
     return (
       <button
-        onClick={() => setSelected(isSel ? null : name)}
+        onClick={() => setSelected(isSel ? null : { label, entity })}
         className={cn(
           "w-full rounded-lg border px-3 py-2 flex items-center justify-between text-left transition-colors",
           isSel ? "border-primary bg-info-soft" : flagged ? "border-alert hover:bg-alert-soft/30" : "border-border hover:bg-secondary/40"
         )}
       >
-        <span className="text-[12px] font-medium truncate">{name}</span>
+        <span className="text-[12px] font-medium truncate">{label}</span>
         {flagged ? <AlertTriangle className="size-4 text-alert shrink-0" /> : <CheckCircle2 className="size-4 text-success shrink-0" />}
       </button>
     );
@@ -2125,14 +2321,14 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
     ? selectedEntities.filter((e) => ENTITY_GROUPS[e.name]).map((e) => ({ entity: e.name, ...ENTITY_GROUPS[e.name] }))
     : Object.entries(ENTITY_GROUPS).filter(([n]) => n !== "Long Focus Capital Management, LLC").map(([entity, v]) => ({ entity, ...v }));
 
-  const entitiesForTree = showAllAttrs
-    ? baseEntities.map((e) => {
-        const profile = ENTITY_PROFILES[e.entity];
-        const allLabels = profile?.attrs.map((a) => a.label) ?? [];
-        const merged = Array.from(new Set([...e.attrs, ...allLabels]));
-        return { ...e, attrs: merged };
-      })
-    : baseEntities;
+  // Always merge in every attribute the entity profile knows about so the tree
+  // can group them by category.
+  const entitiesForTree = baseEntities.map((e) => {
+    const profile = ENTITY_PROFILES[e.entity];
+    const allLabels = profile?.attrs.map((a) => a.label) ?? [];
+    const merged = Array.from(new Set([...e.attrs, ...allLabels]));
+    return { ...e, attrs: merged };
+  });
 
   // Group by DRG parent
   const drgGroups = entitiesForTree.reduce<Record<string, typeof entitiesForTree>>((acc, e) => {
@@ -2141,22 +2337,47 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
   }, {});
   const drgEntries = Object.entries(drgGroups);
 
+  // Helper: per entity, return ordered [category, labels[]] for those categories that have at least one (visible) attribute
+  const categorize = (entity: string, attrs: string[]) => {
+    const profile = ENTITY_PROFILES[entity];
+    const isFlagged = (label: string) => {
+      const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
+      const pa = profile?.attrs.find((x) => x.label === label);
+      return traceFlagged || pa?.status === "alert" || pa?.status === "warn";
+    };
+    const filtered = showOnlyPending ? attrs.filter(isFlagged) : attrs;
+    const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
+      "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
+      "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
+    };
+    for (const label of filtered) buckets[categoryOf(label)].push({ label, flagged: !!isFlagged(label) });
+    return ATTR_CATEGORY_ORDER
+      .map((c) => ({ category: c, items: buckets[c] }))
+      .filter((g) => g.items.length > 0);
+  };
+
+  const isCatOpen = (entity: string, cat: AttrCategory, idx: number) => {
+    const key = `${entity}::${cat}`;
+    if (key in openCats) return openCats[key];
+    return idx === 0; // first non-empty category expanded by default
+  };
+
   return (
     <div className="relative pt-2 space-y-6">
       <div className="flex items-center justify-end gap-2 text-[11px]">
-        <span className="text-muted-foreground">Show all attributes</span>
+        <span className="text-muted-foreground">Show only pending actions</span>
         <button
-          onClick={() => setShowAllAttrs((v) => !v)}
+          onClick={() => setShowOnlyPending((v) => !v)}
           className={cn(
             "relative h-5 w-9 rounded-full transition-colors",
-            showAllAttrs ? "bg-primary" : "bg-muted"
+            showOnlyPending ? "bg-primary" : "bg-muted"
           )}
-          aria-pressed={showAllAttrs}
+          aria-pressed={showOnlyPending}
         >
           <span
             className={cn(
               "absolute top-0.5 size-4 rounded-full bg-background shadow transition-all",
-              showAllAttrs ? "left-[18px]" : "left-0.5"
+              showOnlyPending ? "left-[18px]" : "left-0.5"
             )}
           />
         </button>
@@ -2173,28 +2394,53 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
           <div className={cn("relative grid gap-6", group.length === 1 ? "grid-cols-1 max-w-[320px] mx-auto" : "grid-cols-2")}>
             {group.length > 1 && <div className="absolute top-0 left-[25%] right-[25%] h-px bg-border" />}
 
-            {group.map(({ entity, attrs }) => (
-              <div key={entity} className="relative">
-                {group.length > 1 && <div className="absolute left-1/2 -top-0 -translate-x-1/2 w-px h-3 bg-border" />}
-                <div className="pt-3">{entityNode(entity)}</div>
+            {group.map(({ entity, attrs }) => {
+              const groups = categorize(entity, attrs);
+              return (
+                <div key={entity} className="relative">
+                  {group.length > 1 && <div className="absolute left-1/2 -top-0 -translate-x-1/2 w-px h-3 bg-border" />}
+                  <div className="pt-3">{entityNode(entity)}</div>
 
-                <div className="relative pl-5 mt-2 space-y-2">
-                  <div className="absolute left-2 top-0 bottom-2 w-px bg-border" />
-                  {attrs.map((a) => {
-                    // Flagged if it has a known trace flagged, OR if it's an alert/warn attribute in the entity profile
-                    const traceFlagged = ATTRIBUTE_TRACES[a]?.status === "flagged";
-                    const profileAttr = ENTITY_PROFILES[entity]?.attrs.find((x) => x.label === a);
-                    const flagged = traceFlagged || profileAttr?.status === "alert" || profileAttr?.status === "warn";
-                    return (
-                      <div key={a} className="relative">
-                        <div className="absolute -left-3 top-1/2 w-3 h-px bg-border" />
-                        {attrNode(a, flagged)}
-                      </div>
-                    );
-                  })}
+                  <div className="relative pl-5 mt-2 space-y-2">
+                    <div className="absolute left-2 top-0 bottom-2 w-px bg-border" />
+                    {groups.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground italic px-1 py-2">No pending actions.</p>
+                    )}
+                    {groups.map(({ category, items }, idx) => {
+                      const open = isCatOpen(entity, category, idx);
+                      const pending = items.filter((i) => i.flagged).length;
+                      return (
+                        <div key={category} className="relative">
+                          <div className="absolute -left-3 top-4 w-3 h-px bg-border" />
+                          <button
+                            onClick={() => setOpenCats((s) => ({ ...s, [`${entity}::${category}`]: !open }))}
+                            className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-secondary/40 text-left"
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <ChevronDown className={cn("size-3 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{category}</span>
+                              <span className="text-[10px] text-muted-foreground shrink-0">· {items.length}</span>
+                            </span>
+                            {pending > 0 && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-medium shrink-0">
+                                {pending}
+                              </span>
+                            )}
+                          </button>
+                          {open && (
+                            <div className="mt-1 space-y-1.5 pl-4">
+                              {items.map((it) => (
+                                <div key={it.label}>{attrNode(it.label, entity, it.flagged)}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
@@ -2203,7 +2449,8 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
         <p className="text-xs text-muted-foreground text-center py-6">No entities selected.</p>
       )}
 
-      <p className="text-[10px] text-muted-foreground italic">Tip: click an entity name to view its full attribute set & case file.</p>
+      <p className="text-[10px] text-muted-foreground italic">Tip: click an entity name to view its full attribute set & case file. Click an attribute to see its agent trace.</p>
+
 
 
 
@@ -2215,7 +2462,8 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
                 <Sparkles className="size-3 text-primary" /> Agent Trace · How this was determined
               </p>
-              <p className="text-[13px] font-semibold leading-tight">{selected}</p>
+              <p className="text-[13px] font-semibold leading-tight">{selected?.label}</p>
+              <p className="text-[10px] text-muted-foreground">{selected?.entity}</p>
               <p className="text-[12px] text-muted-foreground mt-0.5">{trace.value}</p>
             </div>
             <span className={cn(
@@ -2310,7 +2558,7 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
               <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsDown className="size-3.5" /></button>
             </div>
             <button
-              onClick={() => runAgents(trace.agents.map((a) => a.id), `Re-verify: ${selected}`)}
+              onClick={() => runAgents(trace.agents.map((a) => a.id), `Re-verify: ${selected?.label}`)}
               className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5"
             >
               <Play className="size-3" /> Re-run agent trace
@@ -3125,6 +3373,276 @@ const EscalationDialog = ({
 };
 
 export default ExceptionReview;
+
+// ---------- Collaboration Comments (per-case) ----------
+
+type CaseComment = {
+  author: string;
+  initials: string;
+  role: string;
+  time: string;
+  body: string;
+  kind: "comment" | "ai" | "action";
+};
+
+const COMMENTS_BY_KYC: Record<string, CaseComment[]> = {
+  "KYC-30214": [
+    { author: "Quinn Doe", initials: "QD", role: "Reviewer · L2", time: "Today, 7:08 AM", kind: "comment",
+      body: "Drafted outreach to Brevan Howard Compliance for the PSC02 correction. Expecting filing within the 7-day SLA." },
+    { author: "Aanya Sharma", initials: "AS", role: "EDD Specialist", time: "Yesterday, 6:03 AM", kind: "comment",
+      body: "BH Partnership Holdings (Jersey) still needs source-of-funds before we can sign off on the Jersey leg." },
+    { author: "Identity Agent", initials: "AI", role: "AI · auto-note", time: "Yesterday, 3:12 PM", kind: "ai",
+      body: "Refreshed CS01 and PSC register for OC302636 from Companies House. 1 new diff detected on PSC address." },
+  ],
+  "KYC-30188": [
+    { author: "Marcus Lee", initials: "ML", role: "Reviewer · L2", time: "Today, 8:21 AM", kind: "comment",
+      body: "FCA permission scope drift confirmed against latest Gabriel return — pinging RM for AIFMD Article 23 pack." },
+    { author: "Sanctions Agent", initials: "AI", role: "AI · auto-note", time: "April 21, 2026, 2:11 PM", kind: "ai",
+      body: "Auto-cleared 1 sanctions false positive on PSC name match — DOB & nationality divergence verified." },
+    { author: "You", initials: "YO", role: "Reviewer · L1", time: "April 22, 2026, 7:18 AM", kind: "action",
+      body: "Confirmed PSC for Marshall Wace LLP — no further action needed on the beneficial-owner leg." },
+  ],
+  "KYC-30215": [
+    { author: "Marcus Lee", initials: "ML", role: "Reviewer · L2", time: "April 21, 2026, 11:02 AM", kind: "comment",
+      body: "LEI mismatch with GLEIF — requested re-issue confirmation from Long Focus client services." },
+    { author: "Document Agent", initials: "AI", role: "AI · auto-note", time: "April 20, 2026, 4:30 PM", kind: "ai",
+      body: "Pulled Form ADV Part 1A from SEC IAPD. Compliance officer attestation date precedes last refresh." },
+  ],
+};
+
+const kindTone: Record<CaseComment["kind"], string> = {
+  comment: "bg-info-soft text-primary",
+  ai: "bg-success-soft text-success",
+  action: "bg-secondary text-foreground",
+};
+
+// ---------- Tasks / Follow-ups, Watchers, Activity ----------
+
+type CaseTask = { title: string; assignee: string; due: string; status: "Open" | "In Progress" | "Done" };
+const TASKS_BY_KYC: Record<string, CaseTask[]> = {
+  "KYC-30214": [
+    { title: "Chase PSC02 correction filing from client", assignee: "Quinn Doe", due: "Apr 28", status: "In Progress" },
+    { title: "Complete Jersey EDD pack on BH Partnership Holdings", assignee: "Aanya Sharma", due: "Apr 30", status: "Open" },
+    { title: "Backfill 'Rivage Capital' alias in CRM", assignee: "You", due: "May 02", status: "Open" },
+  ],
+  "KYC-30188": [
+    { title: "Request AIFMD Article 23 pack from RM", assignee: "Marcus Lee", due: "Apr 27", status: "In Progress" },
+    { title: "Add cleared PSC pair to sanctions allowlist", assignee: "You", due: "Apr 26", status: "Done" },
+  ],
+  "KYC-30215": [
+    { title: "Obtain GLEIF LEI re-issue confirmation", assignee: "Marcus Lee", due: "Apr 29", status: "Open" },
+    { title: "Re-verify Form ADV compliance officer attestation", assignee: "You", due: "May 03", status: "Open" },
+  ],
+};
+
+type Watcher = { name: string; initials: string; role: string };
+const WATCHERS_BY_KYC: Record<string, Watcher[]> = {
+  "KYC-30214": [
+    { name: "Quinn Doe", initials: "QD", role: "Reviewer · L2" },
+    { name: "Aanya Sharma", initials: "AS", role: "EDD Specialist" },
+    { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
+  ],
+  "KYC-30188": [
+    { name: "Marcus Lee", initials: "ML", role: "Reviewer · L2" },
+    { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
+  ],
+  "KYC-30215": [
+    { name: "Marcus Lee", initials: "ML", role: "Reviewer · L2" },
+    { name: "Dana Ortiz", initials: "DO", role: "US Compliance" },
+  ],
+};
+
+type Activity = { time: string; text: string };
+const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
+  "KYC-30214": [
+    { time: "Today, 7:08 AM", text: "Quinn Doe posted a comment" },
+    { time: "Today, 6:00 AM", text: "Identity Agent refreshed Companies House data" },
+    { time: "Yesterday, 4:40 PM", text: "Form CS01 uploaded to locker" },
+    { time: "Yesterday, 3:12 PM", text: "Document Agent attached PSC register diff" },
+    { time: "2 days ago", text: "Case assigned to Quinn Doe" },
+  ],
+  "KYC-30188": [
+    { time: "Today, 8:21 AM", text: "Marcus Lee posted a comment" },
+    { time: "Yesterday, 2:11 PM", text: "Sanctions Agent auto-cleared 1 false positive" },
+    { time: "April 22, 2026, 7:18 AM", text: "You confirmed PSC for Marshall Wace LLP" },
+  ],
+  "KYC-30215": [
+    { time: "April 21, 2026, 11:02 AM", text: "Marcus Lee posted a comment" },
+    { time: "April 20, 2026, 4:30 PM", text: "Document Agent pulled Form ADV Part 1A" },
+  ],
+};
+
+const taskTone: Record<CaseTask["status"], string> = {
+  Open: "bg-secondary text-foreground",
+  "In Progress": "bg-info-soft text-primary",
+  Done: "bg-success-soft text-success",
+};
+
+type CollabSubTab = "comments" | "tasks" | "watchers" | "activity";
+
+const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
+  const [sub, setSub] = useState<CollabSubTab>("comments");
+  const [draft, setDraft] = useState("");
+
+  const comments = COMMENTS_BY_KYC[kyc] ?? [
+    { author: "System", initials: "SY", role: "Auto", time: "Today",
+      body: `No collaboration activity yet on ${entity}. Be the first to leave a note.`, kind: "comment" as const },
+  ];
+  const tasks = TASKS_BY_KYC[kyc] ?? [];
+  const watchers = WATCHERS_BY_KYC[kyc] ?? [];
+  const activity = ACTIVITY_BY_KYC[kyc] ?? [];
+
+  const subTabs: { id: CollabSubTab; label: string; count: number }[] = [
+    { id: "comments", label: "Comments", count: comments.length },
+    { id: "tasks", label: "Tasks", count: tasks.length },
+    { id: "watchers", label: "Watchers", count: watchers.length },
+    { id: "activity", label: "Activity", count: activity.length },
+  ];
+
+  return (
+    <section>
+      <header className="flex items-center justify-between mb-3">
+        <p className="text-[11px] text-muted-foreground truncate">
+          <span className="font-medium text-foreground/80">{kyc}</span> · {entity}
+        </p>
+      </header>
+
+      <div className="flex items-center gap-1 mb-4 p-1 rounded-lg bg-secondary/60 border border-border">
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSub(t.id)}
+            className={cn(
+              "flex-1 text-[11px] py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5",
+              sub === t.id ? "bg-card shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t.label}
+            <span className={cn(
+              "text-[9px] px-1 py-px rounded",
+              sub === t.id ? "bg-secondary text-foreground" : "bg-card/60 text-muted-foreground"
+            )}>{t.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {sub === "comments" && (
+        <>
+          <ul className="space-y-3 max-h-[360px] overflow-y-auto pr-1 -mr-1">
+            {comments.map((c, i) => (
+              <li key={i} className="flex items-start gap-2.5">
+                <span className={cn("size-7 rounded-full grid place-items-center shrink-0 text-[10px] font-semibold", kindTone[c.kind])}>
+                  {c.kind === "ai" ? <Bot className="size-3.5" /> : c.initials}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[12px] font-medium leading-tight">{c.author}</span>
+                    <span className="text-[10px] text-muted-foreground">{c.role}</span>
+                  </div>
+                  <p className="text-[12px] text-foreground/90 mt-0.5 leading-snug">{c.body}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-[10px] text-muted-foreground">{c.time}</p>
+                    <button className="text-[10px] text-muted-foreground hover:text-foreground">Reply</button>
+                    <button className="text-[10px] text-muted-foreground hover:text-foreground">Resolve</button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-3 rounded-lg border border-border p-2">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={2}
+              placeholder="Write a comment… use @ to mention a teammate"
+              className="w-full bg-transparent text-[12px] outline-none resize-none placeholder:text-muted-foreground"
+            />
+            <div className="flex items-center justify-between mt-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <button className="hover:text-foreground" title="Attach"><Paperclip className="size-3.5" /></button>
+                <button className="text-[11px] hover:text-foreground" title="Mention">@</button>
+              </div>
+              <button
+                onClick={() => setDraft("")}
+                className="text-[11px] px-3 py-1 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-95 disabled:opacity-50"
+                disabled={!draft.trim()}
+              >
+                Post
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {sub === "tasks" && (
+        <>
+          <ul className="space-y-2 max-h-[360px] overflow-y-auto pr-1 -mr-1">
+            {tasks.length === 0 && (
+              <li className="text-[12px] text-muted-foreground italic text-center py-4">No tasks for this case yet.</li>
+            )}
+            {tasks.map((t, i) => (
+              <li key={i} className="rounded-lg border border-border p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[12px] font-medium leading-snug">{t.title}</p>
+                  <span className={cn("text-[10px] px-1.5 py-0.5 rounded shrink-0", taskTone[t.status])}>{t.status}</span>
+                </div>
+                <div className="flex items-center justify-between mt-1.5">
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <UserCircle2 className="size-3" /> {t.assignee}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <Clock className="size-3" /> {t.due}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <button className="mt-3 w-full text-[12px] py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors flex items-center justify-center gap-1.5">
+            <Plus className="size-3.5" /> New task
+          </button>
+        </>
+      )}
+
+      {sub === "watchers" && (
+        <>
+          <ul className="space-y-2 max-h-[360px] overflow-y-auto pr-1 -mr-1">
+            {watchers.map((w, i) => (
+              <li key={i} className="flex items-center gap-2.5 rounded-lg border border-border p-2">
+                <span className="size-7 rounded-full grid place-items-center bg-info-soft text-primary text-[10px] font-semibold shrink-0">
+                  {w.initials}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-medium leading-tight truncate">{w.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{w.role}</p>
+                </div>
+                <button className="text-[10px] text-muted-foreground hover:text-foreground">Remove</button>
+              </li>
+            ))}
+          </ul>
+          <button className="mt-3 w-full text-[12px] py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors flex items-center justify-center gap-1.5">
+            <Plus className="size-3.5" /> Add watcher
+          </button>
+        </>
+      )}
+
+      {sub === "activity" && (
+        <ul className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1 -mr-1">
+          {activity.map((a, i) => (
+            <li key={i} className="flex items-start gap-2.5">
+              <span className="mt-1.5 size-1.5 rounded-full bg-primary/60 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[12px] leading-snug">{a.text}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{a.time}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+};
+
 
 
 

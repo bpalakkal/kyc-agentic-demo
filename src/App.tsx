@@ -7,7 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import WorkQueue from "./pages/WorkQueue";
 import ExceptionReview from "./pages/ExceptionReview";
-import { Reports, EvidenceLocker } from "./pages/Placeholders";
+import { Reports } from "./pages/Placeholders";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -17,14 +17,13 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/kyc-agentic2">
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/work-queue" element={<WorkQueue />} />
             <Route path="/work-queue/review" element={<ExceptionReview />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/evidence-locker" element={<EvidenceLocker />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
