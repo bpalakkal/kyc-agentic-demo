@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { GENERATED_WORK_ROWS, GENERATED_ENTITY_DRG } from "@/data/entities-generated";
 import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,18 @@ const groups: Group[] = [
     ],
   },
 ];
+
+// Inject generated entities from entities.md (new entities only, no duplicates)
+{
+  const _existingKycs = new Set(groups.flatMap(g => (g.rows ?? []).map(r => r.kyc).filter(Boolean)));
+  for (const row of GENERATED_WORK_ROWS) {
+    if (_existingKycs.has(row.kyc)) continue;
+    const drg = GENERATED_ENTITY_DRG[row.kyc] ?? "US Private Equity DRG";
+    const target = groups.find(g => g.name === drg) ?? groups.find(g => g.name.includes("US")) ?? groups[0];
+    target?.rows?.push(row as unknown as Row);
+    _existingKycs.add(row.kyc);
+  }
+}
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {

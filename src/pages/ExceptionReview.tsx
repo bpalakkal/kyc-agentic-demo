@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_ENTITY_GROUPS, GENERATED_COMMENTS, GENERATED_TASKS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
 
 
 
@@ -4027,6 +4028,32 @@ const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
     { time: "April 20, 2026, 4:30 PM", text: "Document Agent pulled Form ADV Part 1A" },
   ],
 };
+
+// ── Merge entities from entities.md (auto-generated at build time) ─────────────
+// Static data takes precedence; generated data only adds entities not already here.
+{
+  const _staticKycs = new Set(exceptions.map(e => e.kyc));
+  const _genExcToKyc = Object.fromEntries(GENERATED_EXCEPTIONS.map(e => [e.id, e.kyc]));
+  for (const e of GENERATED_EXCEPTIONS) {
+    if (!_staticKycs.has(e.kyc)) (exceptions as unknown[]).push(e);
+  }
+  for (const [k, v] of Object.entries(GENERATED_COMPARISONS)) {
+    const kyc = _genExcToKyc[k];
+    if (kyc && !_staticKycs.has(kyc) && !COMPARISONS[k]) (COMPARISONS as Record<string, typeof v>)[k] = v;
+  }
+  const _staticProfiles = new Set(Object.keys(ENTITY_PROFILES));
+  for (const [k, v] of Object.entries(GENERATED_ENTITY_PROFILES)) {
+    if (!_staticProfiles.has(k)) (ENTITY_PROFILES as Record<string, typeof v>)[k] = v;
+  }
+  const _staticGroups = new Set(Object.keys(ENTITY_GROUPS));
+  for (const [k, v] of Object.entries(GENERATED_ENTITY_GROUPS)) {
+    if (!_staticGroups.has(k)) (ENTITY_GROUPS as Record<string, typeof v>)[k] = v;
+  }
+  for (const [k, v] of Object.entries(GENERATED_COMMENTS))  { if (!COMMENTS_BY_KYC[k])  (COMMENTS_BY_KYC as Record<string, typeof v>)[k]  = v; }
+  for (const [k, v] of Object.entries(GENERATED_TASKS))     { if (!TASKS_BY_KYC[k])     (TASKS_BY_KYC    as Record<string, typeof v>)[k]  = v; }
+  for (const [k, v] of Object.entries(GENERATED_WATCHERS))  { if (!WATCHERS_BY_KYC[k])  (WATCHERS_BY_KYC as Record<string, typeof v>)[k]  = v; }
+  for (const [k, v] of Object.entries(GENERATED_ACTIVITY))  { if (!ACTIVITY_BY_KYC[k])  (ACTIVITY_BY_KYC as Record<string, typeof v>)[k]  = v; }
+}
 
 const taskTone: Record<CaseTask["status"], string> = {
   Open: "bg-secondary text-foreground",

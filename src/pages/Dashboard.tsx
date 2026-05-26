@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Maximize2, M
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
+import { GENERATED_DASHBOARD_CASES } from "@/data/entities-generated";
 
 type FilterKey = "all" | "attention" | "urgent" | "complete";
 
@@ -14,6 +15,14 @@ const priorityCases = [
   { priority: "Medium", id: "KYC-30216", entity: "Brookfield Asset Management PIC US, LLC", note: "Risk rating discrepancy — Cayman ownership triggered High vs initial Low. Compliance sign-off pending.", due: "Jun 30", est: "30 min", status: "open" },
   { priority: "Low", id: "KYC-30222", entity: "Brevan Howard Asset Management LLP", note: "Previous company name 'Rivage Capital' chain-of-title verification.", due: "Next Week", est: "15 min", status: "open" },
 ] as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
+
+// Inject generated cases (new entities only, no duplicates)
+{
+  const _existingIds = new Set(priorityCases.map(c => c.id));
+  for (const c of GENERATED_DASHBOARD_CASES) {
+    if (!_existingIds.has(c.id)) priorityCases.push(c);
+  }
+}
 
 const aiActions = [
   { dot: "alert", title: "Sign off on KYC-30214", sub: "Brevan Howard · PSC filing overdue", chip: "Recommended", reason: "All exceptions have been resolved." },
