@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 type Row = {
   id: string;
   name: string;
+  kyc?: string;
   due: string;
   overdue?: boolean;
   confidence: string;
@@ -32,15 +33,27 @@ type Group = {
 
 const groups: Group[] = [
   {
+    id: "g3",
+    name: "US Private Equity DRG",
+    priorityNote: "2 Medium Priority Items",
+    priorityTone: "medium",
+    rows: [
+      { id: "r10", name: "Long Focus Capital Management, LLC", kyc: "KYC-30215", due: "Jul 02, 2026", confidence: "93%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE / UK", priority: "High", risk: "Elevated", exc: 5, status: "In Progress", action: "Periodic Refresh", selectable: true },
+      { id: "r11", name: "Apollo Capital Management LP", due: "Jul 02, 2026", confidence: "94%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE", priority: "Medium", risk: "Moderate", exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true },
+      { id: "r12", name: "Silver Lake Management Co. LLC", due: "Jul 15, 2026", confidence: "91%", customerType: "Registered Investment Adviser", jurisdiction: "US — CA", priority: "Medium", risk: "Moderate", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
+      { id: "r17", name: "Vista Equity Partners Management LLC", due: "Jul 21, 2026", confidence: "96%", customerType: "Registered Investment Adviser", jurisdiction: "US — TX", priority: "Low", risk: "Minimal", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
+    ],
+  },
+  {
     id: "g1",
     name: "London Alternatives DRG",
     priorityNote: "2 High Priority Items",
     priorityTone: "high",
     open: true,
     rows: [
-      { id: "r1", name: "Brevan Howard Asset Management LLP", due: "Overdue · Apr 25, 2026", overdue: true, confidence: "92%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r2", name: "Marshall Wace LLP", due: "Overdue · May 14, 2026", overdue: true, confidence: "88%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 2, status: "Pending Feedback", action: "Periodic Refresh", selectable: true },
-      { id: "r3", name: "BH Partnership Holdings Limited", due: "Jun 28, 2026", confidence: "84%", customerType: "Corporate Designated Member", jurisdiction: "Jersey", priority: "Medium", risk: "Elevated", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
+      { id: "r1", name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", due: "Overdue · Apr 25, 2026", overdue: true, confidence: "92%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true },
+      { id: "r2", name: "Marshall Wace LLP", kyc: "KYC-30188", due: "Overdue · May 14, 2026", overdue: true, confidence: "88%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 2, status: "Pending Feedback", action: "Periodic Refresh", selectable: true },
+      { id: "r3", name: "BH Partnership Holdings Limited", kyc: "KYC-30301", due: "Jun 28, 2026", confidence: "84%", customerType: "Corporate Designated Member", jurisdiction: "Jersey", priority: "Medium", risk: "Elevated", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
       { id: "r4", name: "Brevan Howard Asset Mgmt Services Ltd", due: "Jun 29, 2026", confidence: "95%", customerType: "Corporate Designated Member", jurisdiction: "UK", priority: "Medium", risk: "Moderate", exc: 0, status: "In Progress", action: "Periodic Refresh", locked: true },
       { id: "r5", name: "Marshall Wace Investment Strategies LLP", due: "Jul 04, 2026", confidence: "91%", customerType: "Sub-Adviser LLP", jurisdiction: "UK", priority: "Low", risk: "Moderate", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
     ],
@@ -55,17 +68,6 @@ const groups: Group[] = [
       { id: "r7", name: "AHL Partners LLP", due: "Overdue · May 18, 2026", overdue: true, confidence: "87%", customerType: "Sub-Adviser LLP", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 2, status: "Not Started", action: "Periodic Refresh", selectable: true },
       { id: "r8", name: "GLG Partners LP", due: "Overdue · May 22, 2026", overdue: true, confidence: "89%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Moderate", exc: 3, status: "Pending Feedback", action: "Periodic Refresh", selectable: true },
       { id: "r9", name: "Winton Group Limited", due: "Jul 11, 2026", confidence: "93%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "Medium", risk: "Moderate", exc: 1, status: "In Progress", action: "Periodic Refresh", locked: true },
-    ],
-  },
-  {
-    id: "g3",
-    name: "US Private Equity DRG",
-    priorityNote: "2 Medium Priority Items",
-    priorityTone: "medium",
-    rows: [
-      { id: "r10", name: "Apollo Capital Management LP", due: "Jul 02, 2026", confidence: "94%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE", priority: "Medium", risk: "Moderate", exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r11", name: "Silver Lake Management Co. LLC", due: "Jul 15, 2026", confidence: "91%", customerType: "Registered Investment Adviser", jurisdiction: "US — CA", priority: "Medium", risk: "Moderate", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
-      { id: "r12", name: "Vista Equity Partners Management LLC", due: "Jul 21, 2026", confidence: "96%", customerType: "Registered Investment Adviser", jurisdiction: "US — TX", priority: "Low", risk: "Minimal", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
     ],
   },
   {
@@ -92,9 +94,14 @@ const statusColor = (s: Row["status"]) => {
 };
 
 const WorkQueue = () => {
-  const [selected, setSelected] = useState<Record<string, boolean>>({ r1: true, r2: true, r3: true });
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
   const selectedCount = Object.values(selected).filter(Boolean).length;
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ g1: true });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ g3: true });
+
+  const allRows = groups.flatMap((g) => g.rows ?? []);
+  const selectedEntities = allRows
+    .filter((r) => selected[r.id])
+    .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id.toUpperCase() }));
 
   return (
     <div className="px-6 py-6">
@@ -128,6 +135,7 @@ const WorkQueue = () => {
 
         <Link
           to="/work-queue/review"
+          state={{ entities: selectedEntities }}
           className="h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 shadow-sm hover:opacity-95"
         >
           Review Selected

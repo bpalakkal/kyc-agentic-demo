@@ -1,14 +1,17 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Lock, Settings2, Building2, Clock,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId } from "@/components/AgentSystem";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 
 
@@ -299,6 +302,259 @@ const exceptions: Exc[] = [
       },
     ],
   },
+  // ===== Long Focus Capital Management, LLC (KYC-30215) =====
+  {
+    id: "e6",
+    title: "US Registration Number Mismatch",
+    category: "Identity Consistency",
+    confidence: 92,
+    status: "Pending",
+    entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215",
+    flagText: "Client-provided CRD 801-12345 resolves to a different legal entity in SEC IAPD. IAPD record for the matching legal name shows 801-67890.",
+    narrative: "The client onboarding form lists US Registration Number 801-12345. That CRD resolves in IAPD to 'Long Focus Capital LLC' — a different legal entity with a different address. The legal name and principal address on the onboarding form match the entity registered under 801-67890. Most likely a transcription error on the onboarding form; SEC IAPD is the authoritative system of record under KYC Policy §3.1.",
+    reasoningSteps: [
+      "SEC IAPD is the system of record for RIA registration numbers under KYC Policy §3.1.",
+      "Legal entity name and principal address on Form ADV match the client onboarding form exactly.",
+      "Client-provided number resolves in IAPD but to a different legal entity with a different address — supports transcription-error hypothesis.",
+    ],
+    evidenceRationale: "SEC IAPD (Form ADV Part 1A) is the statutory source for US RIA registration numbers; client onboarding form is the counter-source.",
+    evidence: [
+      { name: "SEC IAPD — Form ADV Part 1A", sub: "Retrieved 2026-05-20 · CRD 801-67890" },
+      { name: "Client Onboarding Form", sub: "Self-reported · CRD 801-12345" },
+      { name: "KYC Policy §3.1", sub: "Authoritative source hierarchy" },
+    ],
+    acceptability: "Field-level transcription errors against an authoritative regulator source are routinely corrected to the regulator value with an audit-trail entry. No EDD or escalation typically required.",
+    resolutions: [
+      { id: "r1", title: "Run SEC-ADV Verification Agent and update to 801-67890", desc: "Verify match against SEC IAPD, write 801-67890 to the entity record, and log the discrepancy in the audit trail.", recommended: true,
+        agents: ["regulatory", "identity", "audit"], agentLabel: "Verify and update US Reg #",
+        postRunSummary: "SEC IAPD match confirmed for legal name + principal address. Entity record updated to CRD 801-67890 with a full discrepancy memo in the audit log.",
+        updates: [
+          { attr: "US Registration Number", before: "801-12345 (client self-reported)", after: "801-67890 (SEC IAPD · authoritative)" },
+          { attr: "Discrepancy Memo", before: "—", after: "MEMO-30215-CRD · client transcription error vs IAPD" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Resolved" },
+        ],
+      },
+      { id: "r2", title: "Accept client-provided number with Senior Analyst override", desc: "Retain 801-12345 with documented rationale and a Senior Analyst override signature.",
+        agents: ["identity", "audit"], agentLabel: "Accept with override",
+        postRunSummary: "Client-provided CRD retained under Senior Analyst override; rationale memo attached to case.",
+        updates: [
+          { attr: "US Registration Number", before: "801-12345 (unverified)", after: "801-12345 (Senior Analyst override · MEMO-30215-OVR)" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Accepted with Override" },
+        ],
+      },
+      { id: "r3", title: "Return to client via Relationship Manager", desc: "Route back to RM for client to confirm the correct CRD; case parked pending response.",
+        agents: ["outreach", "audit"], agentLabel: "Return to client for CRD confirmation",
+        postRunSummary: "RM outreach queued requesting confirmation of the correct CRD; case held pending client response.",
+        updates: [
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (CRD confirmation requested)" },
+          { attr: "Outreach Log", before: "—", after: "RM Anderson · Template CRD_CONFIRM_v1 · SLA 5 business days" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "e7",
+    title: "Outstanding LEI Code",
+    category: "Regulatory Status",
+    confidence: 78,
+    status: "Pending",
+    entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215",
+    flagText: "No active LEI found on GLEIF under the entity's legal name or SEC registration number. AUM of $2.4B suggests reportable derivatives activity is plausible.",
+    narrative: "GLEIF returned no match for the legal name 'Long Focus Capital Management, LLC' or against US Reg # 801-67890. For an RIA with $2.4B AUM an LEI is typically expected for swap and derivatives counterparty reporting under EMIR / Dodd-Frank. Absence may indicate the client does not transact in reportable instruments, or that registration has lapsed / is pending.",
+    reasoningSteps: [
+      "LEI is not a CIP requirement and does not block case closure under the FinCEN CDD Rule.",
+      "LEI is required for any EMIR- or Dodd-Frank-reportable derivative or swap activity, which is plausible given AUM.",
+      "GLEIF returned no match on either legal name or SEC registration number — indicates no LEI has ever been issued (vs. lapsed).",
+    ],
+    evidenceRationale: "GLEIF is the global registry of record for LEI codes; the client onboarding form is the counter-source for self-declared identifiers.",
+    evidence: [
+      { name: "GLEIF Registry Lookup", sub: "Legal name + CRD 801-67890 · no match" },
+      { name: "Client Onboarding Form", sub: "LEI field left blank" },
+      { name: "EMIR / Dodd-Frank Reporting Rules", sub: "Reportable derivative activity trigger" },
+    ],
+    acceptability: "Absence of LEI is acceptable if the client does not transact in reportable derivatives. Conditional approval pending client confirmation is a common path.",
+    resolutions: [
+      { id: "r1", title: "Request LEI from client via portal", desc: "Send a templated outreach to the client requesting an LEI; conditionally approve the case if the client confirms no reportable activity. SLA: 7 business days.", recommended: true,
+        agents: ["outreach", "regulatory", "audit"], agentLabel: "Request LEI from client",
+        postRunSummary: "Outreach drafted to client requesting LEI registration or written confirmation of no reportable derivatives activity. Case held in conditional-approval state with a 7-business-day SLA.",
+        updates: [
+          { attr: "LEI Code", before: "Not provided", after: "Pending client (LEI request · SLA 2026-06-02)" },
+          { attr: "Outreach Log", before: "—", after: "Email to client portal · Template LEI_REQUEST_v2" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Conditional approval — awaiting LEI" },
+        ],
+      },
+      { id: "r2", title: "Initiate Broad Search Agent across alternative registries", desc: "Sweep GMEI Utility, KY3P, and other identifier registries before client outreach to rule out an alternative LEI source.",
+        agents: ["identity", "regulatory", "audit"], agentLabel: "Broad search alternative registries",
+        postRunSummary: "Broad Search Agent swept GMEI Utility and KY3P; no alternative LEI was found. Case advanced for client outreach.",
+        updates: [
+          { attr: "Alternative Registry Search", before: "Not run", after: "GMEI Utility · KY3P · 0 matches (2026-05-25)" },
+          { attr: "Recommendation", before: "—", after: "Proceed to client LEI request" },
+        ],
+      },
+      { id: "r3", title: "Flag for re-verification at 30 days", desc: "Park the field with a 30-day re-verification flag; close all other exceptions independently.",
+        agents: ["regulatory", "audit"], agentLabel: "Defer 30-day re-verification",
+        postRunSummary: "LEI field flagged for re-verification on 2026-06-24; case can close on remaining attributes pending that follow-up.",
+        updates: [
+          { attr: "LEI Code", before: "Not provided", after: "Deferred — re-verify 2026-06-24" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Open — non-blocking deferral" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "e8",
+    title: "Principal Place of Business Mismatch",
+    category: "Identity Consistency",
+    confidence: 90,
+    status: "Pending",
+    entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215",
+    flagText: "Corporate website shows 123 Main Street, NY 10001; Form ADV (SEC filing) and the client onboarding form both show 456 Broad Avenue, NY 10005.",
+    narrative: "Two of three sources (Form ADV and client onboarding form) agree on 456 Broad Avenue, NY 10005. The corporate website shows 123 Main Street — likely a secondary office or stale marketing content. Per KYC Policy §3.5 the regulatory filing supersedes marketing material for address determination.",
+    reasoningSteps: [
+      "KYC Policy §3.5 places regulatory filings above corporate website content for address verification.",
+      "Form ADV address matches the address self-reported on the client onboarding form — two corroborating sources.",
+      "Website discrepancy is consistent with a secondary office or stale content, not a substantive change of principal place of business.",
+    ],
+    evidenceRationale: "Form ADV (regulatory filing) and client onboarding form (self-attestation) are the authoritative sources; corporate website is marketing material.",
+    evidence: [
+      { name: "Form ADV Filing (SEC)", sub: "Filed 2026-03-31 · 456 Broad Avenue, NY 10005" },
+      { name: "Corporate Website", sub: "Retrieved 2026-05-20 · 123 Main Street, NY 10001" },
+      { name: "Client Onboarding Form", sub: "Self-reported · 456 Broad Avenue, NY 10005" },
+    ],
+    acceptability: "When two authoritative sources corroborate and only marketing content diverges, accepting the filing address with an audit note is standard practice.",
+    resolutions: [
+      { id: "r1", title: "Accept Form ADV address as authoritative", desc: "Adopt 456 Broad Avenue (Form ADV + client form) as the principal place of business; annotate the website mismatch as non-material stale content.", recommended: true,
+        agents: ["regulatory", "document", "audit"], agentLabel: "Accept Form ADV address",
+        postRunSummary: "Form ADV address adopted as authoritative; website discrepancy annotated as non-material stale content and case closed.",
+        updates: [
+          { attr: "Principal Place of Business", before: "Conflict (Website vs Form ADV)", after: "456 Broad Avenue, NY 10005 (Form ADV · authoritative)" },
+          { attr: "Website Annotation", before: "—", after: "Stale marketing content — non-material, retained for audit" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Accepted" },
+        ],
+      },
+      { id: "r2", title: "Run Geolocation & Business Directory check", desc: "Use D&B and Google Places as a tiebreaker before acceptance — confirms the 456 Broad address is operationally active.",
+        agents: ["identity", "document", "audit"], agentLabel: "Geolocation tiebreaker check",
+        postRunSummary: "D&B and Google Places both confirm 456 Broad Avenue is the operationally active office; 123 Main Street is listed as a secondary location. Acceptance recommended.",
+        updates: [
+          { attr: "D&B Lookup", before: "Not run", after: "456 Broad Avenue · primary operating address" },
+          { attr: "Google Places", before: "Not run", after: "456 Broad Avenue · open · 4.6★ (regional HQ)" },
+        ],
+      },
+      { id: "r3", title: "Request clarification from client", desc: "Ask the client to confirm the primary operating address and explain the website divergence.",
+        agents: ["outreach", "audit"], agentLabel: "Request address clarification",
+        postRunSummary: "Outreach sent to client requesting written confirmation of the principal place of business and an explanation of the website divergence.",
+        updates: [
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (address clarification)" },
+          { attr: "Outreach Log", before: "—", after: "Email to compliance@longfocus.com · Template PPOB_CLARIFY_v1" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "e9",
+    title: "Missing Compliance Officer Attestation",
+    category: "Document Completeness",
+    confidence: 95,
+    status: "Pending",
+    entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215",
+    flagText: "CCO identity (Sarah Chen) is known via Form ADV Schedule A, but no signed attestation has been provided by the client.",
+    narrative: "Form ADV Schedule A independently identifies Sarah Chen as Chief Compliance Officer. The gap is a missing signed attestation, not the CCO's identity. A templated DocuSign request to the named CCO is the most direct remediation path.",
+    reasoningSteps: [
+      "CCO identity is independently verified through Form ADV Schedule A — a regulatory filing.",
+      "The gap is an artefact (a signed attestation) rather than an unknown attribute.",
+      "Direct DocuSign outreach to the verified CCO closes the gap without RM mediation.",
+    ],
+    evidenceRationale: "Form ADV Schedule A is the regulatory source for named compliance officers; the artefact gap is procedural rather than substantive.",
+    evidence: [
+      { name: "Form ADV Schedule A", sub: "Sarah Chen · Chief Compliance Officer" },
+      { name: "Client Submitted Documents", sub: "No signed attestation on file" },
+      { name: "KYC Policy §4.2", sub: "CCO attestation requirement" },
+    ],
+    acceptability: "Procedural gaps where the underlying attribute is verified are typically closed via templated outreach; conditional approval is also acceptable while the signature is in flight.",
+    resolutions: [
+      { id: "r1", title: "Generate pre-filled DocuSign attestation to Sarah Chen", desc: "Auto-populate the attestation form with ADV-confirmed CCO details and send via DocuSign. SLA: 5 business days.", recommended: true,
+        agents: ["document", "outreach", "audit"], agentLabel: "DocuSign attestation to CCO",
+        postRunSummary: "Pre-filled DocuSign attestation queued to Sarah Chen (CCO). Case held in awaiting-signature state with a 5-business-day SLA.",
+        updates: [
+          { attr: "Compliance Officer Attestation", before: "Not provided", after: "Pending signature (DocuSign envelope #DS-30215-CCO)" },
+          { attr: "Outreach Log", before: "—", after: "DocuSign to schen@longfocus.com · Template CCO_ATTEST_v3" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting signature — DocuSign" },
+        ],
+      },
+      { id: "r2", title: "Accept ADV-listed CCO with conditional flag", desc: "Accept the CCO identity from Form ADV and flag the attestation to follow; allow case to close on other attributes.",
+        agents: ["regulatory", "audit"], agentLabel: "Accept ADV CCO conditionally",
+        postRunSummary: "CCO identity accepted from Form ADV with a conditional flag pending signed attestation. Case can advance on other attributes.",
+        updates: [
+          { attr: "Compliance Officer", before: "Identified · attestation missing", after: "Sarah Chen (ADV-verified) · attestation conditional flag" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Conditional approval — attestation outstanding" },
+        ],
+      },
+      { id: "r3", title: "Escalate to client relationship team", desc: "Route to the RM to chase the attestation directly with the client's compliance team.",
+        agents: ["outreach", "audit"], agentLabel: "Escalate to RM team",
+        postRunSummary: "Case escalated to the RM team to chase the signed CCO attestation directly.",
+        updates: [
+          { attr: "Owner", before: "KYC Analyst (Tier 2)", after: "RM Anderson · client relationship team" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — RM follow-up" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "e10",
+    title: "Beneficial Ownership Not Identified",
+    category: "Beneficial Ownership",
+    confidence: 85,
+    status: "Pending",
+    entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215",
+    flagText: "Ownership chain terminates at a Delaware holding company (Long Focus Holdings LLC, 100%) with no publicly disclosed natural-person owners. FinCEN BOI report not on file.",
+    narrative: "Form ADV Schedule A lists Long Focus Holdings LLC as 100% owner — an entity, not a natural person. Public registry traversal terminates at that holding company; Delaware does not require public disclosure of LLC ownership. The FinCEN CDD Rule (31 CFR 1010.230) requires identification of natural-person beneficial owners at the 25%+ threshold, so case closure is blocked until a natural person is identified or the client supplies a FinCEN BOI report.",
+    reasoningSteps: [
+      "25% beneficial-ownership threshold is a regulatory requirement under 31 CFR 1010.230 — case closure is blocked.",
+      "Delaware does not require public disclosure of LLC ownership, so traversal through public sources alone is unlikely to succeed.",
+      "Paid registries (LexisNexis, Sayari) may resolve ownership without client outreach, but the client BOI report is the authoritative source.",
+    ],
+    evidenceRationale: "FinCEN BOI report is the statutory source for natural-person beneficial owners; Form ADV Schedule A and Companies House (UK branch) are supporting evidence.",
+    evidence: [
+      { name: "Form ADV Schedule A", sub: "Owner: Long Focus Holdings LLC (100%)" },
+      { name: "Delaware Division of Corporations", sub: "No public ownership disclosure" },
+      { name: "Companies House (UK branch)", sub: "PSC register · no PSC > 25%" },
+      { name: "31 CFR 1010.230", sub: "FinCEN CDD Rule · 25% UBO requirement" },
+    ],
+    acceptability: "Ownership behind a Delaware holding company is common for US RIAs. The control concern is the missing BOI report; a 7-day formal request is the standard remediation.",
+    resolutions: [
+      { id: "r1", title: "Issue formal FinCEN BOI report request to client", desc: "Send a formal BOI report request with a 7-day SLA; case held in awaiting-client state until natural-person UBOs are identified.", recommended: true,
+        agents: ["beneficial-owner", "outreach", "regulatory", "audit"], agentLabel: "Request FinCEN BOI report",
+        postRunSummary: "Formal FinCEN BOI report request issued to the client. Case held in awaiting-client state with a 7-business-day SLA; closure blocked until natural-person UBOs are identified.",
+        updates: [
+          { attr: "Beneficial Owner (25%+)", before: "Unresolved — chain ends at Long Focus Holdings LLC", after: "Pending — FinCEN BOI report requested" },
+          { attr: "Outreach Log", before: "—", after: "Formal request to compliance@longfocus.com · Template FINCEN_BOI_v1 · SLA 2026-06-02" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Blocked — Awaiting FinCEN BOI report" },
+        ],
+      },
+      { id: "r2", title: "Run Ownership Resolution Agent against paid registries", desc: "Sweep LexisNexis and Sayari to attempt to resolve natural-person ownership before client outreach.",
+        agents: ["beneficial-owner", "identity", "audit"], agentLabel: "Run Ownership Resolution Agent",
+        postRunSummary: "Ownership Resolution Agent traversed LexisNexis and Sayari; partial signal found — proceed to client BOI request for authoritative confirmation.",
+        updates: [
+          { attr: "Paid Registry Traversal", before: "Not run", after: "LexisNexis · Sayari · partial signal (1 candidate UBO)" },
+          { attr: "Recommendation", before: "—", after: "Proceed to client BOI request for authoritative confirmation" },
+        ],
+      },
+      { id: "r3", title: "Escalate to Enhanced Due Diligence team", desc: "Route to the EDD team for full ownership investigation given the opaque Delaware holding structure.",
+        agents: ["beneficial-owner", "risk-scoring", "audit"], agentLabel: "Escalate to EDD team",
+        postRunSummary: "Case escalated to the EDD team for full ownership investigation. Precautionary risk-tier bump applied pending EDD outcome.",
+        updates: [
+          { attr: "Owner", before: "KYC Analyst (Tier 2)", after: "EDD Team · Lead: K. Okafor" },
+          { attr: "Risk Tier", before: "Medium-High", after: "High (precautionary · pending EDD outcome)" },
+          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — EDD investigation" },
+        ],
+      },
+    ],
+  },
 ];
 
 // ---------- Side-by-side comparison data per exception ----------
@@ -357,6 +613,50 @@ const COMPARISONS: Record<string, Compare> = {
       { field: "Passport", a: "—", b: "HMRC-verified on file" },
     ],
   },
+  e6: {
+    aLabel: "Client Onboarding Form",
+    bLabel: "SEC IAPD (Form ADV Part 1A)",
+    rows: [
+      { field: "US Registration Number", a: "801-12345 (self-reported)", b: "801-67890 (retrieved 2026-05-20)", conflict: true },
+      { field: "Legal Entity Name", a: "Long Focus Capital Management, LLC", b: "Long Focus Capital Management, LLC" },
+      { field: "Principal Address", a: "456 Broad Avenue, New York, NY", b: "456 Broad Avenue, New York, NY" },
+    ],
+  },
+  e7: {
+    aLabel: "GLEIF Registry",
+    bLabel: "Client Onboarding Form",
+    rows: [
+      { field: "LEI Code", a: "No active LEI under entity legal name", b: "Not provided", conflict: true },
+      { field: "Search by US Reg # 801-67890", a: "No match", b: "n/a", conflict: true },
+      { field: "AUM (context)", a: "n/a", b: "$2.4B reported" },
+    ],
+  },
+  e8: {
+    aLabel: "Corporate Website",
+    bLabel: "Form ADV Filing (SEC)",
+    rows: [
+      { field: "Principal Address", a: "123 Main Street, New York, NY 10001", b: "456 Broad Avenue, New York, NY 10005", conflict: true },
+      { field: "Source Date", a: "Retrieved 2026-05-20", b: "Filing dated 2026-03-31" },
+      { field: "Matches Client Form", a: "No", b: "Yes", conflict: true },
+    ],
+  },
+  e9: {
+    aLabel: "Form ADV Schedule A",
+    bLabel: "Client Submitted Documents",
+    rows: [
+      { field: "Compliance Officer Name", a: "Sarah Chen (Chief Compliance Officer)", b: "Not listed", conflict: true },
+      { field: "Signed Attestation", a: "n/a", b: "Not provided", conflict: true },
+    ],
+  },
+  e10: {
+    aLabel: "Form ADV Schedule A",
+    bLabel: "Public Registry Traversal",
+    rows: [
+      { field: "25%+ Beneficial Owner", a: "Long Focus Holdings LLC (100%) — entity, not individual", b: "Chain terminates at Long Focus Holdings LLC; no further public data", conflict: true },
+      { field: "FinCEN BOI Filing", a: "Not provided by client", b: "n/a", conflict: true },
+      { field: "Companies House (UK branch)", a: "No PSC at >25%", b: "n/a" },
+    ],
+  },
 };
 
 const getSla = (title: string, recommended?: boolean): string => {
@@ -382,7 +682,7 @@ const buildHeaderMeta = (addressed: number, total: number) => [
   { label: "Reach Outs", value: "0", suffix: "pending" },
 ];
 
-const selectedEntities = [
+const DEFAULT_SELECTED_ENTITIES = [
   { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" },
   { name: "Marshall Wace LLP", kyc: "KYC-30188" },
 ];
@@ -392,7 +692,20 @@ const selectedEntities = [
 type ResolvedInfo = { resolutionId: string; resolutionTitle: string; agentLabel: string };
 
 const ExceptionReview = () => {
-  const [activeId, setActiveId] = useState("e1");
+  const location = useLocation();
+  const navState = location.state as { entities?: { name: string; kyc: string }[] } | null;
+  const selectedEntities = useMemo(
+    () => (navState?.entities && navState.entities.length > 0 ? navState.entities : DEFAULT_SELECTED_ENTITIES),
+    [navState],
+  );
+  const selectedKycSet = useMemo(() => new Set(selectedEntities.map((e) => e.kyc)), [selectedEntities]);
+  const filteredExceptions = useMemo(
+    () => exceptions.filter((e) => selectedKycSet.has(e.kyc)),
+    [selectedKycSet],
+  );
+  const initialActiveId = filteredExceptions[0]?.id ?? exceptions[0].id;
+
+  const [activeId, setActiveId] = useState(initialActiveId);
   const [openAgent, setOpenAgent] = useState(false);
   const [selectedResolution, setSelectedResolution] = useState<string | null>(null);
   const [resolvedMap, setResolvedMap] = useState<Record<string, ResolvedInfo>>({});
@@ -400,10 +713,21 @@ const ExceptionReview = () => {
   const [showEvidence, setShowEvidence] = useState(false);
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<"attrs" | "locker">("attrs");
+  const [escalateOpen, setEscalateOpen] = useState(false);
+  const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
+  
   
   const { runAgents, isRunning, currentLabel, runs } = useAgents();
 
-  const active = exceptions.find((e) => e.id === activeId)!;
+  // If selection changes and current active is no longer in filtered set, reset
+  useEffect(() => {
+    if (!filteredExceptions.find((e) => e.id === activeId)) {
+      setActiveId(filteredExceptions[0]?.id ?? exceptions[0].id);
+    }
+  }, [filteredExceptions, activeId]);
+
+  const active = (filteredExceptions.find((e) => e.id === activeId) ?? exceptions.find((e) => e.id === activeId))!;
 
   const openEvidence = (ev: Evidence) => {
     const lower = ev.name.toLowerCase();
@@ -477,8 +801,8 @@ const ExceptionReview = () => {
     }
   }, [isRunning, runs, currentLabel, selectedResolution, active]);
 
-  const addressedCount = Object.keys(resolvedMap).length;
-  const headerMeta = buildHeaderMeta(addressedCount, exceptions.length);
+  const addressedCount = Object.keys(resolvedMap).filter((id) => filteredExceptions.find((e) => e.id === id)).length;
+  const headerMeta = buildHeaderMeta(addressedCount, filteredExceptions.length);
 
 
 
@@ -522,9 +846,44 @@ const ExceptionReview = () => {
             >
               <Sparkles className="size-4" /> Agent Review
             </button>
-            <button className="text-sm px-4 py-2 rounded-full border border-border text-muted-foreground flex items-center gap-2 hover:bg-secondary transition-colors">
-              <AlertTriangle className="size-4" /> Escalate
-            </button>
+            <Popover open={escalateOpen} onOpenChange={setEscalateOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className={cn(
+                    "text-sm px-4 py-2 rounded-full border flex items-center gap-2 transition-colors",
+                    escalation
+                      ? "border-warning bg-warning-soft text-warning-foreground"
+                      : "border-border text-muted-foreground hover:bg-secondary"
+                  )}
+                >
+                  <AlertTriangle className="size-4" />
+                  {escalation === "fcc" ? "Escalated · FCC" : escalation === "business" ? "Escalated · Business" : "Escalate"}
+                  <ChevronDown className="size-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-1">
+                <button
+                  onClick={() => { setEscalation("fcc"); setEscalateOpen(false); }}
+                  className="w-full text-left p-3 rounded-md hover:bg-secondary flex gap-3 items-start"
+                >
+                  <ShieldAlert className="size-4 mt-0.5 text-alert" />
+                  <div>
+                    <p className="text-sm font-medium">Escalate to FCC</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Financial Crime Compliance review — SAR triage & MLRO oversight.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setEscalation("business"); setEscalateOpen(false); }}
+                  className="w-full text-left p-3 rounded-md hover:bg-secondary flex gap-3 items-start"
+                >
+                  <Briefcase className="size-4 mt-0.5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Escalate to Business</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Relationship Manager outreach for client clarification & documents.</p>
+                  </div>
+                </button>
+              </PopoverContent>
+            </Popover>
             <button className="text-sm px-5 py-2 rounded-full bg-primary text-primary-foreground flex items-center gap-2 shadow-sm hover:opacity-95 transition-opacity">
               <Send className="size-4" /> Submit
             </button>
@@ -534,7 +893,7 @@ const ExceptionReview = () => {
 
       {/* Selected entities */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <span className="text-xs text-muted-foreground">Selected Entities <span className="text-foreground font-medium">(3)</span></span>
+        <span className="text-xs text-muted-foreground">Selected Entities <span className="text-foreground font-medium">({selectedEntities.length})</span></span>
         {selectedEntities.map((e) => (
           <span key={e.kyc} className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card text-xs shadow-sm">
             <Building2 className="size-3 text-muted-foreground" />
@@ -556,10 +915,10 @@ const ExceptionReview = () => {
         <aside className="border-r border-border pr-6">
           <div className="flex items-center gap-2 mb-3">
             <Settings2 className="size-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({exceptions.length})</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({filteredExceptions.length})</span>
           </div>
           <ul className="space-y-2">
-            {exceptions.map((e) => {
+            {filteredExceptions.map((e) => {
               const isActive = e.id === activeId;
               const resolved = resolvedMap[e.id];
               const isResolved = Boolean(resolved);
@@ -904,30 +1263,47 @@ const ExceptionReview = () => {
         </section>
         )}
 
-        {/* Right: Attributes / Tree — collapsible */}
+        {/* Right: Attributes / Document Locker — collapsible */}
         {rightPaneOpen ? (
           <aside className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4 border-b border-border">
               <div className="flex items-center gap-4">
-                <button className="pb-2 text-sm font-medium border-b-2 border-primary -mb-px flex items-center gap-1.5"><Settings2 className="size-3.5" /> Attributes</button>
-                <button className="pb-2 text-sm text-muted-foreground flex items-center gap-1.5 hover:text-foreground transition-colors"><FileText className="size-4" /> Document View</button>
+                <button
+                  onClick={() => setRightTab("attrs")}
+                  className={cn(
+                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                    rightTab === "attrs"
+                      ? "font-medium border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Settings2 className="size-3.5" /> Attributes
+                </button>
+                <button
+                  onClick={() => setRightTab("locker")}
+                  className={cn(
+                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                    rightTab === "locker"
+                      ? "font-medium border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <FileText className="size-4" /> Document Locker
+                  <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length}</span>
+                </button>
               </div>
               <div className="flex items-center gap-1">
-                <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Plus className="size-3.5" /></button>
-                <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Minus className="size-3.5" /></button>
-                <button className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"><Maximize2 className="size-3" /></button>
-                <span className="text-xs text-muted-foreground ml-1 tabular-nums">84%</span>
                 <button
                   onClick={() => setRightPaneOpen(false)}
                   className="ml-2 size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
-                  title="Collapse attribute pane"
+                  title="Collapse pane"
                 >
                   <ChevronRight className="size-3.5" />
                 </button>
               </div>
             </div>
 
-            <AttributeTree />
+            {rightTab === "attrs" ? <AttributeTree selectedEntities={selectedEntities} /> : <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
           </aside>
         ) : (
           <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
@@ -960,6 +1336,12 @@ const ExceptionReview = () => {
           onClose={() => setEvidenceDoc(null)}
         />
       )}
+
+      <EscalationDialog
+        kind={escalation}
+        active={active}
+        onClose={() => setEscalation(null)}
+      />
 
     </div>
   );
@@ -1336,6 +1718,66 @@ const ENTITY_PROFILES: Record<string, EntityProfile> = {
     ],
     caseFile: `# Marshall Wace LLP\n\n**KYC ID:** KYC-30188  \n**Companies House #:** OC302228  \n**FCA FRN:** 211088\n\n## Entity Summary\nUK-domiciled limited liability partnership and FCA-authorised investment manager. Co-founded in 1997 by Sir Paul Marshall and Ian Wace; LLP registered in 2003. Runs long/short equity and quantitative TOPS strategies for global institutions.\n\n## Registered Particulars (Companies House)\n- **Number:** OC302228  \n- **Type:** LLP  \n- **Status:** Active  \n- **Incorporated:** 2003-04-02  \n- **Office:** George House, 131 Sloane Street, London, SW1X 9AT, United Kingdom\n\n## Persons of Significant Control\n| Name | DOB | Nationality | Voting Rights |\n|------|-----|-------------|---------------|\n| Sir Paul Marshall | 1959-08 | British | 25–50% |\n| Ian Wace | 1963-12 | British | 25–50% |\n\n## FCA Permissions\n- Arranging deals in investments\n- Managing investments\n- **Managing an AIF** *(added 2026-02-11 — CRM sync pending)*\n\n## Active Exceptions\n- **FCA Permission Scope Drift** — sync CRM with FCA register\n- **Sanctions Screening — PSC Name Hit** — confirmed false positive on 'Paul Marshall' (different DOB & nationality)\n\n## Next Actions\n1. Sync CRM permission set with FCA register.\n2. Request AIFMD Article 23 disclosure pack from client.\n3. Add cleared name pair to sanctions allowlist.`,
   },
+  "Long Focus Capital Management, LLC": {
+    name: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215",
+    attrs: [
+      { label: "Entity Name", value: "LONG FOCUS CAPITAL MANAGEMENT, LLC", source: "CRM", status: "ok" },
+      { label: "Legal Entity Type", value: "Limited Liability Company", source: "3rd", status: "ok" },
+      { label: "Country of Incorporation", value: "USA", source: "3rd", status: "ok" },
+      { label: "Date of Incorporation", value: "2012-05-10", source: "3rd", status: "ok" },
+      { label: "LEI Code", value: "Not provided · no GLEIF match", source: "3rd", status: "alert" },
+      { label: "Trading Names", value: "Long Focus Capital", source: "CRM", status: "ok" },
+      { label: "Previous Names", value: "Focus Capital Partners LLC", source: "3rd", status: "ok" },
+      { label: "Verification of Existence", value: "Verified via Delaware State Registry", source: "3rd", status: "ok" },
+      { label: "US Registration Number", value: "801-12345 (client) vs 801-67890 (SEC IAPD)", source: "3rd", status: "alert" },
+      { label: "UK Registration Number", value: "N/A", source: "CRM", status: "ok" },
+      { label: "Regulator", value: "SEC", source: "3rd", status: "ok" },
+      { label: "Listing Status", value: "Not Listed", source: "3rd", status: "ok" },
+      { label: "Entity GIIN", value: "987XYZ.654ABC.AB.123", source: "3rd", status: "ok" },
+      { label: "Section 13 / 15d Indicator", value: "No", source: "CRM", status: "ok" },
+      { label: "CFTC Registered", value: "No", source: "CRM", status: "ok" },
+      { label: "Legal Registered Address", value: "1209 Orange Street, Wilmington, DE 19801, USA", source: "3rd", status: "ok" },
+      { label: "Principal Place of Business", value: "Conflict: Website 123 Main St vs Form ADV 456 Broad Ave", source: "3rd", status: "alert" },
+      { label: "Foreign Branches", value: "UK Branch · FCA #123456", source: "3rd", status: "ok" },
+      { label: "Sub-Advisor Address", value: "N/A", source: "CRM", status: "ok" },
+      { label: "Entity Classification", value: "Registered Investment Adviser (RIA)", source: "Forge", status: "ok" },
+      { label: "Entity Risk Rating", value: "Medium-High", source: "Forge", status: "warn" },
+      { label: "CIP Classification", value: "Legal Entity — LLC", source: "Forge", status: "ok" },
+      { label: "Nature of Business", value: "Long/Short Equity Investment Management", source: "CRM", status: "ok" },
+      { label: "Sole Proprietorship", value: "No", source: "CRM", status: "ok" },
+      { label: "Parent Listed on US Exchange", value: "No", source: "CRM", status: "ok" },
+      { label: "Other Business Activity", value: "None", source: "CRM", status: "ok" },
+      { label: "Source of Funds", value: "Management Fees, Performance Fees", source: "CRM", status: "ok" },
+      { label: "Source of Wealth", value: "Founder's Capital", source: "CRM", status: "ok" },
+      { label: "Assets Under Management", value: "$2.4B", source: "CRM", status: "ok" },
+      { label: "Transacting With", value: "Third Party Funds", source: "CRM", status: "ok" },
+      { label: "US Tax ID", value: "98-7654321", source: "3rd", status: "ok" },
+      { label: "UK Tax ID", value: "N/A", source: "CRM", status: "ok" },
+      { label: "Corporate Officer", value: "Michael J. Anderson (CEO)", source: "3rd", status: "ok" },
+      { label: "Board Directors", value: "Michael J. Anderson, Sarah K. Lee", source: "3rd", status: "ok" },
+      { label: "Compliance Officer Attestation", value: "Sarah Chen (CCO) · signed attestation not on file", source: "3rd", status: "alert" },
+      { label: "MLRO / Equivalent", value: "N/A", source: "CRM", status: "ok" },
+      { label: "Authorized Signatory", value: "Michael J. Anderson", source: "CRM", status: "ok" },
+      { label: "Power of Attorney", value: "None on file", source: "CRM", status: "ok" },
+      { label: "Key Controller", value: "Michael J. Anderson", source: "CRM", status: "ok" },
+      { label: "Beneficial Owner (25%+)", value: "Unresolved — chain ends at Long Focus Holdings LLC", source: "3rd", status: "alert" },
+      { label: "List of Subsidiaries", value: "Long Focus UK Branch", source: "3rd", status: "ok" },
+      { label: "Trustee", value: "N/A", source: "CRM", status: "ok" },
+      { label: "Tax Residency", value: "United States (Delaware)", source: "3rd", status: "ok" },
+      { label: "FATCA Classification", value: "Reporting Model 1 FFI", source: "Forge", status: "ok" },
+      { label: "CRS Classification", value: "Investment Entity", source: "Forge", status: "ok" },
+      { label: "Sanctions Screening", value: "Cleared — 2026-05-12 (OFAC/EU/UN)", source: "3rd", status: "ok" },
+      { label: "PEP Screening", value: "No Match", source: "3rd", status: "ok" },
+      { label: "Adverse Media Screening", value: "No Material Adverse Media", source: "3rd", status: "ok" },
+      { label: "Last KYC Refresh", value: "2025-09-18", source: "Forge", status: "ok" },
+      { label: "Next KYC Refresh Due", value: "2026-09-18 (Annual)", source: "Forge", status: "ok" },
+      { label: "Wolfsberg Questionnaire", value: "Not Applicable (non-bank RIA)", source: "Forge", status: "ok" },
+      { label: "Source of Funds Verified", value: "Yes — management & performance fees", source: "Forge", status: "ok" },
+      { label: "EIN / TIN Verified", value: "98-7654321 · IRS verified", source: "3rd", status: "ok" },
+    ],
+    caseFile: `# Long Focus Capital Management, LLC\n\n**KYC ID:** KYC-30215  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware) with UK branch  \n**Client Risk Rating:** Medium-High  \n**Open Exceptions:** 5\n\n## Entity Summary\nDelaware-incorporated LLC operating as a SEC-registered investment adviser with a UK branch (FCA #123456). Founded 2012 (previously Focus Capital Partners LLC). Runs long/short equity strategies; AUM $2.4B.\n\n## Registered Particulars\n- **Legal Form:** Limited Liability Company  \n- **Incorporated:** 2012-05-10 · Delaware, USA  \n- **Registered Office:** 1209 Orange Street, Wilmington, DE 19801  \n- **Regulator:** SEC (CRD pending reconciliation — see exception 1)  \n- **GIIN:** 987XYZ.654ABC.AB.123  \n- **US Tax ID:** 98-7654321\n\n## Key People\n| Role | Name |\n|------|------|\n| CEO / Authorized Signatory | Michael J. Anderson |\n| Board Director | Sarah K. Lee |\n| Chief Compliance Officer | Sarah Chen *(attestation outstanding)* |\n\n## Open Exceptions (5)\n1. **US Registration Number Mismatch** — 801-12345 vs 801-67890 (IAPD)\n2. **Outstanding LEI Code** — no GLEIF match\n3. **Principal Place of Business Mismatch** — website vs Form ADV\n4. **Missing Compliance Officer Attestation** — Sarah Chen, signature missing\n5. **Beneficial Ownership Not Identified** — chain ends at Long Focus Holdings LLC\n\n## Next Actions\n1. Verify CRD via SEC IAPD and update to 801-67890.\n2. Request LEI from client (or confirm no reportable derivatives activity).\n3. Adopt Form ADV principal address (456 Broad Avenue).\n4. Send DocuSign attestation to CCO Sarah Chen.\n5. Issue formal FinCEN BOI report request to client.`,
+  },
 };
 
 
@@ -1374,13 +1816,274 @@ TRACE_DOCS["Designated Members"] = [
 
 
 
-const AttributeTree = () => {
-  const [selected, setSelected] = useState<string | null>("Persons with Significant Control");
+// ---------- Document Locker ----------
+
+type CaseDoc = {
+  id: string;
+  title: string;
+  entity: string;
+  kyc: string;
+  source: string;
+  kind: AttrDocKind;
+  date: string;
+  size: string;
+  url: string;
+  linkedAttrs: string[];
+};
+
+const CASE_DOCUMENTS: CaseDoc[] = [
+  {
+    id: "d1", title: "Annual Confirmation Statement (CS01)", entity: "Brevan Howard Asset Management LLP",
+    kyc: "KYC-30214", source: "Companies House", kind: "filing", date: "2026-03-14", size: "2.5 KB",
+    url: "/sample-docs/cs01-brevan-howard.pdf",
+    linkedAttrs: ["Principal Place of Business", "Registered Office"],
+  },
+  {
+    id: "d2", title: "Persons with Significant Control Register", entity: "Brevan Howard Asset Management LLP",
+    kyc: "KYC-30214", source: "Companies House", kind: "register", date: "2026-05-12", size: "2.7 KB",
+    url: "/sample-docs/psc-register-brevan-howard.pdf",
+    linkedAttrs: ["Persons with Significant Control", "Controllers"],
+  },
+  {
+    id: "d3", title: "Passport — Alan E. Howard", entity: "Brevan Howard Asset Management LLP",
+    kyc: "KYC-30214", source: "HMRC GOV.UK Verify", kind: "passport", date: "2024-11-02", size: "2.5 KB",
+    url: "/sample-docs/passport-alan-howard.pdf",
+    linkedAttrs: ["Persons with Significant Control"],
+  },
+  {
+    id: "d4", title: "FCA Register Extract — FRN 170583", entity: "Marshall Wace LLP",
+    kyc: "KYC-30188", source: "FCA Register", kind: "register", date: "2026-05-22", size: "2.4 KB",
+    url: "/sample-docs/fca-register-marshall-wace.pdf",
+    linkedAttrs: ["Previous Company Names", "FCA Regulatory Permissions"],
+  },
+  {
+    id: "d5", title: "FCA Name Change Notification (2007)", entity: "Marshall Wace LLP",
+    kyc: "KYC-30188", source: "FCA Correspondence", kind: "letter", date: "2007-09-03", size: "2.2 KB",
+    url: "/sample-docs/fca-name-change-letter.pdf",
+    linkedAttrs: ["Previous Company Names"],
+  },
+  {
+    id: "d6", title: "CRM Snapshot — Customer 360", entity: "Marshall Wace LLP",
+    kyc: "KYC-30188", source: "Salesforce CRM", kind: "screenshot", date: "2026-02-11", size: "2.5 KB",
+    url: "/sample-docs/crm-snapshot-mw.pdf",
+    linkedAttrs: ["Previous Company Names", "FCA Regulatory Permissions"],
+  },
+  // ===== Long Focus Capital Management, LLC =====
+  {
+    id: "d7", title: "Client Onboarding Form (signed)", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "Client Submission", kind: "filing", date: "2026-04-02", size: "—",
+    url: "/sample-docs/cs01-brevan-howard.pdf",
+    linkedAttrs: ["US Registration Number", "Principal Place of Business", "LEI Code"],
+  },
+  {
+    id: "d8", title: "Form ADV (Part 1 + Schedule A)", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "SEC IAPD", kind: "filing", date: "2026-03-30", size: "—",
+    url: "/sample-docs/cs01-brevan-howard.pdf",
+    linkedAttrs: ["US Registration Number", "Principal Place of Business", "Beneficial Owner (25%+)"],
+  },
+  {
+    id: "d9", title: "SEC IAPD Registration Extract — CRD 801-67890", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "SEC IAPD", kind: "register", date: "2026-05-15", size: "—",
+    url: "/sample-docs/fca-register-marshall-wace.pdf",
+    linkedAttrs: ["US Registration Number", "Regulator"],
+  },
+  {
+    id: "d10", title: "GLEIF LEI Lookup — No Match", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "GLEIF Registry", kind: "register", date: "2026-05-20", size: "—",
+    url: "/sample-docs/fca-register-marshall-wace.pdf",
+    linkedAttrs: ["LEI Code"],
+  },
+  {
+    id: "d11", title: "Compliance Officer Attestation (DRAFT — unsigned)", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "Internal · DocuSign Envelope", kind: "letter", date: "2026-04-10", size: "—",
+    url: "/sample-docs/fca-name-change-letter.pdf",
+    linkedAttrs: ["Compliance Officer Attestation"],
+  },
+  {
+    id: "d12", title: "Delaware Secretary of State — Certificate of Formation", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "Delaware State Registry", kind: "filing", date: "2012-05-10", size: "—",
+    url: "/sample-docs/cs01-brevan-howard.pdf",
+    linkedAttrs: ["Date of Incorporation", "Country of Incorporation", "Legal Registered Address"],
+  },
+  {
+    id: "d13", title: "Corporate Website Snapshot — Contact Page", entity: "Long Focus Capital Management, LLC",
+    kyc: "KYC-30215", source: "longfocuscapital.com (archived)", kind: "screenshot", date: "2026-05-18", size: "—",
+    url: "/sample-docs/crm-snapshot-mw.pdf",
+    linkedAttrs: ["Principal Place of Business"],
+  },
+];
+
+const DocumentLocker = ({ selectedEntityNames }: { selectedEntityNames: string[] }) => {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | AttrDocKind>("all");
+  const [preview, setPreview] = useState<CaseDoc | null>(null);
+
+  const scoped = selectedEntityNames.length > 0
+    ? CASE_DOCUMENTS.filter((d) => selectedEntityNames.includes(d.entity))
+    : CASE_DOCUMENTS;
+
+  const grouped = scoped
+    .filter((d) => (filter === "all" || d.kind === filter))
+    .filter((d) => !query || (d.title + d.source + d.entity).toLowerCase().includes(query.toLowerCase()))
+    .reduce<Record<string, CaseDoc[]>>((acc, d) => {
+      (acc[d.entity] ??= []).push(d);
+      return acc;
+    }, {});
+
+  const kinds: ("all" | AttrDocKind)[] = ["all", "filing", "register", "passport", "letter", "screenshot"];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search documents…"
+            className="w-full h-8 pl-8 pr-3 text-xs rounded-md border border-border bg-secondary/40 outline-none focus:ring-2 focus:ring-ring/30"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1">
+        {kinds.map((k) => {
+          const label = k === "all" ? "All" : DOC_KIND_META[k].label;
+          const active = filter === k;
+          const count = k === "all" ? CASE_DOCUMENTS.length : CASE_DOCUMENTS.filter((d) => d.kind === k).length;
+          return (
+            <button
+              key={k}
+              onClick={() => setFilter(k)}
+              className={cn(
+                "text-[10px] px-2 py-1 rounded-full border transition-colors",
+                active
+                  ? "border-primary bg-info-soft text-primary font-medium"
+                  : "border-border text-muted-foreground hover:bg-secondary"
+              )}
+            >
+              {label} <span className="opacity-60">· {count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="space-y-4">
+        {Object.entries(grouped).map(([entity, docs]) => (
+          <div key={entity}>
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="size-3.5 text-muted-foreground" />
+              <span className="text-[11px] font-semibold">{entity}</span>
+              <span className="text-[10px] text-muted-foreground">· {docs.length} doc{docs.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className="space-y-1.5">
+              {docs.map((d) => {
+                const meta = DOC_KIND_META[d.kind];
+                return (
+                  <div
+                    key={d.id}
+                    className="group flex items-center gap-3 p-2.5 rounded-lg border border-border hover:border-primary hover:bg-info-soft/30 transition-colors"
+                  >
+                    <div className="size-9 rounded-md bg-secondary border border-border grid place-items-center shrink-0">
+                      <FileText className="size-4 text-muted-foreground group-hover:text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-medium truncate">{d.title}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {d.source} · {d.date} · {d.size}
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide", meta.tone)}>
+                          {meta.label}
+                        </span>
+                        {d.linkedAttrs.slice(0, 2).map((a) => (
+                          <span key={a} className="text-[9px] px-1.5 py-0.5 rounded bg-secondary border border-border text-muted-foreground">
+                            {a}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setPreview(d)}
+                        className="text-[10px] px-2 py-1 rounded-md border border-border hover:bg-secondary"
+                        title="Preview"
+                      >
+                        Preview
+                      </button>
+                      <a
+                        href={d.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] px-2 py-1 rounded-md border border-primary text-primary hover:bg-info-soft"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {Object.keys(grouped).length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-6">No documents match this filter.</p>
+        )}
+      </div>
+
+      {preview && (
+        <Dialog open onOpenChange={(o) => !o && setPreview(null)}>
+          <DialogContent className="max-w-5xl w-[90vw] h-[85vh] p-0 flex flex-col overflow-hidden">
+            <DialogHeader className="px-5 py-3 border-b border-border">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <DialogTitle className="text-sm truncate">{preview.title}</DialogTitle>
+                  <DialogDescription className="text-[11px]">
+                    {preview.entity} · {preview.source} · {preview.date}
+                  </DialogDescription>
+                </div>
+                <a
+                  href={preview.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs px-3 py-1.5 rounded-md border border-primary text-primary hover:bg-info-soft"
+                >
+                  Open in new tab
+                </a>
+              </div>
+            </DialogHeader>
+            <iframe src={preview.url} title={preview.title} className="flex-1 w-full bg-secondary/30" />
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+};
+
+
+const ENTITY_GROUPS: Record<string, { drg: string; attrs: string[] }> = {
+  "Brevan Howard Asset Management LLP": {
+    drg: "London Alternatives DRG",
+    attrs: ["Controllers", "Persons with Significant Control", "Principal Place of Business", "FCA Regulatory Permissions"],
+  },
+  "Marshall Wace LLP": {
+    drg: "London Alternatives DRG",
+    attrs: ["Controllers", "Previous Company Names", "Principal Place of Business", "Sanctions Screening"],
+  },
+  "Long Focus Capital Management, LLC": {
+    drg: "US Private Equity DRG",
+    attrs: ["US Registration Number", "LEI Code", "Principal Place of Business", "Compliance Officer Attestation", "Beneficial Owner (25%+)"],
+  },
+};
+
+const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string; kyc: string }[] }) => {
+  const [selected, setSelected] = useState<string | null>(null);
   const [openEntity, setOpenEntity] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [traceStepsOpen, setTraceStepsOpen] = useState(false);
   const [traceDocsOpen, setTraceDocsOpen] = useState(false);
   const [expandedEntities, setExpandedEntities] = useState<Record<string, boolean>>({});
+  const [showAllAttrs, setShowAllAttrs] = useState(false);
   // Reset disclosures when switching attribute
   useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); }, [selected]);
 
@@ -1417,31 +2120,93 @@ const AttributeTree = () => {
     </button>
   );
 
+  // Build dynamic tree from selected entities
+  const baseEntities = selectedEntities.length > 0
+    ? selectedEntities.filter((e) => ENTITY_GROUPS[e.name]).map((e) => ({ entity: e.name, ...ENTITY_GROUPS[e.name] }))
+    : Object.entries(ENTITY_GROUPS).filter(([n]) => n !== "Long Focus Capital Management, LLC").map(([entity, v]) => ({ entity, ...v }));
+
+  const entitiesForTree = showAllAttrs
+    ? baseEntities.map((e) => {
+        const profile = ENTITY_PROFILES[e.entity];
+        const allLabels = profile?.attrs.map((a) => a.label) ?? [];
+        const merged = Array.from(new Set([...e.attrs, ...allLabels]));
+        return { ...e, attrs: merged };
+      })
+    : baseEntities;
+
+  // Group by DRG parent
+  const drgGroups = entitiesForTree.reduce<Record<string, typeof entitiesForTree>>((acc, e) => {
+    (acc[e.drg] ??= []).push(e);
+    return acc;
+  }, {});
+  const drgEntries = Object.entries(drgGroups);
+
   return (
-    <div className="relative pt-2">
-      <div className="flex flex-col items-center">
-        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2">DRG Parent</span>
-        <div className="w-full">{entityNode("London Alternatives DRG")}</div>
+    <div className="relative pt-2 space-y-6">
+      <div className="flex items-center justify-end gap-2 text-[11px]">
+        <span className="text-muted-foreground">Show all attributes</span>
+        <button
+          onClick={() => setShowAllAttrs((v) => !v)}
+          className={cn(
+            "relative h-5 w-9 rounded-full transition-colors",
+            showAllAttrs ? "bg-primary" : "bg-muted"
+          )}
+          aria-pressed={showAllAttrs}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 size-4 rounded-full bg-background shadow transition-all",
+              showAllAttrs ? "left-[18px]" : "left-0.5"
+            )}
+          />
+        </button>
       </div>
-
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        {([
-          { entity: "Brevan Howard Asset Management LLP", attrs: ["Controllers", "Persons with Significant Control", "Principal Place of Business", "FCA Regulatory Permissions"] as const },
-          { entity: "Marshall Wace LLP", attrs: ["Controllers", "Previous Company Names", "Principal Place of Business", "Sanctions Screening"] as const },
-        ]).map(({ entity, attrs }) => (
-          <div key={entity} className="space-y-2">
-            {entityNode(entity)}
-            {attrs.map((a) => {
-              const flagged = ATTRIBUTE_TRACES[a]?.status === "flagged";
-              return <div key={a}>{attrNode(a, flagged)}</div>;
-            })}
+      {drgEntries.map(([drgName, group]) => (
+        <div key={drgName}>
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2">DRG Parent</span>
+            <div className="w-full max-w-[320px]">{entityNode(drgName)}</div>
           </div>
-        ))}
-      </div>
+
+          <div className="mx-auto w-px h-5 bg-border" />
+
+          <div className={cn("relative grid gap-6", group.length === 1 ? "grid-cols-1 max-w-[320px] mx-auto" : "grid-cols-2")}>
+            {group.length > 1 && <div className="absolute top-0 left-[25%] right-[25%] h-px bg-border" />}
+
+            {group.map(({ entity, attrs }) => (
+              <div key={entity} className="relative">
+                {group.length > 1 && <div className="absolute left-1/2 -top-0 -translate-x-1/2 w-px h-3 bg-border" />}
+                <div className="pt-3">{entityNode(entity)}</div>
+
+                <div className="relative pl-5 mt-2 space-y-2">
+                  <div className="absolute left-2 top-0 bottom-2 w-px bg-border" />
+                  {attrs.map((a) => {
+                    // Flagged if it has a known trace flagged, OR if it's an alert/warn attribute in the entity profile
+                    const traceFlagged = ATTRIBUTE_TRACES[a]?.status === "flagged";
+                    const profileAttr = ENTITY_PROFILES[entity]?.attrs.find((x) => x.label === a);
+                    const flagged = traceFlagged || profileAttr?.status === "alert" || profileAttr?.status === "warn";
+                    return (
+                      <div key={a} className="relative">
+                        <div className="absolute -left-3 top-1/2 w-3 h-px bg-border" />
+                        {attrNode(a, flagged)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {entitiesForTree.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-6">No entities selected.</p>
+      )}
+
+      <p className="text-[10px] text-muted-foreground italic">Tip: click an entity name to view its full attribute set & case file.</p>
 
 
 
-      <p className="text-[10px] text-muted-foreground mt-3 italic">Tip: click an entity name to view its full attribute set & case file.</p>
 
       {trace && (
         <div className="mt-5 rounded-xl border border-border bg-secondary/30 p-4">
@@ -1618,6 +2383,36 @@ const EntityDetailPanel = ({ profile, onClose }: { profile: EntityProfile; onClo
         <div className="flex-1 overflow-y-auto">
           {tab === "attrs" ? (
             <div className="p-3">
+              {(() => {
+                const total = profile.attrs.length;
+                const incomplete = profile.attrs.filter((a) => a.status === "alert").length;
+                const review = profile.attrs.filter((a) => a.status === "warn").length;
+                const complete = total - incomplete - review;
+                const pct = total ? Math.round((complete / total) * 100) : 0;
+                return (
+                  <div className="mb-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3 mb-1.5">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Attribute Completeness</p>
+                      <span className="text-[11px] font-semibold">{pct}% complete</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-border overflow-hidden flex">
+                      <div className="h-full bg-success" style={{ width: `${(complete / total) * 100}%` }} />
+                      <div className="h-full bg-warning" style={{ width: `${(review / total) * 100}%` }} />
+                      <div className="h-full bg-alert" style={{ width: `${(incomplete / total) * 100}%` }} />
+                    </div>
+                    <div className="flex items-center gap-4 mt-2 text-[11px]">
+                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-success" /><span className="text-success font-medium">{complete}</span><span className="text-muted-foreground">Complete</span></span>
+                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-warning" /><span className="text-warning font-medium">{review}</span><span className="text-muted-foreground">Review</span></span>
+                      <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-alert" /><span className="text-alert font-medium">{incomplete}</span><span className="text-muted-foreground">Incomplete</span></span>
+                    </div>
+                    {incomplete > 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-1.5 leading-snug">
+                        Incomplete attributes have open exceptions on the left rail and block case closure.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               {profile.attrs.map((a) => (
                 <AttributeRow key={a.label} attr={a} entity={profile.name} />
               ))}
@@ -1626,6 +2421,7 @@ const EntityDetailPanel = ({ profile, onClose }: { profile: EntityProfile; onClo
             <CaseFileView markdown={profile.caseFile} profile={profile} />
           )}
         </div>
+
 
         <div className="px-5 py-3 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
           <span className="flex items-center gap-3">
@@ -1650,6 +2446,16 @@ const SOURCE_AGENT: Record<EntityAttr["source"], { name: string; system: string;
 
 const STATUS_LABEL: Record<EntityAttr["status"], string> = {
   ok: "Verified", warn: "Review", alert: "Action Required",
+};
+
+const COMPLETENESS_LABEL: Record<EntityAttr["status"], string> = {
+  ok: "Complete", warn: "Review", alert: "Incomplete",
+};
+
+const COMPLETENESS_STYLE: Record<EntityAttr["status"], string> = {
+  ok: "bg-success-soft text-success border-success-soft-border",
+  warn: "bg-warning-soft text-warning border-warning-soft-border",
+  alert: "bg-alert-soft text-alert border-alert-soft-border",
 };
 
 const DOC_KIND_META: Record<AttrDocKind, { label: string; tone: string }> = {
@@ -1686,6 +2492,9 @@ const AttributeRow = ({ attr, entity }: { attr: EntityAttr; entity: string }) =>
             <p className="text-[12px] truncate">{attr.value}</p>
           </div>
         </div>
+        <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0", COMPLETENESS_STYLE[attr.status])}>
+          {COMPLETENESS_LABEL[attr.status]}
+        </span>
         <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0", SOURCE_STYLE[attr.source])}>
           {attr.source}
         </span>
@@ -2127,6 +2936,195 @@ const AgentReviewModal = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
+// ---------- Escalation Dialog (simulated downstream screen) ----------
+
+type EscalationKind = "fcc" | "business" | null;
+
+const ESCALATION_CONFIG = {
+  fcc: {
+    title: "Escalate to Financial Crime Compliance",
+    badge: "FCC Queue",
+    badgeTone: "bg-alert/10 text-alert border-alert/30",
+    icon: ShieldAlert,
+    iconTone: "text-alert",
+    summary: "Routed to the FCC team for MLRO oversight. Case is now read-only for the analyst and tracked under the SAR triage workflow.",
+    assignee: { name: "Priya Raman", role: "MLRO · Financial Crime Compliance", avatar: "PR" },
+    sla: "24 hours · SAR triage SLA",
+    priority: "Critical",
+    priorityTone: "text-alert",
+    nextSteps: [
+      "MLRO reviews PSC integrity & sanctions cross-checks",
+      "Decision: file internal SAR or return to analyst with guidance",
+      "Risk tier automatically bumped to Elevated pending review",
+      "All downstream periodic refresh actions paused on this entity",
+    ],
+    notifyChips: ["MLRO Group", "Risk Committee", "Audit Trail"],
+    sideTitle: "FCC Case View",
+    sideRows: [
+      { k: "Case Status", v: "Escalated → MLRO Review", tone: "alert" },
+      { k: "Workflow", v: "Financial Crime Compliance · SAR Triage" },
+      { k: "Risk Tier", v: "Elevated (auto-bumped)", tone: "alert" },
+      { k: "Periodic Refresh", v: "Paused", tone: "warn" },
+      { k: "Lock", v: "Analyst read-only", tone: "warn" },
+    ],
+  },
+  business: {
+    title: "Escalate to Business",
+    badge: "RM Outreach",
+    badgeTone: "bg-info-soft text-primary border-primary/30",
+    icon: Briefcase,
+    iconTone: "text-primary",
+    summary: "Routed to the covering Relationship Manager to obtain client confirmation and supporting documents before resolution.",
+    assignee: { name: "James Holloway", role: "Relationship Manager · EMEA Alternatives", avatar: "JH" },
+    sla: "5 business days · Client response SLA",
+    priority: "High",
+    priorityTone: "text-warning",
+    nextSteps: [
+      "RM contacts client to confirm registered office change",
+      "Client provides updated PSC filing & address evidence",
+      "Documents returned to analyst for verification",
+      "Case resumes resolution workflow once evidence received",
+    ],
+    notifyChips: ["Coverage Team", "KYC Analyst", "Client Portal"],
+    sideTitle: "Business Outreach View",
+    sideRows: [
+      { k: "Case Status", v: "Escalated → Awaiting Client", tone: "warn" },
+      { k: "Workflow", v: "RM Outreach · Client Confirmation" },
+      { k: "Risk Tier", v: "Moderate (unchanged)" },
+      { k: "Periodic Refresh", v: "On hold pending response", tone: "warn" },
+      { k: "Lock", v: "Analyst can amend after response", tone: "warn" },
+    ],
+  },
+} as const;
+
+const EscalationDialog = ({
+  kind, active, onClose,
+}: { kind: EscalationKind; active: Exc; onClose: () => void }) => {
+  if (!kind) return null;
+  const cfg = ESCALATION_CONFIG[kind];
+  const Icon = cfg.icon;
+  const toneClass = (t?: string) =>
+    t === "alert" ? "text-alert" : t === "warn" ? "text-warning" : "text-foreground";
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl p-0 overflow-hidden">
+        <div className="p-6 border-b border-border bg-secondary/40">
+          <DialogHeader>
+            <div className="flex items-start gap-3">
+              <div className={cn("size-10 rounded-full grid place-items-center border", cfg.badgeTone)}>
+                <Icon className={cn("size-5", cfg.iconTone)} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={cn("text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded border", cfg.badgeTone)}>
+                    {cfg.badge}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">Case {active.kyc} · {active.entity}</span>
+                </div>
+                <DialogTitle className="text-[17px]">{cfg.title}</DialogTitle>
+                <DialogDescription className="mt-1">{cfg.summary}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+        </div>
+
+        <div className="grid grid-cols-2 gap-0 divide-x divide-border">
+          <div className="p-5 space-y-4">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Assigned To</p>
+              <div className="flex items-center gap-3">
+                <div className="size-9 rounded-full bg-primary/10 text-primary grid place-items-center text-xs font-semibold">
+                  {cfg.assignee.avatar}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{cfg.assignee.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{cfg.assignee.role}</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">SLA</p>
+                <p className="text-sm flex items-center gap-1.5"><Clock className="size-3.5 text-muted-foreground" />{cfg.sla}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Priority</p>
+                <p className={cn("text-sm font-medium", cfg.priorityTone)}>{cfg.priority}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Next Steps</p>
+              <ol className="space-y-2">
+                {cfg.nextSteps.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px]">
+                    <span className="size-4 mt-0.5 rounded-full bg-secondary text-[10px] grid place-items-center font-medium">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2">Notified</p>
+              <div className="flex flex-wrap gap-1.5">
+                {cfg.notifyChips.map((c) => (
+                  <span key={c} className="text-[11px] px-2 py-0.5 rounded-full bg-secondary border border-border">{c}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 bg-secondary/20">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-1.5">
+              <ArrowRight className="size-3" /> Simulated screen · {cfg.sideTitle}
+            </p>
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building2 className="size-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-[13px] font-semibold leading-tight">{active.entity}</p>
+                    <p className="text-[10px] text-muted-foreground">{active.kyc} · {active.title}</p>
+                  </div>
+                </div>
+                <Lock className="size-3.5 text-muted-foreground" />
+              </div>
+              <div className="divide-y divide-border">
+                {cfg.sideRows.map((r) => (
+                  <div key={r.k} className="px-4 py-2.5 flex items-center justify-between text-[12px]">
+                    <span className="text-muted-foreground">{r.k}</span>
+                    <span className={cn("font-medium", toneClass((r as any).tone))}>{r.v}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="px-4 py-3 border-t border-border bg-secondary/30 flex items-center gap-2">
+                <UserCircle2 className="size-4 text-muted-foreground" />
+                <span className="text-[11px] text-muted-foreground">Owner reassigned to <span className="text-foreground font-medium">{cfg.assignee.name}</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="px-5 py-4 border-t border-border">
+          <button onClick={onClose} className="text-sm px-4 py-2 rounded-full border border-border hover:bg-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={onClose}
+            className={cn(
+              "text-sm px-5 py-2 rounded-full text-primary-foreground flex items-center gap-2 shadow-sm",
+              kind === "fcc" ? "bg-alert hover:bg-alert/90" : "bg-primary hover:opacity-95"
+            )}
+          >
+            <Send className="size-4" /> Confirm escalation
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export default ExceptionReview;
+
 
 
