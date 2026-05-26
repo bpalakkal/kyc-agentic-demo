@@ -4,7 +4,7 @@ import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Lock, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId } from "@/components/AgentSystem";
@@ -674,12 +674,12 @@ const severityFromConfidence = (c: number): { label: "High" | "Medium" | "Low"; 
   return { label: "Low", ring: "stroke-success", text: "text-success" };
 };
 
-const buildHeaderMeta = (addressed: number, total: number) => [
+const buildHeaderMeta = (addressed: number, total: number, reachOuts = 0) => [
   { label: "Exceptions", value: `${addressed}/${total}`, suffix: "addressed" },
   { label: "Due Date", value: "Apr 25, 2026" },
   { label: "Risk", value: "Elevated", tone: "alert" as const },
   { label: "Priority", value: "High" },
-  { label: "Reach Outs", value: "0", suffix: "pending" },
+  { label: "Outreach", value: `${reachOuts}`, suffix: "pending" },
 ];
 
 const DEFAULT_SELECTED_ENTITIES = [
@@ -744,6 +744,15 @@ const ExceptionReview = () => {
   const [rightTab, setRightTab] = useState<"attrs" | "locker" | "collab">("attrs");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
+  const [reachOutOpen, setReachOutOpen] = useState(false);
+  const [reachOutModal, setReachOutModal] = useState<null | "email" | "zoom">(null);
+  const [reachOutCount, setReachOutCount] = useState(0);
+  const [zoomDuration, setZoomDuration] = useState("30 min");
+  const [zoomLoading, setZoomLoading] = useState(false);
+  const [zoomMeeting, setZoomMeeting] = useState<{
+    id: number; join_url: string; start_url: string; password: string; topic: string;
+  } | null>(null);
+  const [zoomError, setZoomError] = useState<string | null>(null);
   
   
   const { runAgents, isRunning, currentLabel, runs } = useAgents();
@@ -830,7 +839,7 @@ const ExceptionReview = () => {
   }, [isRunning, runs, currentLabel, selectedResolution, active]);
 
   const addressedCount = Object.keys(resolvedMap).filter((id) => effectiveExceptions.find((e) => e.id === id)).length;
-  const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length);
+  const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length, reachOutCount);
 
 
 
@@ -865,14 +874,48 @@ const ExceptionReview = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <Link to="/work-queue" className="text-sm text-muted-foreground hover:text-foreground px-3 py-2">Cancel</Link>
             <button className="text-sm text-primary hover:underline px-3 py-2">Audit Log</button>
-            <button className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors">
-              <Mail className="size-4" /> Reach Outs
-            </button>
+            <Popover open={reachOutOpen} onOpenChange={setReachOutOpen}>
+              <PopoverTrigger asChild>
+                <button className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors">
+                  <Mail className="size-4" /> Outreach
+                  {reachOutCount > 0 && (
+                    <span className="size-5 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center font-semibold">
+                      {reachOutCount}
+                    </span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-1">
+                <div className="px-3 pt-2 pb-1.5">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Choose outreach method</p>
+                </div>
+                <button
+                  onClick={() => { setReachOutModal("email"); setReachOutOpen(false); }}
+                  className="w-full text-left p-3 rounded-md hover:bg-secondary flex gap-3 items-start transition-colors"
+                >
+                  <Mail className="size-4 mt-0.5 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Send Email</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Compose a templated outreach to the client's compliance team.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setReachOutModal("zoom"); setReachOutOpen(false); }}
+                  className="w-full text-left p-3 rounded-md hover:bg-secondary flex gap-3 items-start transition-colors"
+                >
+                  <Video className="size-4 mt-0.5 shrink-0 text-[#2D8CFF]" />
+                  <div>
+                    <p className="text-sm font-medium">Schedule Zoom Call</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Book a video call with the client to discuss outstanding items.</p>
+                  </div>
+                </button>
+              </PopoverContent>
+            </Popover>
             <button
               onClick={() => setOpenAgent(true)}
               className="text-sm px-4 py-2 rounded-full border border-primary text-primary flex items-center gap-2 hover:bg-info-soft transition-colors"
             >
-              <Sparkles className="size-4" /> Agent Review
+              <Sparkles className="size-4" /> QA Review
             </button>
             <Popover open={escalateOpen} onOpenChange={setEscalateOpen}>
               <PopoverTrigger asChild>
@@ -1003,10 +1046,12 @@ const ExceptionReview = () => {
                         <p className="text-[11px] leading-snug">{resolved!.resolutionTitle}</p>
                       </div>
                     )}
-                    <div className="mt-2 flex items-center gap-1.5 text-[10px]">
-                      <Building2 className="size-2.5 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground truncate">{e.entity}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-secondary text-muted-foreground shrink-0">{e.kyc}</span>
+                    <div className="mt-2 text-[10px]">
+                      <div className="flex items-start gap-1">
+                        <Building2 className="size-2.5 text-muted-foreground shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground leading-snug line-clamp-2">{e.entity}</span>
+                      </div>
+                      <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{e.kyc}</span>
                     </div>
 
                   </button>
@@ -1280,7 +1325,7 @@ const ExceptionReview = () => {
 
               <div className="mt-3 rounded-lg border border-border p-3">
                 <input className="w-full bg-transparent text-sm placeholder:text-muted-foreground outline-none" placeholder="Or enter a custom resolution note…" />
-                <div className="flex items-center justify-end mt-8">
+                <div className="flex items-center justify-end mt-2">
                   <button className="text-xs px-4 py-1.5 rounded-full border border-border text-muted-foreground hover:bg-secondary flex items-center gap-2">
                     <Send className="size-3.5" /> Submit Note
                   </button>
@@ -1348,35 +1393,53 @@ const ExceptionReview = () => {
             {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
           </aside>
         ) : (
-          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-3">
+          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-4">
             <button
               onClick={() => setRightPaneOpen(true)}
-              className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+              className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors shrink-0"
               title="Expand right pane"
             >
               <ChevronDown className="size-3.5 rotate-90" />
             </button>
-            <button
-              onClick={() => { setRightPaneOpen(true); setRightTab("attrs"); }}
-              className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
-              title="Attributes"
-            >
-              <Settings2 className="size-3" /> Attributes
-            </button>
-            <button
-              onClick={() => { setRightPaneOpen(true); setRightTab("locker"); }}
-              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
-              title="Document Locker"
-            >
-              <FileText className="size-3" /> Documents
-            </button>
-            <button
-              onClick={() => { setRightPaneOpen(true); setRightTab("collab"); }}
-              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
-              title="Collaboration"
-            >
-              <MessageSquare className="size-3" /> Collaboration
-            </button>
+            <div className="flex-1 flex flex-col items-center justify-evenly w-full pt-3">
+              <button
+                onClick={() => { setRightPaneOpen(true); setRightTab("attrs"); }}
+                className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+                title="Attributes"
+              >
+                <Settings2 className="size-3" /> Attributes
+              </button>
+              <div className="w-5 h-px bg-border/60" />
+              <div className="relative">
+                <button
+                  onClick={() => { setRightPaneOpen(true); setRightTab("locker"); }}
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+                  title="Document Locker"
+                >
+                  <FileText className="size-3" /> Documents
+                </button>
+                {CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length > 0 && (
+                  <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[8px] grid place-items-center font-semibold leading-none">
+                    {CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length}
+                  </span>
+                )}
+              </div>
+              <div className="w-5 h-px bg-border/60" />
+              <div className="relative">
+                <button
+                  onClick={() => { setRightPaneOpen(true); setRightTab("collab"); }}
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+                  title="Collaboration"
+                >
+                  <MessageSquare className="size-3" /> Collaboration
+                </button>
+                {(COMMENTS_BY_KYC[active.kyc]?.length ?? 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[8px] grid place-items-center font-semibold leading-none">
+                    {COMMENTS_BY_KYC[active.kyc]?.length}
+                  </span>
+                )}
+              </div>
+            </div>
           </aside>
         )}
 
@@ -1398,6 +1461,251 @@ const ExceptionReview = () => {
         active={active}
         onClose={() => setEscalation(null)}
       />
+
+      {/* Email Outreach Modal */}
+      {reachOutModal === "email" && (
+        <Dialog open onOpenChange={() => setReachOutModal(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="size-4 text-primary" /> Compose Outreach Email
+              </DialogTitle>
+              <DialogDescription>
+                Sending to <span className="font-medium text-foreground">{active.entity}</span> regarding <span className="font-medium text-foreground">{active.title}</span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-1">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">To</p>
+                <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 bg-secondary/30">
+                  <UserCircle2 className="size-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm flex-1">compliance@brevanhoward.com</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-info-soft text-primary border border-primary/20">Compliance Team</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">CC</p>
+                <div className="rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
+                  rm.anderson@kpmg.com
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Subject</p>
+                <div className="rounded-lg border border-border px-3 py-2 text-sm">
+                  [{active.kyc}] Outstanding KYC Item — {active.title}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Message</p>
+                <textarea
+                  defaultValue={`Dear ${active.entity} Compliance Team,\n\nI hope this message finds you well. I am writing regarding a KYC review item for ${active.kyc} that requires your attention.\n\n${active.flagText}\n\nCould you please provide the relevant documentation or clarification at your earliest convenience? Our SLA for this item closes on Apr 25, 2026.\n\nKind regards,\nKYC Analyst — KPMG`}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-transparent resize-none outline-none focus:ring-2 focus:ring-ring/30 min-h-[148px]"
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button className="text-xs flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                  <Paperclip className="size-3.5" /> Attach document
+                </button>
+                <span className="text-muted-foreground/40 text-xs">·</span>
+                <span className="text-[11px] text-muted-foreground">SLA: 7 business days</span>
+              </div>
+            </div>
+            <DialogFooter>
+              <button onClick={() => setReachOutModal(null)} className="text-sm px-4 py-2 rounded-full border border-border hover:bg-secondary transition-colors">Cancel</button>
+              <button
+                onClick={() => { setReachOutCount((c) => c + 1); setReachOutModal(null); }}
+                className="text-sm px-5 py-2 rounded-full bg-primary text-primary-foreground flex items-center gap-2 hover:opacity-95 transition-opacity shadow-sm"
+              >
+                <Send className="size-3.5" /> Send Email
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Zoom Scheduling Modal */}
+      {reachOutModal === "zoom" && (
+        <Dialog open onOpenChange={() => { setReachOutModal(null); setZoomMeeting(null); setZoomError(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Video className="size-4 text-[#2D8CFF]" /> Schedule Zoom Call
+              </DialogTitle>
+              <DialogDescription>
+                Book a video call with <span className="font-medium text-foreground">{active.entity}</span> to discuss outstanding items
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* ── Success state ── */}
+            {zoomMeeting ? (
+              <div className="space-y-4 py-2">
+                <div className="rounded-xl border border-success/40 bg-success-soft/50 p-4 flex items-start gap-3">
+                  <CheckCircle2 className="size-5 text-success shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-success">Meeting created</p>
+                    <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{zoomMeeting.topic}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: "Meeting ID", value: String(zoomMeeting.id) },
+                    { label: "Passcode", value: zoomMeeting.password },
+                  ].map((r) => (
+                    <div key={r.label} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{r.label}</span>
+                      <span className="text-sm font-mono font-medium">{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => window.open(zoomMeeting.join_url, "_blank")}
+                    className="flex-1 text-sm py-2 rounded-full border border-[#2D8CFF] text-[#2D8CFF] hover:bg-[#2D8CFF]/10 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Video className="size-3.5" /> Join via Browser
+                  </button>
+                  <button
+                    onClick={() => {
+                      const zoommtg = `zoommtg://zoom.us/join?action=join&confno=${zoomMeeting.id}&pwd=${zoomMeeting.password}&zc=0`;
+                      window.location.href = zoommtg;
+                    }}
+                    className="flex-1 text-sm py-2 rounded-full bg-[#2D8CFF] text-white hover:opacity-95 transition-opacity shadow-sm flex items-center justify-center gap-2"
+                  >
+                    <Video className="size-3.5" /> Open Desktop App
+                  </button>
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(zoomMeeting.join_url)}
+                  className="w-full text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1"
+                >
+                  Copy invite link
+                </button>
+              </div>
+            ) : (
+            /* ── Form state ── */
+            <div className="space-y-3 py-1">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Meeting Title</p>
+                <div className="rounded-lg border border-border px-3 py-2 text-sm bg-secondary/30">
+                  [{active.kyc}] KYC Review — {active.title}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Attendees</p>
+                <div className="space-y-1.5">
+                  {[
+                    { name: "KYC Analyst", email: "analyst@kpmg.com", you: true },
+                    { name: "Compliance Team", email: "compliance@brevanhoward.com" },
+                    { name: "RM Anderson", email: "rm.anderson@kpmg.com" },
+                  ].map((a) => (
+                    <div key={a.email} className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 bg-secondary/20">
+                      <UserCircle2 className="size-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-[12px] font-medium flex-1">{a.name}</span>
+                      <span className="text-[11px] text-muted-foreground">{a.email}</span>
+                      {a.you && <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">You</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Date</p>
+                  <div className="rounded-lg border border-border px-3 py-2 flex items-center gap-2 text-sm">
+                    <Calendar className="size-3.5 text-muted-foreground shrink-0" /> May 27, 2026
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Time</p>
+                  <div className="rounded-lg border border-border px-3 py-2 flex items-center gap-2 text-sm">
+                    <Clock className="size-3.5 text-muted-foreground shrink-0" /> 10:00 AM GMT
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Duration</p>
+                <div className="flex gap-2">
+                  {["30 min", "45 min", "60 min"].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setZoomDuration(d)}
+                      className={cn(
+                        "flex-1 text-xs py-1.5 rounded-full border transition-colors",
+                        zoomDuration === d
+                          ? "border-[#2D8CFF] bg-[#2D8CFF]/10 text-[#2D8CFF] font-medium"
+                          : "border-border hover:bg-secondary text-muted-foreground"
+                      )}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Agenda</p>
+                <textarea
+                  id="zoom-agenda"
+                  defaultValue={`1. Review outstanding KYC exception: ${active.title}\n2. Discuss required documentation\n3. Agree remediation timeline\n4. Q&A`}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm bg-transparent resize-none outline-none focus:ring-2 focus:ring-ring/30 min-h-[80px]"
+                />
+              </div>
+              {zoomError && (
+                <div className="rounded-lg border border-alert/30 bg-alert-soft/50 px-3 py-2 text-[12px] text-alert flex items-center gap-2">
+                  <AlertTriangle className="size-3.5 shrink-0" /> {zoomError}
+                </div>
+              )}
+            </div>
+            )}
+
+            <DialogFooter>
+              <button
+                onClick={() => { setReachOutModal(null); setZoomMeeting(null); setZoomError(null); }}
+                className="text-sm px-4 py-2 rounded-full border border-border hover:bg-secondary transition-colors"
+              >
+                {zoomMeeting ? "Close" : "Cancel"}
+              </button>
+              {!zoomMeeting && (
+                <button
+                  disabled={zoomLoading}
+                  onClick={async () => {
+                    setZoomLoading(true);
+                    setZoomError(null);
+                    try {
+                      const agenda = (document.getElementById("zoom-agenda") as HTMLTextAreaElement)?.value ?? "";
+                      const durationMins = parseInt(zoomDuration);
+                      const startTime = new Date("2026-05-27T10:00:00Z").toISOString();
+                      const res = await fetch("http://localhost:3001/api/zoom/create-meeting", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          topic: `[${active.kyc}] KYC Review — ${active.title}`,
+                          agenda,
+                          start_time: startTime,
+                          duration: durationMins,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error ?? "Failed to create meeting");
+                      setZoomMeeting(data);
+                      setReachOutCount((c) => c + 1);
+                    } catch (err: unknown) {
+                      setZoomError(err instanceof Error ? err.message : "Could not reach the local Zoom server. Is it running? (npm run server)");
+                    } finally {
+                      setZoomLoading(false);
+                    }
+                  }}
+                  className="text-sm px-5 py-2 rounded-full bg-[#2D8CFF] text-white flex items-center gap-2 hover:opacity-95 disabled:opacity-60 transition-opacity shadow-sm"
+                >
+                  {zoomLoading ? (
+                    <><span className="size-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Creating…</>
+                  ) : (
+                    <><Video className="size-3.5" /> Schedule Meeting</>
+                  )}
+                </button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
     </div>
   );
@@ -3102,7 +3410,7 @@ const AgentReviewModal = ({ onClose }: { onClose: () => void }) => (
           <div className="flex items-start gap-3">
             <span className="size-8 rounded-lg bg-primary/10 text-primary grid place-items-center">🧳</span>
             <div>
-              <h3 className="text-[15px] font-semibold">Agent Review</h3>
+              <h3 className="text-[15px] font-semibold">QA Review</h3>
               <p className="text-xs text-muted-foreground">London Alternatives DRG · 4 attributes checked</p>
             </div>
           </div>
@@ -3483,21 +3791,63 @@ type CollabSubTab = "comments" | "tasks" | "watchers" | "activity";
 const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
   const [sub, setSub] = useState<CollabSubTab>("comments");
   const [draft, setDraft] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const comments = COMMENTS_BY_KYC[kyc] ?? [
-    { author: "System", initials: "SY", role: "Auto", time: "Today",
-      body: `No collaboration activity yet on ${entity}. Be the first to leave a note.`, kind: "comment" as const },
-  ];
+  const [localComments, setLocalComments] = useState<CaseComment[]>(
+    () => COMMENTS_BY_KYC[kyc] ?? [
+      { author: "System", initials: "SY", role: "Auto", time: "Today",
+        body: `No collaboration activity yet on ${entity}. Be the first to leave a note.`, kind: "comment" as const },
+    ]
+  );
+  const [localActivity, setLocalActivity] = useState<Activity[]>(
+    () => ACTIVITY_BY_KYC[kyc] ?? []
+  );
+
+  // Reset when switching to a different case
+  useEffect(() => {
+    setLocalComments(COMMENTS_BY_KYC[kyc] ?? [
+      { author: "System", initials: "SY", role: "Auto", time: "Today",
+        body: `No collaboration activity yet on ${entity}. Be the first to leave a note.`, kind: "comment" as const },
+    ]);
+    setLocalActivity(ACTIVITY_BY_KYC[kyc] ?? []);
+    setDraft("");
+  }, [kyc, entity]);
+
   const tasks = TASKS_BY_KYC[kyc] ?? [];
   const watchers = WATCHERS_BY_KYC[kyc] ?? [];
-  const activity = ACTIVITY_BY_KYC[kyc] ?? [];
 
   const subTabs: { id: CollabSubTab; label: string; count: number }[] = [
-    { id: "comments", label: "Comments", count: comments.length },
+    { id: "comments", label: "Comments", count: localComments.length },
     { id: "tasks", label: "Tasks", count: tasks.length },
     { id: "watchers", label: "Watchers", count: watchers.length },
-    { id: "activity", label: "Activity", count: activity.length },
+    { id: "activity", label: "Activity", count: localActivity.length },
   ];
+
+  const handlePost = () => {
+    const text = draft.trim();
+    if (!text) return;
+    const newComment: CaseComment = {
+      author: "You",
+      initials: "YO",
+      role: "Reviewer · L1",
+      time: "Just now",
+      body: text,
+      kind: "comment",
+    };
+    setLocalComments((prev) => [newComment, ...prev]);
+    setLocalActivity((prev) => [{ time: "Just now", text: "You posted a comment" }, ...prev]);
+    setDraft("");
+  };
+
+  const handleReply = (author: string) => {
+    setDraft(`@${author} `);
+    setSub("comments");
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      const len = (`@${author} `).length;
+      textareaRef.current?.setSelectionRange(len, len);
+    }, 0);
+  };
 
   return (
     <section>
@@ -3529,8 +3879,8 @@ const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
       {sub === "comments" && (
         <>
           <ul className="space-y-3 max-h-[360px] overflow-y-auto pr-1 -mr-1">
-            {comments.map((c, i) => (
-              <li key={i} className="flex items-start gap-2.5">
+            {localComments.map((c, i) => (
+              <li key={i} className={cn("flex items-start gap-2.5", i === 0 && c.time === "Just now" && "animate-fade-in")}>
                 <span className={cn("size-7 rounded-full grid place-items-center shrink-0 text-[10px] font-semibold", kindTone[c.kind])}>
                   {c.kind === "ai" ? <Bot className="size-3.5" /> : c.initials}
                 </span>
@@ -3538,22 +3888,34 @@ const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[12px] font-medium leading-tight">{c.author}</span>
                     <span className="text-[10px] text-muted-foreground">{c.role}</span>
+                    {i === 0 && c.time === "Just now" && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-soft text-success border border-success-soft-border">Posted</span>
+                    )}
                   </div>
                   <p className="text-[12px] text-foreground/90 mt-0.5 leading-snug">{c.body}</p>
                   <div className="flex items-center gap-3 mt-1">
                     <p className="text-[10px] text-muted-foreground">{c.time}</p>
-                    <button className="text-[10px] text-muted-foreground hover:text-foreground">Reply</button>
-                    <button className="text-[10px] text-muted-foreground hover:text-foreground">Resolve</button>
+                    {c.kind !== "ai" && (
+                      <button
+                        onClick={() => handleReply(c.author)}
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Reply
+                      </button>
+                    )}
+                    <button className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">Resolve</button>
                   </div>
                 </div>
               </li>
             ))}
           </ul>
 
-          <div className="mt-3 rounded-lg border border-border p-2">
+          <div className="mt-3 rounded-lg border border-border p-2 focus-within:ring-2 focus-within:ring-ring/30 transition-shadow">
             <textarea
+              ref={textareaRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handlePost(); }}
               rows={2}
               placeholder="Write a comment… use @ to mention a teammate"
               className="w-full bg-transparent text-[12px] outline-none resize-none placeholder:text-muted-foreground"
@@ -3561,11 +3923,12 @@ const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
             <div className="flex items-center justify-between mt-1">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <button className="hover:text-foreground" title="Attach"><Paperclip className="size-3.5" /></button>
-                <button className="text-[11px] hover:text-foreground" title="Mention">@</button>
+                <button className="text-[11px] hover:text-foreground" title="Mention" onClick={() => setDraft((d) => d + "@")}>@</button>
+                <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">⌘↵ to post</span>
               </div>
               <button
-                onClick={() => setDraft("")}
-                className="text-[11px] px-3 py-1 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-95 disabled:opacity-50"
+                onClick={handlePost}
+                className="text-[11px] px-3 py-1 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-95 disabled:opacity-40 transition-opacity"
                 disabled={!draft.trim()}
               >
                 Post
@@ -3628,9 +3991,12 @@ const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
 
       {sub === "activity" && (
         <ul className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1 -mr-1">
-          {activity.map((a, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span className="mt-1.5 size-1.5 rounded-full bg-primary/60 shrink-0" />
+          {localActivity.length === 0 && (
+            <li className="text-[12px] text-muted-foreground italic text-center py-4">No activity yet for this case.</li>
+          )}
+          {localActivity.map((a, i) => (
+            <li key={i} className={cn("flex items-start gap-2.5", i === 0 && a.time === "Just now" && "animate-fade-in")}>
+              <span className={cn("mt-1.5 size-1.5 rounded-full shrink-0", i === 0 && a.time === "Just now" ? "bg-success" : "bg-primary/60")} />
               <div className="min-w-0">
                 <p className="text-[12px] leading-snug">{a.text}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{a.time}</p>

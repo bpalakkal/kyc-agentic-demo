@@ -6,8 +6,8 @@ import { AgentProvider, AgentRecommendationStrip } from "@/components/AgentSyste
 const tabs = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/work-queue", label: "Work Queue" },
-  { to: "/reports", label: "Reports" },
-];
+  { to: "/reports", label: "Reports", disabled: true },
+] as { to: string; label: string; end?: boolean; disabled?: boolean }[];
 
 const AppLayout = () => {
   const location = useLocation();
@@ -24,23 +24,34 @@ const AppLayout = () => {
             </div>
 
             <nav className="flex-1 flex items-center justify-center gap-8">
-              {tabs.map((t) => (
-                <NavLink
-                  key={t.to}
-                  to={t.to}
-                  end={t.end}
-                  className={({ isActive }) =>
-                    cn(
-                      "relative text-[14px] py-[18px] transition-colors",
-                      isActive
-                        ? "text-nav-foreground after:absolute after:left-0 after:right-0 after:-bottom-px after:h-[2px] after:bg-nav-foreground"
-                        : "text-nav-muted hover:text-nav-foreground"
-                    )
-                  }
-                >
-                  {t.label}
-                </NavLink>
-              ))}
+              {tabs.map((t) =>
+                t.disabled ? (
+                  <span
+                    key={t.to}
+                    title="Coming soon"
+                    className="relative text-[14px] py-[18px] text-nav-muted/50 cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {t.label}
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-white/10 uppercase tracking-wide leading-none">Soon</span>
+                  </span>
+                ) : (
+                  <NavLink
+                    key={t.to}
+                    to={t.to}
+                    end={t.end}
+                    className={({ isActive }) =>
+                      cn(
+                        "relative text-[14px] py-[18px] transition-colors",
+                        isActive
+                          ? "text-nav-foreground after:absolute after:left-0 after:right-0 after:-bottom-px after:h-[2px] after:bg-nav-foreground"
+                          : "text-nav-muted hover:text-nav-foreground"
+                      )
+                    }
+                  >
+                    {t.label}
+                  </NavLink>
+                )
+              )}
             </nav>
 
             <div className="flex items-center gap-4">

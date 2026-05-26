@@ -203,18 +203,6 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
           <span className="text-[11px] text-muted-foreground truncate hidden md:inline">· {bundle.reason}</span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {bundle.agents.map((id) => {
-            const a = AGENTS_BY_ID[id];
-            const Icon = a.icon;
-            return (
-              <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-card border border-border text-[11px]">
-                <Icon className="size-3 text-primary" /> {a.short}
-              </span>
-            );
-          })}
-        </div>
-
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={runRecommended}

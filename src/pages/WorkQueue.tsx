@@ -136,7 +136,14 @@ const WorkQueue = () => {
         <Link
           to="/work-queue/review"
           state={{ entities: selectedEntities }}
-          className="h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 shadow-sm hover:opacity-95"
+          onClick={(e) => { if (selectedCount === 0) e.preventDefault(); }}
+          className={cn(
+            "h-10 px-5 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm transition-all",
+            selectedCount > 0
+              ? "bg-primary text-primary-foreground hover:opacity-95 cursor-pointer"
+              : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed pointer-events-none"
+          )}
+          aria-disabled={selectedCount === 0}
         >
           Review Selected
           <span className="size-5 rounded-full bg-white/20 grid place-items-center text-[11px]">{selectedCount}</span>
@@ -191,7 +198,7 @@ const WorkQueue = () => {
                 >
                   <span className="flex justify-center">
                     {r.locked ? (
-                      <Lock className="size-4 text-muted-foreground/50" />
+                      <Lock className="size-4 text-muted-foreground/50" title="Assigned to another analyst — read only" />
                     ) : (
                       <input
                         type="checkbox"
