@@ -80,11 +80,10 @@ type AgentApiConfig = {
 };
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
-    slug: "uk-ch-data-sourcing",
+    slug: "uk-companies-house",
     buildBody: (ctx) => ({
       entity_name: ctx?.name ?? "",
-      static_data_store: "reference_database",
-      classification_defintions: "ddocument_classification_taxonomy",
+      out_document_store: "all_unstructured_docs",
     }),
     fetchSteps: true,
     asyncMode: true,
