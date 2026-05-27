@@ -91,28 +91,43 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   },
 };
 
+function isNodeObjectArray(arr: unknown[]): boolean {
+  if (arr.length === 0) return false;
+  const first = arr[0];
+  if (!first || typeof first !== "object") return false;
+  return "node_alias" in (first as object) || ("agent_steps" in (first as object) && !("type" in (first as object)));
+}
+
+function flattenNodeObjects(nodes: unknown[]): unknown[] {
+  return nodes.flatMap((node) => {
+    if (!node || typeof node !== "object") return [];
+    const n = node as Record<string, unknown>;
+    const steps = Array.isArray(n.agent_steps) ? n.agent_steps : [];
+    if (steps.length === 0) return [];
+    return [
+      { type: "node_header", label: String(n.node_alias ?? "agent"), execution_time_ms: n.execution_time_ms },
+      ...steps,
+    ];
+  });
+}
+
 function extractRawSteps(raw: unknown): unknown[] {
   if (!raw || typeof raw !== "object") return [];
-  if (Array.isArray(raw)) return raw as unknown[];
-  const d = raw as Record<string, unknown>;
 
-  // Actual AWS agent API: {"value": [{node_alias, agent_steps: [...]}, ...], "Count": N}
-  if (Array.isArray(d.value)) {
-    return (d.value as unknown[]).flatMap((node) => {
-      if (!node || typeof node !== "object") return [];
-      const n = node as Record<string, unknown>;
-      const steps = Array.isArray(n.agent_steps) ? n.agent_steps : [];
-      if (steps.length === 0) return [];
-      // Synthetic header so the dock shows which node each step belongs to
-      return [
-        { type: "node_header", label: String(n.node_alias ?? "agent"), execution_time_ms: n.execution_time_ms },
-        ...steps,
-      ];
-    });
+  // Plain array — could be node objects (with node_alias/agent_steps) or already-flat step objects
+  if (Array.isArray(raw)) {
+    return isNodeObjectArray(raw) ? flattenNodeObjects(raw) : (raw as unknown[]);
   }
 
-  // Fallback: node-level objects each containing their own steps array — flatten them
-  const flattenNodes = (nodes: unknown[]) =>
+  const d = raw as Record<string, unknown>;
+
+  // {"value": [...], "Count": N} — AWS execution-logs format (wrapped or unwrapped node arrays)
+  if (Array.isArray(d.value)) {
+    return isNodeObjectArray(d.value) ? flattenNodeObjects(d.value) : (d.value as unknown[]);
+  }
+
+  // Fallback: keyed step arrays
+  const flattenSteps = (nodes: unknown[]) =>
     nodes.flatMap((node) => {
       if (!node || typeof node !== "object") return [node];
       const n = node as Record<string, unknown>;
@@ -123,10 +138,10 @@ function extractRawSteps(raw: unknown): unknown[] {
       return [node];
     });
 
-  if (Array.isArray(d.steps)) return flattenNodes(d.steps);
-  if (Array.isArray(d.agentSteps)) return flattenNodes(d.agentSteps);
-  if (Array.isArray(d.agent_steps)) return flattenNodes(d.agent_steps);
-  if (Array.isArray(d.events)) return flattenNodes(d.events);
+  if (Array.isArray(d.steps)) return flattenSteps(d.steps);
+  if (Array.isArray(d.agentSteps)) return flattenSteps(d.agentSteps);
+  if (Array.isArray(d.agent_steps)) return flattenSteps(d.agent_steps);
+  if (Array.isArray(d.events)) return flattenSteps(d.events);
   if (Array.isArray(d.messages)) return d.messages as unknown[];
   return [];
 }
