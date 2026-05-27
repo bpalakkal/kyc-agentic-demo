@@ -2,13 +2,14 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import {
   Bot, Sparkles, ChevronDown, ChevronUp, X, Loader2, CheckCircle2, Play, Search,
   ShieldCheck, FileCheck2, Database, Mail, Scale, UserCheck, Globe, Brain, Zap, Minus, Building2,
+  Network, Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
   | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
-  | "companies-house";
+  | "companies-house" | "uk-parent-flow" | "jersey-fsc" | "fca";
 
 export type Agent = {
   id: AgentId;
@@ -53,6 +54,15 @@ export const AGENTS: Agent[] = [
   { id: "companies-house", name: "UK Companies House Agent", short: "Co. House", icon: Building2,
     description: "Queries the UK Companies House registry to verify incorporation, filing status, and directors.",
     defaultThoughts: ["Connecting to Companies House registry…", "Preparing company name search query…", "Awaiting API response…"] },
+  { id: "uk-parent-flow", name: "UK Orchestration Flow", short: "UK Flow", icon: Network,
+    description: "Orchestrates all UK-registered entity agents end-to-end — Companies House, FCA, JFSC, and more.",
+    defaultThoughts: ["Initialising UK entity orchestration flow…", "Dispatching sub-agents…", "Awaiting results…"] },
+  { id: "jersey-fsc", name: "Jersey FSC Agent", short: "JFSC", icon: Landmark,
+    description: "Sources data from the Jersey Financial Services Commission registry for regulated entities.",
+    defaultThoughts: ["Connecting to JFSC registry…", "Searching entity name…", "Awaiting API response…"] },
+  { id: "fca", name: "FCA Data Sourcing Agent", short: "FCA", icon: Scale,
+    description: "Sources regulatory data from the UK Financial Conduct Authority register.",
+    defaultThoughts: ["Connecting to FCA register…", "Searching entity name…", "Awaiting API response…"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -85,6 +95,27 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
       entity_name: ctx?.name ?? "",
       out_document_store: "all_unstructured_docs",
     }),
+    fetchSteps: true,
+    asyncMode: true,
+  },
+  "uk-parent-flow": {
+    slug: "uk-parent-flow",
+    buildBody: (ctx) => ({
+      entity_name: ctx?.name ?? "",
+      out_document_store: "all_unstructured_docs",
+    }),
+    fetchSteps: true,
+    asyncMode: true,
+  },
+  "jersey-fsc": {
+    slug: "uk-jersey-financial-services-commission",
+    buildBody: (ctx) => ({ entity_name: ctx?.name ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+  },
+  "fca": {
+    slug: "fca-data-sourcing",
+    buildBody: (ctx) => ({ entity_name: ctx?.name ?? "" }),
     fetchSteps: true,
     asyncMode: true,
   },
@@ -611,27 +642,37 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                     <span className="size-1.5 rounded-full bg-success inline-block" />
                     Live Data Sources
                   </p>
-                  <button
-                    disabled={!entityContext?.name}
-                    onClick={() => { runAgents(["companies-house"], "UK Companies House Lookup"); setOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-secondary/60"
-                  >
-                    <span className="size-7 rounded-md bg-success-soft text-success border border-success-soft-border grid place-items-center shrink-0 mt-0.5">
-                      <Building2 className="size-3.5" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-[12px] font-medium">UK Companies House</p>
-                        <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Live API</span>
+                  {(
+                    [
+                      { id: "companies-house" as const, icon: Building2, label: "UK Companies House", desc: "Companies House incorporation & filing registry" },
+                      { id: "uk-parent-flow" as const, icon: Network, label: "UK Orchestration Flow", desc: "All UK agents end-to-end (Companies House, FCA, JFSC)" },
+                      { id: "jersey-fsc" as const, icon: Landmark, label: "Jersey FSC", desc: "Jersey Financial Services Commission registry" },
+                      { id: "fca" as const, icon: Scale, label: "FCA Data Sourcing", desc: "UK Financial Conduct Authority register" },
+                    ] as const
+                  ).map(({ id, icon: Icon, label, desc }) => (
+                    <button
+                      key={id}
+                      disabled={!entityContext?.name}
+                      onClick={() => { runAgents([id], `${label} Lookup`); setOpen(false); }}
+                      className="w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-secondary/60"
+                    >
+                      <span className="size-7 rounded-md bg-success-soft text-success border border-success-soft-border grid place-items-center shrink-0 mt-0.5">
+                        <Icon className="size-3.5" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[12px] font-medium">{label}</p>
+                          <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Live API</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          {entityContext?.name
+                            ? <><span className="font-medium text-foreground">{entityContext.name}</span> · {desc}</>
+                            : "Open an entity in the review page first"}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">
-                        {entityContext?.name
-                          ? <>Search <span className="font-medium text-foreground">{entityContext.name}</span> in the Companies House registry</>
-                          : "Open an entity in the review page first"}
-                      </p>
-                    </div>
-                    <span className="text-[11px] text-primary font-medium shrink-0 mt-1">Run →</span>
-                  </button>
+                      <span className="text-[11px] text-primary font-medium shrink-0 mt-1">Run →</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
