@@ -208,6 +208,17 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
       }
     }
   }
+
+  // If nothing was parsed, show a raw preview to help diagnose the format
+  if (thoughts.length === 0 && steps.length > 0) {
+    thoughts.push(`📦 Received ${steps.length} step(s) — raw preview:`);
+    for (const step of steps.slice(0, 5)) {
+      if (step && typeof step === "object") {
+        thoughts.push(JSON.stringify(step).slice(0, 400));
+      }
+    }
+  }
+
   return thoughts.length > 0 ? thoughts : ["✓ Agent completed — no structured steps returned"];
 }
 
@@ -343,6 +354,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           try {
             const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
             const stepsRaw = await sr.json() as unknown;
+            console.log("[agent-steps] raw:", JSON.stringify(stepsRaw).slice(0, 1000));
             updateLiveThoughts(extractRawSteps(stepsRaw));
           } catch { /* non-fatal — keep polling */ }
 
