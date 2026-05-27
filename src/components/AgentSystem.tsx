@@ -510,8 +510,9 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                     Live Data Sources
                   </p>
                   <button
+                    disabled={!entityContext?.name}
                     onClick={() => { runAgents(["companies-house"], "UK Companies House Lookup"); setOpen(false); }}
-                    className="w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-secondary/60 transition-colors"
+                    className="w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-secondary/60"
                   >
                     <span className="size-7 rounded-md bg-success-soft text-success border border-success-soft-border grid place-items-center shrink-0 mt-0.5">
                       <Building2 className="size-3.5" />
@@ -524,7 +525,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                       <p className="text-[11px] text-muted-foreground leading-snug">
                         {entityContext?.name
                           ? <>Search <span className="font-medium text-foreground">{entityContext.name}</span> in the Companies House registry</>
-                          : "Verify incorporation, filing status, and directors"}
+                          : "Open an entity in the review page first"}
                       </p>
                     </div>
                     <span className="text-[11px] text-primary font-medium shrink-0 mt-1">Run →</span>
