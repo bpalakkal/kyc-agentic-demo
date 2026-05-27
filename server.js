@@ -89,41 +89,50 @@ const AWS_AGENT_BASE =
   process.env.AWS_AGENT_BASE ??
   "http://gs-forge-agentic-runtime-lb-1873180191.us-east-1.elb.amazonaws.com";
 
-app.post("/api/agent/:slug", async (req, res) => {
+// Helper: fetch a URL and always return { ok, status, data } — never throws,
+// never returns raw HTML to the browser.
+async function proxyFetch(url, options = {}) {
+  let status = 502;
   try {
-    const url = `${AWS_AGENT_BASE}/api/invoke/${req.params.slug}`;
-    const upstream = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body ?? {}),
-    });
-    const data = await upstream.json();
-    res.status(upstream.status).json(data);
+    const upstream = await fetch(url, options);
+    status = upstream.status;
+    const text = await upstream.text();
+    console.log(`[agent-proxy] ${options.method ?? "GET"} ${url} → ${status} (${text.length} chars)`);
+    try {
+      return { ok: upstream.ok, status, data: JSON.parse(text) };
+    } catch {
+      // Upstream returned non-JSON (e.g. HTML 404/502 page from load balancer)
+      const preview = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+      console.error(`[agent-proxy] Non-JSON body from ${url}: ${preview}`);
+      return { ok: false, status, data: { error: `Upstream returned non-JSON (HTTP ${status})`, preview } };
+    }
   } catch (err) {
-    res.status(502).json({ error: `Agent proxy error: ${err.message}` });
+    console.error(`[agent-proxy] Network error fetching ${url}: ${err.message}`);
+    return { ok: false, status, data: { error: `Network error: ${err.message}` } };
   }
+}
+
+app.post("/api/agent/:slug", async (req, res) => {
+  const url = `${AWS_AGENT_BASE}/api/invoke/${req.params.slug}`;
+  console.log(`[agent-proxy] Invoking agent: ${url}`, req.body);
+  const { status, data } = await proxyFetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req.body ?? {}),
+  });
+  res.status(status).json(data);
 });
 
 app.get("/api/agent-steps/:runId", async (req, res) => {
-  try {
-    const url = `${AWS_AGENT_BASE}/api/execution-logs/${req.params.runId}/agent-steps`;
-    const upstream = await fetch(url);
-    const data = await upstream.json();
-    res.status(upstream.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: `Agent steps proxy error: ${err.message}` });
-  }
+  const url = `${AWS_AGENT_BASE}/api/execution-logs/${req.params.runId}/agent-steps`;
+  const { status, data } = await proxyFetch(url);
+  res.status(status).json(data);
 });
 
 app.get("/api/agent-run/:runId", async (req, res) => {
-  try {
-    const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
-    const upstream = await fetch(url);
-    const data = await upstream.json();
-    res.status(upstream.status).json(data);
-  } catch (err) {
-    res.status(502).json({ error: `Agent run proxy error: ${err.message}` });
-  }
+  const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
+  const { status, data } = await proxyFetch(url);
+  res.status(status).json(data);
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));

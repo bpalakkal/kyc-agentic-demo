@@ -80,7 +80,7 @@ type AgentApiConfig = {
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
     slug: "uk-companies-house",
-    buildBody: (ctx) => (ctx?.name ? { company_name: ctx.name } : {}),
+    buildBody: (ctx) => (ctx?.name ? { entity_name: ctx.name } : {}),
     fetchSteps: true,
   },
 };
@@ -252,7 +252,11 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cfg.buildBody(ctx)),
       })
-        .then((r) => r.json())
+        .then(async (r) => {
+          const text = await r.text();
+          try { return JSON.parse(text); }
+          catch { throw new Error(`Server returned non-JSON (HTTP ${r.status}). Is the proxy running? (npm start)`); }
+        })
         .then(async (data: unknown) => {
           let thoughts: string[] = [];
           if (cfg.fetchSteps) {
