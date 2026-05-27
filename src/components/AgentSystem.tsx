@@ -300,7 +300,17 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
               return;
             }
             if (["failed", "error", "cancelled"].includes(status)) {
-              markDone([`⚠ Agent ${status}: ${String(rd.error ?? rd.message ?? "unknown error")}`], rd);
+              // Show whatever steps ran before the failure, then append the error
+              const errLine = `⚠ Run ${status}: ${String(rd.error ?? rd.message ?? "unknown error")}`;
+              try {
+                const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+                const stepsRaw = await sr.json() as unknown;
+                const steps = extractRawSteps(stepsRaw);
+                const thoughts = steps.length > 0
+                  ? [...buildThoughtsFromAgentSteps(steps), errLine]
+                  : [errLine];
+                markDone(thoughts, rd);
+              } catch { markDone([errLine], rd); }
               return;
             }
           } catch { /* non-fatal — keep polling */ }
