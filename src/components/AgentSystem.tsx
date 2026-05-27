@@ -96,11 +96,27 @@ function extractRawSteps(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw as unknown[];
   const d = raw as Record<string, unknown>;
 
-  // Some APIs return node-level objects each containing their own steps array — flatten them
+  // Actual AWS agent API: {"value": [{node_alias, agent_steps: [...]}, ...], "Count": N}
+  if (Array.isArray(d.value)) {
+    return (d.value as unknown[]).flatMap((node) => {
+      if (!node || typeof node !== "object") return [];
+      const n = node as Record<string, unknown>;
+      const steps = Array.isArray(n.agent_steps) ? n.agent_steps : [];
+      if (steps.length === 0) return [];
+      // Synthetic header so the dock shows which node each step belongs to
+      return [
+        { type: "node_header", label: String(n.node_alias ?? "agent"), execution_time_ms: n.execution_time_ms },
+        ...steps,
+      ];
+    });
+  }
+
+  // Fallback: node-level objects each containing their own steps array — flatten them
   const flattenNodes = (nodes: unknown[]) =>
     nodes.flatMap((node) => {
       if (!node || typeof node !== "object") return [node];
       const n = node as Record<string, unknown>;
+      if (Array.isArray(n.agent_steps)) return n.agent_steps;
       if (Array.isArray(n.steps)) return n.steps;
       if (Array.isArray(n.messages)) return n.messages;
       if (Array.isArray(n.content)) return n.content;
@@ -134,20 +150,27 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
   const processStep = (s: Record<string, unknown>) => {
     const type = String(s.type ?? s.role ?? "");
 
+    if (type === "node_header") {
+      const ms = s.execution_time_ms != null ? ` (${(Number(s.execution_time_ms) / 1000).toFixed(1)}s)` : "";
+      thoughts.push(`📍 Node: ${String(s.label ?? "agent")}${ms}`);
+      return;
+    }
+
     // Nested content array (e.g. assistant message with multiple blocks)
-    if (Array.isArray(s.content) && !["tool_result", "tool_use"].includes(type)) {
+    if (Array.isArray(s.content) && !["tool_result", "tool_use", "tool_call"].includes(type)) {
       for (const item of s.content) {
         if (item && typeof item === "object") processStep(item as Record<string, unknown>);
       }
       return;
     }
 
-    if (type === "thinking") {
+    if (type === "thinking" || type === "reasoning") {
       const text = extractText(s.thinking ?? s.content ?? s.text).trim();
       if (text) thoughts.push(`💭 ${text}`);
-    } else if (type === "tool_use") {
+    } else if (type === "tool_use" || type === "tool_call") {
       const name = String(s.name ?? s.tool ?? "tool");
-      const inputStr = s.input ? JSON.stringify(s.input, null, 2) : "";
+      const inputData = s.input ?? s.args;
+      const inputStr = inputData ? JSON.stringify(inputData, null, 2) : "";
       thoughts.push(`🔧 ${name}${inputStr ? `\n${inputStr}` : ""}`);
     } else if (type === "tool_result") {
       const text = extractText(s.content ?? s.output ?? s.result).trim();
