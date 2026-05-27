@@ -93,40 +93,83 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
 
 function extractRawSteps(raw: unknown): unknown[] {
   if (!raw || typeof raw !== "object") return [];
-  const d = raw as Record<string, unknown>;
-  if (Array.isArray(d.steps)) return d.steps;
-  if (Array.isArray(d.agentSteps)) return d.agentSteps;
-  if (Array.isArray(d.agent_steps)) return d.agent_steps;
-  if (Array.isArray(d.events)) return d.events;
   if (Array.isArray(raw)) return raw as unknown[];
+  const d = raw as Record<string, unknown>;
+
+  // Some APIs return node-level objects each containing their own steps array — flatten them
+  const flattenNodes = (nodes: unknown[]) =>
+    nodes.flatMap((node) => {
+      if (!node || typeof node !== "object") return [node];
+      const n = node as Record<string, unknown>;
+      if (Array.isArray(n.steps)) return n.steps;
+      if (Array.isArray(n.messages)) return n.messages;
+      if (Array.isArray(n.content)) return n.content;
+      return [node];
+    });
+
+  if (Array.isArray(d.steps)) return flattenNodes(d.steps);
+  if (Array.isArray(d.agentSteps)) return flattenNodes(d.agentSteps);
+  if (Array.isArray(d.agent_steps)) return flattenNodes(d.agent_steps);
+  if (Array.isArray(d.events)) return flattenNodes(d.events);
+  if (Array.isArray(d.messages)) return d.messages as unknown[];
   return [];
+}
+
+function extractText(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (Array.isArray(v))
+    return v.map((c) => (typeof c === "object" && c !== null
+      ? String((c as Record<string, unknown>).text ?? (c as Record<string, unknown>).content ?? JSON.stringify(c))
+      : String(c))).join("\n");
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return String(o.text ?? o.content ?? o.message ?? JSON.stringify(v));
+  }
+  return String(v ?? "");
 }
 
 function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): string[] {
   const thoughts: string[] = [];
+
+  const processStep = (s: Record<string, unknown>) => {
+    const type = String(s.type ?? s.role ?? "");
+
+    // Nested content array (e.g. assistant message with multiple blocks)
+    if (Array.isArray(s.content) && !["tool_result", "tool_use"].includes(type)) {
+      for (const item of s.content) {
+        if (item && typeof item === "object") processStep(item as Record<string, unknown>);
+      }
+      return;
+    }
+
+    if (type === "thinking") {
+      const text = extractText(s.thinking ?? s.content ?? s.text).trim();
+      if (text) thoughts.push(`💭 ${text}`);
+    } else if (type === "tool_use") {
+      const name = String(s.name ?? s.tool ?? "tool");
+      const inputStr = s.input ? JSON.stringify(s.input, null, 2) : "";
+      thoughts.push(`🔧 ${name}${inputStr ? `\n${inputStr}` : ""}`);
+    } else if (type === "tool_result") {
+      const text = extractText(s.content ?? s.output ?? s.result).trim();
+      if (text) thoughts.push(`📥 ${text}`);
+    } else if (type === "text") {
+      const text = extractText(s.text ?? s.content).trim();
+      if (text) thoughts.push(`✓ ${text}`);
+    } else if (type === "assistant" || type === "user") {
+      const text = extractText(s.content ?? s.message).trim();
+      if (text) thoughts.push(text);
+    } else {
+      // Unknown type — surface any readable content field
+      const text = extractText(s.content ?? s.message ?? s.output ?? s.text).trim();
+      if (text) thoughts.push(text);
+    }
+  };
+
   for (const step of steps) {
     if (!step || typeof step !== "object") continue;
-    const s = step as Record<string, unknown>;
-    if (s.type === "thinking") {
-      const text = String(s.thinking ?? s.content ?? "").trim();
-      if (text) thoughts.push(`💭 ${text.slice(0, 200)}`);
-    } else if (s.type === "tool_use") {
-      const name = String(s.name ?? s.tool ?? "tool");
-      const inputStr = s.input ? JSON.stringify(s.input).slice(0, 100) : "";
-      thoughts.push(`🔧 ${name}(${inputStr})`);
-    } else if (s.type === "tool_result") {
-      const raw = Array.isArray(s.content)
-        ? (s.content as unknown[]).map((c) => (typeof c === "object" ? (c as Record<string, unknown>).text ?? "" : String(c))).join(" ")
-        : String(s.content ?? "");
-      if (raw.trim()) thoughts.push(`📥 ${raw.trim().slice(0, 200)}`);
-    } else if (s.type === "text") {
-      const text = String(s.text ?? s.content ?? "").trim();
-      if (text) thoughts.push(`✓ ${text.slice(0, 200)}`);
-    } else if (s.message || s.content) {
-      const text = String(s.message ?? s.content).trim();
-      if (text) thoughts.push(text.slice(0, 200));
-    }
+    processStep(step as Record<string, unknown>);
   }
+
   // Append result summary
   if (apiData && typeof apiData === "object") {
     const d = apiData as Record<string, unknown>;
@@ -135,7 +178,7 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
     if (results && typeof results === "object") {
       const entries = Object.entries(results as Record<string, unknown>)
         .filter(([, v]) => v != null && (typeof v === "string" || typeof v === "number"))
-        .slice(0, 6);
+        .slice(0, 8);
       for (const [k, v] of entries) {
         const label = k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
         thoughts.push(`${label}: ${String(v)}`);
@@ -271,7 +314,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         let polls = 0;
         const poll = async () => {
           polls++;
-          if (polls > 90) { markDone(["⚠ Agent run timed out after 3 minutes"]); return; }
+          if (polls > 300) { markDone(["⚠ Agent run timed out after 10 minutes"]); return; }
 
           // Fetch latest thinking steps and show them live
           try {
