@@ -82,6 +82,50 @@ app.post("/api/zoom/create-meeting", async (req, res) => {
   }
 });
 
+// ── AWS Agent Runtime proxy ─────────────────────────────────────────────────
+// The AWS ELB runs on plain HTTP; this proxy lets the browser (HTTPS in prod,
+// HTTP in dev) call it without mixed-content or CORS issues.
+const AWS_AGENT_BASE =
+  process.env.AWS_AGENT_BASE ??
+  "http://gs-forge-agentic-runtime-lb-1873180191.us-east-1.elb.amazonaws.com";
+
+app.post("/api/agent/:slug", async (req, res) => {
+  try {
+    const url = `${AWS_AGENT_BASE}/api/invoke/${req.params.slug}`;
+    const upstream = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body ?? {}),
+    });
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: `Agent proxy error: ${err.message}` });
+  }
+});
+
+app.get("/api/agent-steps/:runId", async (req, res) => {
+  try {
+    const url = `${AWS_AGENT_BASE}/api/execution-logs/${req.params.runId}/agent-steps`;
+    const upstream = await fetch(url);
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: `Agent steps proxy error: ${err.message}` });
+  }
+});
+
+app.get("/api/agent-run/:runId", async (req, res) => {
+  try {
+    const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
+    const upstream = await fetch(url);
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: `Agent run proxy error: ${err.message}` });
+  }
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT ?? 3001;

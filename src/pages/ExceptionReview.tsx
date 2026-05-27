@@ -921,7 +921,7 @@ const ExceptionReview = () => {
   const [zoomError, setZoomError] = useState<string | null>(null);
   
   
-  const { runAgents, isRunning, currentLabel, runs } = useAgents();
+  const { runAgents, isRunning, currentLabel, runs, setEntityContext } = useAgents();
 
   // If selection changes and current active is no longer in the effective set, reset
   useEffect(() => {
@@ -931,6 +931,12 @@ const ExceptionReview = () => {
   }, [effectiveExceptions, activeId]);
 
   const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0] ?? exceptions[0])!;
+
+  // Keep agent context in sync with the currently viewed entity so "Run Agent" dropdown knows what to search
+  useEffect(() => {
+    setEntityContext({ name: active.entity, kyc: active.kyc });
+    return () => setEntityContext(null);
+  }, [active.entity, active.kyc, setEntityContext]);
 
   const openEvidence = (ev: Evidence) => {
     const lower = ev.name.toLowerCase();

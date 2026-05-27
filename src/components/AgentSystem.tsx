@@ -1,13 +1,14 @@
-import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import {
   Bot, Sparkles, ChevronDown, ChevronUp, X, Loader2, CheckCircle2, Play, Search,
-  ShieldCheck, FileCheck2, Database, Mail, Scale, UserCheck, Globe, Brain, Zap, Minus,
+  ShieldCheck, FileCheck2, Database, Mail, Scale, UserCheck, Globe, Brain, Zap, Minus, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
-  | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring";
+  | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
+  | "companies-house";
 
 export type Agent = {
   id: AgentId;
@@ -49,6 +50,9 @@ export const AGENTS: Agent[] = [
   { id: "audit", name: "Audit Trail Agent", short: "Audit", icon: ShieldCheck,
     description: "Writes decisions, sources, and evidence pointers to the immutable log.",
     defaultThoughts: ["Hashing decision payload (SHA-256)", "Committing to evidence locker", "Audit entry #A-29104 written"] },
+  { id: "companies-house", name: "UK Companies House Agent", short: "Co. House", icon: Building2,
+    description: "Queries the UK Companies House registry to verify incorporation, filing status, and directors.",
+    defaultThoughts: ["Connecting to Companies House registry…", "Preparing company name search query…", "Awaiting API response…"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -63,6 +67,100 @@ export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string
     agents: ["sanctions", "pep", "adverse-media", "beneficial-owner", "risk-scoring"] },
 ];
 
+const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
+
+type EntityCtx = { name: string; kyc?: string };
+
+// Per-agent real API config. Add an entry here whenever a new agent is deployed to AWS.
+type AgentApiConfig = {
+  slug: string;
+  buildBody: (ctx: EntityCtx | null) => Record<string, unknown>;
+  fetchSteps: boolean;
+};
+const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
+  "companies-house": {
+    slug: "uk-companies-house",
+    buildBody: (ctx) => (ctx?.name ? { company_name: ctx.name } : {}),
+    fetchSteps: true,
+  },
+};
+
+function extractRawSteps(raw: unknown): unknown[] {
+  if (!raw || typeof raw !== "object") return [];
+  const d = raw as Record<string, unknown>;
+  if (Array.isArray(d.steps)) return d.steps;
+  if (Array.isArray(d.agentSteps)) return d.agentSteps;
+  if (Array.isArray(d.agent_steps)) return d.agent_steps;
+  if (Array.isArray(d.events)) return d.events;
+  if (Array.isArray(raw)) return raw as unknown[];
+  return [];
+}
+
+function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): string[] {
+  const thoughts: string[] = [];
+  for (const step of steps) {
+    if (!step || typeof step !== "object") continue;
+    const s = step as Record<string, unknown>;
+    if (s.type === "thinking") {
+      const text = String(s.thinking ?? s.content ?? "").trim();
+      if (text) thoughts.push(`💭 ${text.slice(0, 200)}`);
+    } else if (s.type === "tool_use") {
+      const name = String(s.name ?? s.tool ?? "tool");
+      const inputStr = s.input ? JSON.stringify(s.input).slice(0, 100) : "";
+      thoughts.push(`🔧 ${name}(${inputStr})`);
+    } else if (s.type === "tool_result") {
+      const raw = Array.isArray(s.content)
+        ? (s.content as unknown[]).map((c) => (typeof c === "object" ? (c as Record<string, unknown>).text ?? "" : String(c))).join(" ")
+        : String(s.content ?? "");
+      if (raw.trim()) thoughts.push(`📥 ${raw.trim().slice(0, 200)}`);
+    } else if (s.type === "text") {
+      const text = String(s.text ?? s.content ?? "").trim();
+      if (text) thoughts.push(`✓ ${text.slice(0, 200)}`);
+    } else if (s.message || s.content) {
+      const text = String(s.message ?? s.content).trim();
+      if (text) thoughts.push(text.slice(0, 200));
+    }
+  }
+  // Append result summary
+  if (apiData && typeof apiData === "object") {
+    const d = apiData as Record<string, unknown>;
+    if (d.executionTime != null) thoughts.push(`⏱ Completed in ${d.executionTime}ms`);
+    const results = d.results ?? d.output ?? d.data;
+    if (results && typeof results === "object") {
+      const entries = Object.entries(results as Record<string, unknown>)
+        .filter(([, v]) => v != null && (typeof v === "string" || typeof v === "number"))
+        .slice(0, 6);
+      for (const [k, v] of entries) {
+        const label = k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+        thoughts.push(`${label}: ${String(v)}`);
+      }
+    }
+  }
+  return thoughts.length > 0 ? thoughts : ["✓ Agent completed — no structured steps returned"];
+}
+
+function buildThoughtsFromResult(data: unknown, agentId: AgentId): string[] {
+  const agent = AGENTS_BY_ID[agentId];
+  if (!data || typeof data !== "object") return [...agent.defaultThoughts, "✓ Run completed"];
+  const d = data as Record<string, unknown>;
+  const thoughts: string[] = [];
+  if (d.executionTime != null) thoughts.push(`Completed in ${d.executionTime}ms`);
+  if (d.status) thoughts.push(`Agent status: ${String(d.status)}`);
+  const results = d.results ?? d.output ?? d.data;
+  if (results && typeof results === "object") {
+    const entries = Object.entries(results as Record<string, unknown>)
+      .filter(([, v]) => v != null && (typeof v === "string" || typeof v === "number" || typeof v === "boolean"))
+      .slice(0, 6);
+    for (const [k, v] of entries) {
+      const label = k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      thoughts.push(`${label}: ${String(v)}`);
+    }
+  }
+  if (d.runId) thoughts.push(`Run ID: ${String(d.runId)}`);
+  if (thoughts.length < 2) thoughts.push("✓ Agent completed — no structured results returned");
+  return thoughts;
+}
+
 type StepState = "pending" | "running" | "done";
 type AgentRun = {
   id: string;
@@ -71,6 +169,8 @@ type AgentRun = {
   thoughts: string[];
   currentThought: number;
   startedAt: number;
+  isReal?: boolean;
+  result?: unknown;
 };
 
 type AgentContextValue = {
@@ -83,6 +183,8 @@ type AgentContextValue = {
   runAgents: (agentIds: AgentId[], label?: string) => void;
   clearRuns: () => void;
   currentLabel: string | null;
+  entityContext: EntityCtx | null;
+  setEntityContext: (ctx: EntityCtx | null) => void;
 };
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -98,32 +200,91 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const [dockOpen, setDockOpen] = useState(false);
   const [dockMinimized, setDockMinimized] = useState(false);
   const [currentLabel, setCurrentLabel] = useState<string | null>(null);
+  const [entityContext, setEntityContext] = useState<EntityCtx | null>(null);
+  // Ref so runAgents (stable useCallback) always reads the latest entity context
+  const entityContextRef = useRef<EntityCtx | null>(null);
+  entityContextRef.current = entityContext;
 
   const isRunning = runs.some((r) => r.state !== "done");
 
   const runAgents = useCallback((agentIds: AgentId[], label?: string) => {
-    const newRuns: AgentRun[] = agentIds.map((id, i) => ({
-      id: `${Date.now()}-${i}`,
-      agentId: id,
-      state: i === 0 ? "running" : "pending",
-      thoughts: AGENTS_BY_ID[id].defaultThoughts,
-      currentThought: 0,
-      startedAt: Date.now(),
-    }));
+    const newRuns: AgentRun[] = agentIds.map((id, i) => {
+      const hasReal = !!AGENT_API_CONFIGS[id];
+      return {
+        id: `${Date.now()}-${i}`,
+        agentId: id,
+        state: (i === 0 ? "running" : "pending") as StepState,
+        thoughts: hasReal
+          ? [...AGENTS_BY_ID[id].defaultThoughts, "Awaiting API response…"]
+          : AGENTS_BY_ID[id].defaultThoughts,
+        currentThought: 0,
+        startedAt: Date.now(),
+        isReal: hasReal,
+      };
+    });
     setRuns(newRuns);
     setCurrentLabel(label ?? "Custom Agent Run");
     setDockOpen(true);
     setDockMinimized(false);
+
+    // Snapshot entity context at call time (ref is always current)
+    const ctx = entityContextRef.current;
+
+    newRuns.forEach((run) => {
+      const cfg = AGENT_API_CONFIGS[run.agentId];
+      if (!cfg) return;
+
+      const markDone = (thoughts: string[], result?: unknown) => {
+        setRuns((prev) => {
+          const idx = prev.findIndex((r) => r.id === run.id);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next[idx] = { ...next[idx], state: "done", thoughts, currentThought: thoughts.length - 1, result };
+          if (idx + 1 < next.length && next[idx + 1].state === "pending") {
+            next[idx + 1] = { ...next[idx + 1], state: "running" };
+          }
+          return next;
+        });
+      };
+
+      fetch(`${AGENT_API_BASE}/api/agent/${cfg.slug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cfg.buildBody(ctx)),
+      })
+        .then((r) => r.json())
+        .then(async (data: unknown) => {
+          let thoughts: string[] = [];
+          if (cfg.fetchSteps) {
+            const runId = (data as Record<string, unknown>)?.runId ?? (data as Record<string, unknown>)?.run_id;
+            if (runId) {
+              try {
+                const stepsRes = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+                const stepsRaw = await stepsRes.json();
+                const steps = extractRawSteps(stepsRaw);
+                if (steps.length > 0) thoughts = buildThoughtsFromAgentSteps(steps, data);
+              } catch { /* fall through to result-based thoughts */ }
+            }
+          }
+          if (thoughts.length === 0) thoughts = buildThoughtsFromResult(data, run.agentId);
+          markDone(thoughts, data);
+        })
+        .catch((err: Error) => {
+          markDone([...AGENTS_BY_ID[run.agentId].defaultThoughts, `⚠ API error: ${err.message}`]);
+        });
+    });
   }, []);
 
   const clearRuns = useCallback(() => setRuns([]), []);
 
-  // Drive simulation: progress thoughts then mark done, then start next
+  // Drive simulation: advance thoughts then mark done; real agents wait for their fetch callback
   useEffect(() => {
     if (runs.length === 0) return;
     const runningIdx = runs.findIndex((r) => r.state === "running");
     if (runningIdx === -1) return;
     const run = runs[runningIdx];
+    // Real agents stop animation at last thought — fetch callback will mark them done
+    if (run.isReal && run.currentThought >= run.thoughts.length - 1) return;
     const t = setTimeout(() => {
       setRuns((prev) => {
         const next = [...prev];
@@ -131,7 +292,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         if (cur.currentThought < cur.thoughts.length - 1) {
           cur.currentThought += 1;
           next[runningIdx] = cur;
-        } else {
+        } else if (!cur.isReal) {
           cur.state = "done";
           next[runningIdx] = cur;
           if (runningIdx + 1 < next.length) {
@@ -146,8 +307,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo(() => ({
     runs, isRunning, dockOpen, dockMinimized, setDockOpen, setDockMinimized,
-    runAgents, clearRuns, currentLabel,
-  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel]);
+    runAgents, clearRuns, currentLabel, entityContext, setEntityContext,
+  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel, entityContext, setEntityContext]);
 
   return (
     <AgentContext.Provider value={value}>
@@ -160,7 +321,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 // =========== Top recommendation strip ===========
 
 export const AgentRecommendationStrip = ({ route }: { route: string }) => {
-  const { runAgents } = useAgents();
+  const { runAgents, entityContext } = useAgents();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<AgentId>>(new Set());
 
@@ -262,6 +423,34 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                     className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-95 disabled:opacity-40"
                   >
                     <Play className="size-3" /> Run Selected
+                  </button>
+                </div>
+
+                {/* ── Live Data Source Agents ─────────────────────── */}
+                <div className="border-t border-border bg-secondary/30">
+                  <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-success inline-block" />
+                    Live Data Sources
+                  </p>
+                  <button
+                    onClick={() => { runAgents(["companies-house"], "UK Companies House Lookup"); setOpen(false); }}
+                    className="w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-secondary/60 transition-colors"
+                  >
+                    <span className="size-7 rounded-md bg-success-soft text-success border border-success-soft-border grid place-items-center shrink-0 mt-0.5">
+                      <Building2 className="size-3.5" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[12px] font-medium">UK Companies House</p>
+                        <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Live API</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {entityContext?.name
+                          ? <>Search <span className="font-medium text-foreground">{entityContext.name}</span> in the Companies House registry</>
+                          : "Verify incorporation, filing status, and directors"}
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-primary font-medium shrink-0 mt-1">Run →</span>
                   </button>
                 </div>
               </div>
