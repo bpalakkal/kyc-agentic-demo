@@ -76,12 +76,14 @@ type AgentApiConfig = {
   slug: string;
   buildBody: (ctx: EntityCtx | null) => Record<string, unknown>;
   fetchSteps: boolean;
+  asyncMode?: boolean; // use async invoke + live step polling instead of blocking sync call
 };
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
     slug: "uk-companies-house",
     buildBody: (ctx) => (ctx?.name ? { entity_name: ctx.name } : {}),
     fetchSteps: true,
+    asyncMode: true,
   },
 };
 
@@ -247,10 +249,70 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         });
       };
 
+      // Live-update the dock thoughts without marking the run done yet
+      const updateLiveThoughts = (steps: unknown[]) => {
+        if (steps.length === 0) return;
+        const thoughts = buildThoughtsFromAgentSteps(steps);
+        setRuns((prev) => {
+          const idx = prev.findIndex((r) => r.id === run.id);
+          if (idx === -1 || prev[idx].state !== "running") return prev;
+          const next = [...prev];
+          next[idx] = { ...next[idx], thoughts, currentThought: thoughts.length - 1 };
+          return next;
+        });
+      };
+
+      // Poll agent-steps and run-status until complete
+      const startPolling = (runId: string) => {
+        let polls = 0;
+        const poll = async () => {
+          polls++;
+          if (polls > 90) { markDone(["⚠ Agent run timed out after 3 minutes"]); return; }
+
+          // Fetch latest thinking steps and show them live
+          try {
+            const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+            const stepsRaw = await sr.json() as unknown;
+            updateLiveThoughts(extractRawSteps(stepsRaw));
+          } catch { /* non-fatal — keep polling */ }
+
+          // Check completion status
+          try {
+            const rr = await fetch(`${AGENT_API_BASE}/api/agent-run/${runId}`);
+            const rd = await rr.json() as Record<string, unknown>;
+            const status = String(rd.status ?? "");
+
+            if (["complete", "completed", "done", "succeeded"].includes(status)) {
+              // Final step fetch so we get every thought before marking done
+              try {
+                const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+                const stepsRaw = await sr.json() as unknown;
+                const steps = extractRawSteps(stepsRaw);
+                markDone(
+                  steps.length > 0 ? buildThoughtsFromAgentSteps(steps, rd) : buildThoughtsFromResult(rd, run.agentId),
+                  rd,
+                );
+              } catch { markDone(buildThoughtsFromResult(rd, run.agentId), rd); }
+              return;
+            }
+            if (["failed", "error", "cancelled"].includes(status)) {
+              markDone([`⚠ Agent ${status}: ${String(rd.error ?? rd.message ?? "unknown error")}`], rd);
+              return;
+            }
+          } catch { /* non-fatal — keep polling */ }
+
+          setTimeout(poll, 2000);
+        };
+        setTimeout(poll, 1500); // first poll after 1.5 s
+      };
+
       fetch(`${AGENT_API_BASE}/api/agent/${cfg.slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cfg.buildBody(ctx)),
+        body: JSON.stringify({
+          ...cfg.buildBody(ctx),
+          ...(cfg.asyncMode ? { async: true } : {}),
+        }),
       })
         .then(async (r) => {
           const text = await r.text();
@@ -258,20 +320,27 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           catch { throw new Error(`Server returned non-JSON (HTTP ${r.status}). Is the proxy running? (npm start)`); }
         })
         .then(async (data: unknown) => {
-          let thoughts: string[] = [];
-          if (cfg.fetchSteps) {
-            const runId = (data as Record<string, unknown>)?.runId ?? (data as Record<string, unknown>)?.run_id;
-            if (runId) {
+          const d = data as Record<string, unknown>;
+          const runId = d.runId ?? d.run_id ?? d.id;
+          const status = String(d.status ?? "");
+
+          // Already complete (sync response or instant agent)
+          if (!runId || !cfg.asyncMode || ["complete", "completed", "done"].includes(status)) {
+            let thoughts: string[] = [];
+            if (cfg.fetchSteps && runId) {
               try {
-                const stepsRes = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
-                const stepsRaw = await stepsRes.json();
+                const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${String(runId)}`);
+                const stepsRaw = await sr.json() as unknown;
                 const steps = extractRawSteps(stepsRaw);
                 if (steps.length > 0) thoughts = buildThoughtsFromAgentSteps(steps, data);
-              } catch { /* fall through to result-based thoughts */ }
+              } catch { /* fall through */ }
             }
+            markDone(thoughts.length > 0 ? thoughts : buildThoughtsFromResult(data, run.agentId), data);
+            return;
           }
-          if (thoughts.length === 0) thoughts = buildThoughtsFromResult(data, run.agentId);
-          markDone(thoughts, data);
+
+          // Async: start live polling
+          startPolling(String(runId));
         })
         .catch((err: Error) => {
           markDone([...AGENTS_BY_ID[run.agentId].defaultThoughts, `⚠ API error: ${err.message}`]);
