@@ -393,7 +393,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         let polls = 0;
         const poll = async () => {
           polls++;
-          if (polls > 300) { markDone(["⚠ Agent run timed out after 10 minutes"]); return; }
+          if (polls > 1800) { markDone(["⚠ Agent run timed out after 60 minutes"]); return; }
 
           // Fetch latest thinking steps and show them live
           try {
