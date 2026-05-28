@@ -189,6 +189,21 @@ function extractText(v: unknown): string {
   return String(v ?? "");
 }
 
+function cleanReasoning(raw: string): string {
+  const text = raw
+    .replace(/#{1,6}\s*/g, "")              // ## headings
+    .replace(/\*\*(.*?)\*\*/gs, "$1")       // **bold**
+    .replace(/\*(.*?)\*/gs, "$1")           // *italic*
+    .replace(/^---+$/gm, "")               // horizontal rules
+    .replace(/\n/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (text.length <= 280) return text;
+  const cut = text.slice(0, 280);
+  const dot = cut.lastIndexOf(".");
+  return (dot > 100 ? cut.slice(0, dot + 1) : cut) + "…";
+}
+
 function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): string[] {
   const thoughts: string[] = [];
 
@@ -210,23 +225,38 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
     }
 
     if (type === "thinking" || type === "reasoning") {
-      const text = extractText(s.thinking ?? s.content ?? s.text).trim();
-      if (text) thoughts.push(`💭 ${text}`);
+      const raw = extractText(s.thinking ?? s.content ?? s.text).trim();
+      if (raw) thoughts.push(`💭 ${cleanReasoning(raw)}`);
     } else if (type === "tool_use" || type === "tool_call") {
       const name = String(s.name ?? s.tool ?? "tool");
       const args = (s.input ?? s.args ?? {}) as Record<string, unknown>;
 
-      // Internal orchestration introspection — not useful to display
+      // Internal plumbing — suppress entirely
       const SUPPRESSED = new Set([
         "get_current_project", "get_current_data_flow", "get_data_flow_description",
         "search_data_flows", "list_data_flows", "get_execution_results",
-        "get_current_project_context",
+        "get_current_project_context", "get_filing_history_item",
+        "get_document_metadata", "get_document_content",
       ]);
       if (SUPPRESSED.has(name)) return;
 
-      // Semantic conversions — turn internal tool calls into readable statements
+      // Semantic conversions
       if (name === "get_data_flow" && args.data_flow_name) {
         thoughts.push(`🔄 Invoking ${String(args.data_flow_name)}`);
+        return;
+      }
+      if (name === "search_companies" && args.query) {
+        thoughts.push(`🔍 Searching Companies House: ${String(args.query)}`);
+        return;
+      }
+      if (name === "get_filing_history" && args.company_number) {
+        const cat = args.category ? ` (${String(args.category)})` : "";
+        thoughts.push(`📋 Retrieving filing history${cat} for ${String(args.company_number)}`);
+        return;
+      }
+      if (name === "download_url" && (args.store_description ?? args.url)) {
+        const label = String(args.store_description ?? args.url);
+        thoughts.push(`💾 ${label.length > 100 ? label.slice(0, 100) + "…" : label}`);
         return;
       }
       if (name === "firecrawl_scrape" && args.url) {
@@ -247,7 +277,7 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
         return;
       }
 
-      // Everything else: show tool name + args compactly
+      // Remaining tools: show name + key args compactly
       const argStr = Object.keys(args).length ? JSON.stringify(args) : "";
       thoughts.push(`🔧 ${name}${argStr ? `  ${argStr}` : ""}`);
     } else if (type === "tool_result") {
