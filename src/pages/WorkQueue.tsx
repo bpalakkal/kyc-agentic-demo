@@ -95,7 +95,9 @@ const statusColor = (s: Row["status"]) => {
 const WorkQueue = () => {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const selectedCount = Object.values(selected).filter(Boolean).length;
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ g3: true });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
+    () => groups.length > 0 ? { [groups[0].id]: true } : {}
+  );
 
   const allRows = groups.flatMap((g) => g.rows ?? []);
   const selectedEntities = allRows
