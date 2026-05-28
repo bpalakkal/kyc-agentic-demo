@@ -233,18 +233,12 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
 
       // Internal plumbing — suppress entirely
       const SUPPRESSED = new Set([
-        "get_current_project", "get_current_data_flow", "get_data_flow_description",
-        "search_data_flows", "list_data_flows", "get_execution_results",
-        "get_current_project_context", "get_filing_history_item",
-        "get_document_metadata", "get_document_content",
+        "get_current_project", "get_current_data_flow", "get_data_flow",
+        "get_data_flow_description", "search_data_flows", "list_data_flows",
+        "get_execution_results", "get_current_project_context",
+        "get_filing_history_item", "get_document_metadata", "get_document_content",
       ]);
       if (SUPPRESSED.has(name)) return;
-
-      // Semantic conversions
-      if (name === "get_data_flow" && args.data_flow_name) {
-        thoughts.push(`🔄 Invoking ${String(args.data_flow_name)}`);
-        return;
-      }
       if (name === "search_companies" && args.query) {
         thoughts.push(`🔍 Searching Companies House: ${String(args.query)}`);
         return;
