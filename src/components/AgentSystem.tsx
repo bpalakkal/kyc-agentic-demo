@@ -214,12 +214,44 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
       if (text) thoughts.push(`💭 ${text}`);
     } else if (type === "tool_use" || type === "tool_call") {
       const name = String(s.name ?? s.tool ?? "tool");
-      const inputData = s.input ?? s.args;
-      const inputStr = inputData ? JSON.stringify(inputData, null, 2) : "";
-      thoughts.push(`🔧 ${name}${inputStr ? `\n${inputStr}` : ""}`);
+      const args = (s.input ?? s.args ?? {}) as Record<string, unknown>;
+
+      // Internal orchestration introspection — not useful to display
+      const SUPPRESSED = new Set([
+        "get_current_project", "get_current_data_flow", "get_data_flow_description",
+        "search_data_flows", "list_data_flows", "get_execution_results",
+        "get_current_project_context",
+      ]);
+      if (SUPPRESSED.has(name)) return;
+
+      // Semantic conversions — turn internal tool calls into readable statements
+      if (name === "get_data_flow" && args.data_flow_name) {
+        thoughts.push(`🔄 Invoking ${String(args.data_flow_name)}`);
+        return;
+      }
+      if (name === "firecrawl_scrape" && args.url) {
+        thoughts.push(`🌐 Scraping ${String(args.url)}`);
+        return;
+      }
+      if ((name === "firecrawl_interact" || name === "firecrawl_click") && args.prompt) {
+        const p = String(args.prompt);
+        thoughts.push(`🖱 ${p.length > 120 ? p.slice(0, 120) + "…" : p}`);
+        return;
+      }
+      if (name === "capture_screenshot" && args.context) {
+        thoughts.push(`📸 ${String(args.context)}`);
+        return;
+      }
+      if (name === "firecrawl_interact_stop") {
+        thoughts.push(`✓ Browser session closed`);
+        return;
+      }
+
+      // Everything else: show tool name + args compactly
+      const argStr = Object.keys(args).length ? JSON.stringify(args) : "";
+      thoughts.push(`🔧 ${name}${argStr ? `  ${argStr}` : ""}`);
     } else if (type === "tool_result") {
-      const text = extractText(s.content ?? s.output ?? s.result).trim();
-      if (text) thoughts.push(`📥 ${text}`);
+      // Suppress raw tool results — they're verbose API dumps; reasoning steps already summarise them
     } else if (type === "text") {
       const text = extractText(s.text ?? s.content).trim();
       if (text) thoughts.push(`✓ ${text}`);
