@@ -1,3 +1,27 @@
+/**
+ * WorkQueue — entity selection table
+ *
+ * Displays KYC cases grouped by Dedicated Relationship Group (DRG).
+ * Analysts select one or more entities and click "Review Selected" to open
+ * the ExceptionReview page with the chosen entities pre-loaded.
+ *
+ * Data sources (current state — demo)
+ * ─────────────────────────────────────
+ * `groups`              Hard-coded in this file.  Contains ~20 demo entities
+ *                       across four DRGs.
+ * GENERATED_WORK_ROWS   Auto-generated from entities.md via parse-entities.cjs.
+ *                       Injected at the bottom of each DRG at module load time.
+ *
+ * TODO (production)
+ * ─────────────────
+ * - Replace `groups` with an API call (React Query) to a case management
+ *   backend: GET /api/work-queue?analyst=<id>&status=open
+ * - Add real search/filter/sort against the backend (the search box and filter
+ *   button are currently non-functional UI stubs)
+ * - The "389 entities" count is hard-coded — derive from total API result count
+ * - Locking logic should come from the backend (assigned_to !== current_user)
+ */
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { GENERATED_WORK_ROWS, GENERATED_ENTITY_DRG } from "@/data/entities-generated";
@@ -32,6 +56,10 @@ type Group = {
   rows?: Row[];
 };
 
+// ─── HARD-CODED DEMO DATA ─────────────────────────────────────────────────────
+// Replace with an API call in production.  Each group represents a DRG; each
+// row is a KYC case.  `selectable` rows can be added to a review session;
+// `locked` rows are assigned to another analyst (read-only indicator).
 const groups: Group[] = [
   {
     id: "g3",
@@ -86,7 +114,10 @@ const groups: Group[] = [
   },
 ];
 
-// Inject generated entities from entities.md (new entities only, no duplicates)
+// Inject entities sourced from entities.md (parse-entities.cjs generates them).
+// This merge step prevents duplicates if an entity appears in both the hard-
+// coded list and the generated file.  Remove in production once groups comes
+// from the API.
 {
   const _existingKycs = new Set(groups.flatMap(g => (g.rows ?? []).map(r => r.kyc).filter(Boolean)));
   for (const row of GENERATED_WORK_ROWS) {

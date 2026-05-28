@@ -1,3 +1,35 @@
+/**
+ * ExceptionReview — KYC exception detail and resolution workspace
+ *
+ * Layout
+ * ──────
+ * Left sidebar   Exception list for the selected entities (from WorkQueue state)
+ * Centre panel   Active exception: flag text, narrative, evidence, resolutions
+ * Right panel    Attributes / Document Locker / Collaboration (collapsible)
+ * Top bar        QA Review · Escalate · Outreach · Submit actions
+ * Bottom-right   Agent Console Dock (from AgentSystem)
+ *
+ * Data sources (current state — demo)
+ * ─────────────────────────────────────
+ * `exceptions`         Hard-coded array below (~13 curated exceptions across
+ *                      Brevan Howard and Marshall Wace).  These are the only
+ *                      entities with full exception detail.
+ * GENERATED_EXCEPTIONS Auto-generated from entities.md — merged at runtime
+ *                      (Long Focus, Brookfield).
+ * GENERATED_*          All other generated data (attributes, comparisons,
+ *                      activity, comments, tasks) from entities-generated.ts.
+ *
+ * TODO (production)
+ * ─────────────────
+ * - Replace `exceptions` + GENERATED_EXCEPTIONS with GET /api/cases/:kycId/exceptions
+ * - Replace attribute panels with GET /api/cases/:kycId/attributes
+ * - Replace activity feed with a real-time websocket or polling subscription
+ * - Resolution submission (handleSubmit) currently only sets local state —
+ *   wire to POST /api/cases/:kycId/exceptions/:excId/resolve
+ * - Escalation and Outreach are UI-only — wire to notification/email service
+ * - Zoom meeting creation already calls a real API (server.js /api/zoom/create-meeting)
+ */
+
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {

@@ -1,10 +1,43 @@
+/**
+ * KYC Platform — Express proxy server
+ *
+ * Responsibilities
+ * ────────────────
+ * 1. Zoom meeting creation  (server-to-server OAuth — credentials stay secret)
+ * 2. AWS agent runtime proxy (HTTP ELB behind HTTPS Railway → avoids mixed-
+ *    content errors and CORS issues when the browser is on HTTPS GitHub Pages)
+ *
+ * Environment variables (set in .env locally, Railway dashboard in production)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ZOOM_ACCOUNT_ID      Zoom Server-to-Server OAuth account ID
+ * ZOOM_CLIENT_ID       Zoom OAuth client ID
+ * ZOOM_CLIENT_SECRET   Zoom OAuth client secret
+ * AWS_AGENT_BASE       Base URL of the AWS agent ELB (defaults to the current ELB)
+ * PORT                 HTTP port (defaults to 3001)
+ *
+ * Production deployment
+ * ──────────────────────
+ * Hosted on Railway via `Procfile` (web: npm run server).
+ * The frontend reads VITE_AGENT_API_BASE (injected at GitHub Actions build time)
+ * to know where to send requests.  That variable must equal this Railway URL.
+ *
+ * TODO (production hardening)
+ * ─────────────────────────────
+ * - Restrict CORS origin to the GitHub Pages domain instead of "*"
+ * - Add request authentication (API key header or JWT) so the proxy cannot be
+ *   called by arbitrary clients
+ * - Add rate limiting (express-rate-limit) to prevent abuse
+ * - Stream agent-step responses rather than buffering (EventSource / SSE)
+ */
+
 import express from "express";
 import cors from "cors";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
-// Load .env manually (no dotenv dependency needed)
+// Load .env manually so the server has zero extra dependencies in production.
+// Railway and other platforms inject env vars directly, so this is a no-op there.
 try {
   const __dir = dirname(fileURLToPath(import.meta.url));
   const env = readFileSync(resolve(__dir, ".env"), "utf8");
@@ -13,18 +46,22 @@ try {
     if (k && v.length) process.env[k.trim()] = v.join("=").trim();
   }
 } catch {
-  // .env not present — rely on shell environment variables
+  // .env not present — rely on shell / platform environment variables
 }
 
 const { ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET } = process.env;
 
 const app = express();
+
+// TODO: lock this down to the GitHub Pages origin in production
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
+// ─── Zoom ─────────────────────────────────────────────────────────────────────
+
 async function getZoomToken() {
   if (!ZOOM_ACCOUNT_ID || !ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
-    throw new Error("Zoom credentials missing. Check your .env file.");
+    throw new Error("Zoom credentials missing. Set ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET.");
   }
   const creds = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString("base64");
   const res = await fetch(
@@ -43,10 +80,7 @@ app.post("/api/zoom/create-meeting", async (req, res) => {
 
     const response = await fetch("https://api.zoom.us/v2/users/me/meetings", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         topic,
         type: 2,
@@ -82,15 +116,19 @@ app.post("/api/zoom/create-meeting", async (req, res) => {
   }
 });
 
-// ── AWS Agent Runtime proxy ─────────────────────────────────────────────────
-// The AWS ELB runs on plain HTTP; this proxy lets the browser (HTTPS in prod,
-// HTTP in dev) call it without mixed-content or CORS issues.
+// ─── AWS agent runtime proxy ──────────────────────────────────────────────────
+// The ELB runs on plain HTTP.  This proxy lets the HTTPS browser reach it
+// without mixed-content blocks or CORS rejections.
+//
+// TODO: if the ELB is ever put behind HTTPS + a domain, this proxy can be
+// removed and the frontend can call the ELB directly.
+
 const AWS_AGENT_BASE =
   process.env.AWS_AGENT_BASE ??
   "http://gs-forge-agentic-runtime-lb-1873180191.us-east-1.elb.amazonaws.com";
 
-// Helper: fetch a URL and always return { ok, status, data } — never throws,
-// never returns raw HTML to the browser.
+// Fetches a URL and always returns { ok, status, data } — never throws and
+// never forwards raw HTML error pages to the browser.
 async function proxyFetch(url, options = {}) {
   let status = 502;
   try {
@@ -101,7 +139,7 @@ async function proxyFetch(url, options = {}) {
     try {
       return { ok: upstream.ok, status, data: JSON.parse(text) };
     } catch {
-      // Upstream returned non-JSON (e.g. HTML 404/502 page from load balancer)
+      // Upstream returned non-JSON (e.g. HTML 404/502 from the load balancer)
       const preview = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
       console.error(`[agent-proxy] Non-JSON body from ${url}: ${preview}`);
       return { ok: false, status, data: { error: `Upstream returned non-JSON (HTTP ${status})`, preview } };
@@ -112,6 +150,8 @@ async function proxyFetch(url, options = {}) {
   }
 }
 
+// Invoke an agent.  Body is forwarded as-is from the frontend, including
+// { async: true } when the frontend uses asyncMode.
 app.post("/api/agent/:slug", async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/invoke/${req.params.slug}`;
   console.log(`[agent-proxy] Invoking agent: ${url}`, req.body);
@@ -123,21 +163,24 @@ app.post("/api/agent/:slug", async (req, res) => {
   res.status(status).json(data);
 });
 
+// Agent thinking steps — polled every 2 s by the frontend while a run is live.
 app.get("/api/agent-steps/:runId", async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/execution-logs/${req.params.runId}/agent-steps`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
 });
 
+// Run status — polled alongside agent-steps to detect completion / failure.
 app.get("/api/agent-run/:runId", async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
 });
 
+// ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 const PORT = process.env.PORT ?? 3001;
 app.listen(PORT, () =>
-  console.log(`\n✓ Zoom proxy server running → http://localhost:${PORT}\n`)
+  console.log(`\n✓ KYC proxy server running → http://localhost:${PORT}\n`)
 );

@@ -1,3 +1,65 @@
+/**
+ * AgentSystem — KYC Agent Orchestration Layer
+ *
+ * Architecture overview
+ * ─────────────────────
+ * This file owns every agent-related concern: registry, API wiring, state
+ * management, polling, step parsing, and UI (recommendation strip + dock).
+ *
+ * Key concepts
+ * ────────────
+ * AGENTS            Catalogue of all known agents (simulated + live).
+ *                   Each entry provides the display name, icon, and default
+ *                   "thought" strings used while the real API warms up.
+ *
+ * AGENT_API_CONFIGS Per-agent real API config (slug, request body builder,
+ *                   async mode flag).  Only agents with an entry here hit a
+ *                   live endpoint; all others run in simulation mode.
+ *                   → To wire a new agent: add an AgentId value and an entry
+ *                     in AGENT_API_CONFIGS.  No other changes required.
+ *
+ * AgentProvider     React context that holds all run state and exposes
+ *                   runAgents() to any child component.
+ *
+ * runAgents()       Core orchestration function.
+ *                   1. Creates AgentRun records (pending/running/done).
+ *                   2. For each live agent: POSTs to the proxy with
+ *                      { ...buildBody(), async: true }.
+ *                   3. Receives { runId, status: "running" } immediately.
+ *                   4. Starts startPolling(runId) — polls every 2 s:
+ *                        a. GET /api/agent-steps/:runId  → live step stream
+ *                        b. GET /api/agent-run/:runId    → completion status
+ *                   5. On completion, builds final thought list and marks done.
+ *
+ * Step parsing pipeline
+ * ──────────────────────
+ * Raw API response → extractRawSteps() → buildThoughtsFromAgentSteps()
+ *
+ *   extractRawSteps   Normalises whatever shape the API returns into a flat
+ *                     array of step objects.  Handles bare arrays of node
+ *                     objects ([{node_alias, agent_steps:[]},...]), the
+ *                     {value:[...], Count:N} envelope, and several fallback
+ *                     keyed shapes.
+ *
+ *   buildThoughtsFromAgentSteps
+ *                     Maps each step to a human-readable string:
+ *                       "reasoning" / "thinking" → 💭 cleaned text
+ *                       "tool_call" / "tool_use"  → semantic conversion or
+ *                                                   suppressed (see SUPPRESSED set)
+ *                       "node_header" (synthetic) → 📍 Node: alias (Xs)
+ *                     Add entries to SUPPRESSED to hide internal tool noise.
+ *                     Add new `if (name === "...")` branches to convert tool
+ *                     calls into readable statements.
+ *
+ * Proxy (server.js)
+ * ─────────────────
+ * Browser → HTTPS Railway proxy → HTTP AWS ELB (CORS + mixed-content bypass)
+ * Routes: POST /api/agent/:slug, GET /api/agent-steps/:runId,
+ *         GET /api/agent-run/:runId
+ * Set VITE_AGENT_API_BASE in GitHub Secrets (build-time) and Railway env
+ * (runtime) to the Railway URL.
+ */
+
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import {
   Bot, Sparkles, ChevronDown, ChevronUp, X, Loader2, CheckCircle2, Play, Search,
@@ -5,6 +67,10 @@ import {
   Network, Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+// ─── Agent registry ──────────────────────────────────────────────────────────
+// Add a new AgentId value and a corresponding entry in AGENTS[] to introduce
+// any new agent.  If the agent has a live API, also add it to AGENT_API_CONFIGS.
 
 export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
@@ -67,7 +133,13 @@ export const AGENTS: Agent[] = [
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
 
-// Recommended bundles per route context
+// ─── Simulated agents (no live API yet) ──────────────────────────────────────
+// defaultThoughts are shown while the agent "runs" in simulation mode.
+// Replace with real API configs in AGENT_API_CONFIGS when agents are deployed.
+
+// ─── Recommended bundles ─────────────────────────────────────────────────────
+// One bundle per route.  The strip picks the matching route; falls back to
+// the last entry.  TODO: drive this from a backend config (per-user, per-case).
 export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string; agents: AgentId[] }[] = [
   { route: "/work-queue/review", label: "Resolve Title Discrepancy", reason: "Recommended for this exception · 92% historical resolution rate",
     agents: ["identity", "document", "regulatory", "audit"] },
@@ -77,16 +149,26 @@ export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string
     agents: ["sanctions", "pep", "adverse-media", "beneficial-owner", "risk-scoring"] },
 ];
 
+// VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
+// Locally it falls back to the Express proxy on 3001 (`npm start`).
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
+// EntityCtx is set by ExceptionReview when an entity is open, giving
+// Live Data Source agents the entity name to search for.
 type EntityCtx = { name: string; kyc?: string };
 
-// Per-agent real API config. Add an entry here whenever a new agent is deployed to AWS.
+// ─── Live agent API configs ───────────────────────────────────────────────────
+// Add an entry here to wire an agent to a real endpoint.
+// slug        → matches POST /api/invoke/<slug> on the AWS runtime
+// buildBody   → builds the request body from the current entity context
+// asyncMode   → true: POST returns {runId} immediately; poll for completion
+//               false: POST blocks until done (avoid for long-running flows)
+// fetchSteps  → whether to call /api/execution-logs/:runId/agent-steps
 type AgentApiConfig = {
   slug: string;
   buildBody: (ctx: EntityCtx | null) => Record<string, unknown>;
   fetchSteps: boolean;
-  asyncMode?: boolean; // use async invoke + live step polling instead of blocking sync call
+  asyncMode?: boolean;
 };
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
@@ -121,6 +203,10 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   },
 };
 
+// ─── Step parsing ─────────────────────────────────────────────────────────────
+
+// Detects whether an array is a list of agent-node objects (each containing
+// agent_steps) rather than a flat list of step primitives.
 function isNodeObjectArray(arr: unknown[]): boolean {
   if (arr.length === 0) return false;
   const first = arr[0];
@@ -345,6 +431,8 @@ function buildThoughtsFromResult(data: unknown, agentId: AgentId): string[] {
   return thoughts;
 }
 
+// ─── State types ──────────────────────────────────────────────────────────────
+
 type StepState = "pending" | "running" | "done";
 type AgentRun = {
   id: string;
@@ -378,6 +466,10 @@ export const useAgents = () => {
   if (!v) throw new Error("useAgents must be used within AgentProvider");
   return v;
 };
+
+// ─── AgentProvider ────────────────────────────────────────────────────────────
+// Wrap the application once (in AppLayout) to give all pages access to agent
+// state.  Components consume it via useAgents().
 
 export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const [runs, setRuns] = useState<AgentRun[]>([]);
@@ -455,7 +547,6 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           try {
             const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
             const stepsRaw = await sr.json() as unknown;
-            console.log("[agent-steps] raw:", JSON.stringify(stepsRaw).slice(0, 1000));
             updateLiveThoughts(extractRawSteps(stepsRaw));
           } catch { /* non-fatal — keep polling */ }
 
@@ -543,7 +634,9 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 
   const clearRuns = useCallback(() => setRuns([]), []);
 
-  // Drive simulation: advance thoughts then mark done; real agents wait for their fetch callback
+  // Simulation ticker: advances currentThought every 900 ms for agents without a
+  // live API config.  Real agents pause at the last thought and wait for the
+  // fetch callback to call markDone() with the final thought list.
   useEffect(() => {
     if (runs.length === 0) return;
     const runningIdx = runs.findIndex((r) => r.state === "running");
