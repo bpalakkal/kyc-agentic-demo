@@ -608,6 +608,12 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           const runId = d.runId ?? d.run_id ?? d.id;
           const status = String(d.status ?? "");
 
+          // Proxy returned an error (e.g. upstream timeout or network error)
+          if (!runId && (d.error || d.message)) {
+            markDone([`⚠ ${String(d.error ?? d.message)}`]);
+            return;
+          }
+
           // Already complete (sync response or instant agent)
           if (!runId || !cfg.asyncMode || ["complete", "completed", "done"].includes(status)) {
             let thoughts: string[] = [];
@@ -627,7 +633,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           startPolling(String(runId));
         })
         .catch((err: Error) => {
-          markDone([...AGENTS_BY_ID[run.agentId].defaultThoughts, `⚠ API error: ${err.message}`]);
+          markDone([`⚠ API error: ${err.message}`]);
         });
     });
   }, []);

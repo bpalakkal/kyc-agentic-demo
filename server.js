@@ -129,12 +129,17 @@ const AWS_AGENT_BASE =
 
 // Fetches a URL and always returns { ok, status, data } — never throws and
 // never forwards raw HTML error pages to the browser.
-async function proxyFetch(url, options = {}) {
+// timeoutMs defaults to 25 s so we always respond before Railway's 30 s stream
+// idle timeout, avoiding "Stream idle timeout - partial response received".
+async function proxyFetch(url, options = {}, timeoutMs = 25000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let status = 502;
   try {
-    const upstream = await fetch(url, options);
+    const upstream = await fetch(url, { ...options, signal: controller.signal });
     status = upstream.status;
     const text = await upstream.text();
+    clearTimeout(timer);
     console.log(`[agent-proxy] ${options.method ?? "GET"} ${url} → ${status} (${text.length} chars)`);
     try {
       return { ok: upstream.ok, status, data: JSON.parse(text) };
@@ -145,6 +150,11 @@ async function proxyFetch(url, options = {}) {
       return { ok: false, status, data: { error: `Upstream returned non-JSON (HTTP ${status})`, preview } };
     }
   } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      console.error(`[agent-proxy] Timeout (${timeoutMs}ms) fetching ${url}`);
+      return { ok: false, status: 504, data: { error: `Upstream timed out after ${timeoutMs / 1000}s — the agent is still running, keep polling` } };
+    }
     console.error(`[agent-proxy] Network error fetching ${url}: ${err.message}`);
     return { ok: false, status, data: { error: `Network error: ${err.message}` } };
   }

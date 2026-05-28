@@ -5,12 +5,11 @@
  * Analysts select one or more entities and click "Review Selected" to open
  * the ExceptionReview page with the chosen entities pre-loaded.
  *
- * Data sources (current state — demo)
+ * Data source (current state — demo)
  * ─────────────────────────────────────
- * `groups`              Hard-coded in this file.  Contains ~20 demo entities
- *                       across four DRGs.
- * GENERATED_WORK_ROWS   Auto-generated from entities.md via parse-entities.cjs.
- *                       Injected at the bottom of each DRG at module load time.
+ * `groups` is built at module load time from GENERATED_WORK_ROWS, which is
+ * auto-generated from entities.md via parse-entities.cjs.  Adding or removing
+ * an entity only requires editing entities.md and rebuilding.
  *
  * TODO (production)
  * ─────────────────
@@ -56,78 +55,33 @@ type Group = {
   rows?: Row[];
 };
 
-// ─── HARD-CODED DEMO DATA ─────────────────────────────────────────────────────
-// Replace with an API call in production.  Each group represents a DRG; each
-// row is a KYC case.  `selectable` rows can be added to a review session;
-// `locked` rows are assigned to another analyst (read-only indicator).
-const groups: Group[] = [
-  {
-    id: "g3",
-    name: "US Private Equity DRG",
-    priorityNote: "2 Medium Priority Items",
-    priorityTone: "medium",
-    rows: [
-      { id: "r10", name: "Long Focus Capital Management, LLC", kyc: "KYC-30215", due: "Jul 02, 2026", confidence: "93%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE / UK", priority: "High", risk: "Elevated", exc: 5, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r18", name: "Brookfield Asset Management PIC US, LLC", kyc: "KYC-30216", due: "Jun 30, 2026", confidence: "91%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE", priority: "Medium", risk: "Moderate", exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r11", name: "Apollo Capital Management LP", due: "Jul 02, 2026", confidence: "94%", customerType: "Registered Investment Adviser", jurisdiction: "US — DE", priority: "Medium", risk: "Moderate", exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r12", name: "Silver Lake Management Co. LLC", due: "Jul 15, 2026", confidence: "91%", customerType: "Registered Investment Adviser", jurisdiction: "US — CA", priority: "Medium", risk: "Moderate", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
-      { id: "r17", name: "Vista Equity Partners Management LLC", due: "Jul 21, 2026", confidence: "96%", customerType: "Registered Investment Adviser", jurisdiction: "US — TX", priority: "Low", risk: "Minimal", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
-    ],
-  },
-  {
-    id: "g1",
-    name: "London Alternatives DRG",
-    priorityNote: "2 High Priority Items",
-    priorityTone: "high",
-    open: true,
-    rows: [
-      { id: "r1", name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", due: "Overdue · Apr 25, 2026", overdue: true, confidence: "92%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r2", name: "Marshall Wace LLP", kyc: "KYC-30188", due: "Overdue · May 14, 2026", overdue: true, confidence: "88%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 2, status: "Pending Feedback", action: "Periodic Refresh", selectable: true },
-      { id: "r3", name: "BH Partnership Holdings Limited", kyc: "KYC-30301", due: "Jun 28, 2026", confidence: "84%", customerType: "Corporate Designated Member", jurisdiction: "Jersey", priority: "Medium", risk: "Elevated", exc: 1, status: "Not Started", action: "Periodic Refresh", selectable: true },
-      { id: "r4", name: "Brevan Howard Asset Mgmt Services Ltd", due: "Jun 29, 2026", confidence: "95%", customerType: "Corporate Designated Member", jurisdiction: "UK", priority: "Medium", risk: "Moderate", exc: 0, status: "In Progress", action: "Periodic Refresh", locked: true },
-      { id: "r5", name: "Marshall Wace Investment Strategies LLP", due: "Jul 04, 2026", confidence: "91%", customerType: "Sub-Adviser LLP", jurisdiction: "UK", priority: "Low", risk: "Moderate", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
-    ],
-  },
-  {
-    id: "g2",
-    name: "EMEA Hedge Funds DRG",
-    priorityNote: "3 High Priority Items",
-    priorityTone: "high",
-    rows: [
-      { id: "r6", name: "Man Group plc", due: "Overdue · May 02, 2026", overdue: true, confidence: "90%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 4, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r7", name: "AHL Partners LLP", due: "Overdue · May 18, 2026", overdue: true, confidence: "87%", customerType: "Sub-Adviser LLP", jurisdiction: "UK", priority: "High", risk: "Elevated", exc: 2, status: "Not Started", action: "Periodic Refresh", selectable: true },
-      { id: "r8", name: "GLG Partners LP", due: "Overdue · May 22, 2026", overdue: true, confidence: "89%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "High", risk: "Moderate", exc: 3, status: "Pending Feedback", action: "Periodic Refresh", selectable: true },
-      { id: "r9", name: "Winton Group Limited", due: "Jul 11, 2026", confidence: "93%", customerType: "Registered Investment Adviser", jurisdiction: "UK", priority: "Medium", risk: "Moderate", exc: 1, status: "In Progress", action: "Periodic Refresh", locked: true },
-    ],
-  },
-  {
-    id: "g4",
-    name: "APAC Wealth Managers DRG",
-    priorityNote: "4 Low Priority Items",
-    priorityTone: "low",
-    rows: [
-      { id: "r13", name: "Platinum Asset Management Ltd", due: "Aug 04, 2026", confidence: "92%", customerType: "Registered Investment Adviser", jurisdiction: "AU", priority: "Low", risk: "Minimal", exc: 0, status: "Not Started", action: "Periodic Refresh", selectable: true },
-      { id: "r14", name: "Value Partners Group Ltd", due: "Aug 09, 2026", confidence: "90%", customerType: "Registered Investment Adviser", jurisdiction: "HK", priority: "Low", risk: "Moderate", exc: 1, status: "In Progress", action: "Periodic Refresh", selectable: true },
-      { id: "r15", name: "Nikko Asset Management Co., Ltd.", due: "Aug 18, 2026", confidence: "95%", customerType: "Registered Investment Adviser", jurisdiction: "JP", priority: "Low", risk: "Minimal", exc: 0, status: "Pending Feedback", action: "Periodic Refresh", locked: true },
-      { id: "r16", name: "Eastspring Investments (Singapore) Ltd", due: "Aug 24, 2026", confidence: "93%", customerType: "Registered Investment Adviser", jurisdiction: "SG", priority: "Low", risk: "Minimal", exc: 0, status: "Not Started", action: "Onboarding", locked: true },
-    ],
-  },
-];
-
-// Inject entities sourced from entities.md (parse-entities.cjs generates them).
-// This merge step prevents duplicates if an entity appears in both the hard-
-// coded list and the generated file.  Remove in production once groups comes
-// from the API.
-{
-  const _existingKycs = new Set(groups.flatMap(g => (g.rows ?? []).map(r => r.kyc).filter(Boolean)));
+// ─── WORK QUEUE DATA (derived from entities.md via parse-entities.cjs) ────────
+// Groups are built at module load time.  Replace with a React Query API call in
+// production: GET /api/work-queue?analyst=<id>&status=open
+function buildGroups(): Group[] {
+  const drgMap = new Map<string, Row[]>();
   for (const row of GENERATED_WORK_ROWS) {
-    if (_existingKycs.has(row.kyc)) continue;
-    const drg = GENERATED_ENTITY_DRG[row.kyc] ?? "US Private Equity DRG";
-    const target = groups.find(g => g.name === drg) ?? groups.find(g => g.name.includes("US")) ?? groups[0];
-    target?.rows?.push(row as unknown as Row);
-    _existingKycs.add(row.kyc);
+    const drg = GENERATED_ENTITY_DRG[row.kyc] ?? "Other";
+    if (!drgMap.has(drg)) drgMap.set(drg, []);
+    drgMap.get(drg)!.push(row as unknown as Row);
   }
+  return Array.from(drgMap.entries()).map(([drgName, rows], i) => {
+    const highCount = rows.filter(r => r.priority === "High").length;
+    const medCount  = rows.filter(r => r.priority === "Medium").length;
+    const topCount  = highCount > 0 ? highCount : medCount;
+    const topLabel  = highCount > 0 ? "High" : medCount > 0 ? "Medium" : "Low";
+    const tone: Group["priorityTone"] = highCount > 0 ? "high" : medCount > 0 ? "medium" : "low";
+    return {
+      id: `drg-${i}`,
+      name: drgName,
+      priorityNote: `${topCount} ${topLabel} Priority Item${topCount !== 1 ? "s" : ""}`,
+      priorityTone: tone,
+      rows,
+    };
+  });
 }
+
+const groups: Group[] = buildGroups();
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {
