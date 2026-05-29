@@ -457,6 +457,8 @@ type AgentContextValue = {
   currentLabel: string | null;
   entityContext: EntityCtx | null;
   setEntityContext: (ctx: EntityCtx | null) => void;
+  qaReviewCallback: (() => void) | null;
+  setQaReviewCallback: (fn: (() => void) | null) => void;
 };
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -477,6 +479,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const [dockMinimized, setDockMinimized] = useState(false);
   const [currentLabel, setCurrentLabel] = useState<string | null>(null);
   const [entityContext, setEntityContext] = useState<EntityCtx | null>(null);
+  const [qaReviewCallback, setQaReviewCallback] = useState<(() => void) | null>(null);
   // Ref so runAgents (stable useCallback) always reads the latest entity context
   const entityContextRef = useRef<EntityCtx | null>(null);
   entityContextRef.current = entityContext;
@@ -673,7 +676,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo(() => ({
     runs, isRunning, dockOpen, dockMinimized, setDockOpen, setDockMinimized,
     runAgents, clearRuns, currentLabel, entityContext, setEntityContext,
-  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel, entityContext, setEntityContext]);
+    qaReviewCallback, setQaReviewCallback,
+  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel, entityContext, setEntityContext, qaReviewCallback]);
 
   return (
     <AgentContext.Provider value={value}>
@@ -686,7 +690,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 // =========== Top recommendation strip ===========
 
 export const AgentRecommendationStrip = ({ route }: { route: string }) => {
-  const { runAgents, entityContext } = useAgents();
+  const { runAgents, entityContext, qaReviewCallback } = useAgents();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<AgentId>>(new Set());
 
@@ -829,6 +833,31 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                     </button>
                   ))}
                 </div>
+
+                {/* ── Quality Assurance ─────────────────────────── */}
+                {qaReviewCallback && (
+                  <div className="border-t border-border bg-secondary/30">
+                    <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-primary inline-block" />
+                      Quality Assurance
+                    </p>
+                    <button
+                      onClick={() => { qaReviewCallback(); setOpen(false); }}
+                      className="w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors hover:bg-secondary/60"
+                    >
+                      <span className="size-7 rounded-md bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
+                        <Sparkles className="size-3.5" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[12px] font-medium">QA Review</p>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">Review AI-suggested corrections and confirm analyst decisions</p>
+                      </div>
+                      <span className="text-[11px] text-primary font-medium shrink-0 mt-1">Open →</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

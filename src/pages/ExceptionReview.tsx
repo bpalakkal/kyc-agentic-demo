@@ -35,7 +35,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
-  ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Lock, Settings2, Building2, Clock,
+  ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
   ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -872,12 +872,11 @@ const severityFromConfidence = (c: number): { label: "High" | "Medium" | "Low"; 
   return { label: "Low", ring: "stroke-success", text: "text-success" };
 };
 
-const buildHeaderMeta = (addressed: number, total: number, reachOuts = 0) => [
+const buildHeaderMeta = (addressed: number, total: number) => [
   { label: "Exceptions", value: `${addressed}/${total}`, suffix: "addressed" },
   { label: "Due Date", value: "Apr 25, 2026" },
   { label: "Risk", value: "Elevated", tone: "alert" as const },
   { label: "Priority", value: "High" },
-  { label: "Outreach", value: `${reachOuts}`, suffix: "pending" },
 ];
 
 const DEFAULT_SELECTED_ENTITIES = [
@@ -953,7 +952,12 @@ const ExceptionReview = () => {
   const [zoomError, setZoomError] = useState<string | null>(null);
   
   
-  const { runAgents, isRunning, currentLabel, runs, setEntityContext } = useAgents();
+  const { runAgents, isRunning, currentLabel, runs, setEntityContext, setQaReviewCallback } = useAgents();
+
+  useEffect(() => {
+    setQaReviewCallback(() => () => setOpenAgent(true));
+    return () => setQaReviewCallback(null);
+  }, [setQaReviewCallback]);
 
   // If selection changes and current active is no longer in the effective set, reset
   useEffect(() => {
@@ -1043,7 +1047,7 @@ const ExceptionReview = () => {
   }, [isRunning, runs, currentLabel, selectedResolution, active]);
 
   const addressedCount = Object.keys(resolvedMap).filter((id) => effectiveExceptions.find((e) => e.id === id)).length;
-  const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length, reachOutCount);
+  const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length);
 
 
 
@@ -1057,13 +1061,30 @@ const ExceptionReview = () => {
           <div className="flex items-start gap-8 flex-1 flex-wrap">
             <div>
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">DRG</p>
-              <div className="flex items-center gap-2">
-                <h1 className="text-[15px] font-semibold">London Alternatives DRG</h1>
-                <Info className="size-3.5 text-muted-foreground" />
-                <button className="px-2 py-0.5 rounded border border-border text-[11px] flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                  <Lock className="size-2.5" /> Why?
-                </button>
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-1.5 hover:text-primary transition-colors group">
+                    <h1 className="text-[15px] font-semibold group-hover:underline underline-offset-2">London Alternatives DRG</h1>
+                    <Info className="size-3.5 text-muted-foreground group-hover:text-primary" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">DRG Details</p>
+                  <div className="space-y-2 text-sm mb-3">
+                    <div className="flex justify-between"><span className="text-muted-foreground">DRG ID</span><span className="font-medium">DRG-001</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">DRG Name</span><span className="font-medium">London Alternatives</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Region</span><span className="font-medium">EMEA</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Relationship Manager</span><span className="font-medium">RM Anderson</span></div>
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Entities in DRG</p>
+                  <ul className="space-y-1 text-[12px]">
+                    {["Brevan Howard Asset Management LLP · KYC-30214", "Marshall Wace LLP · KYC-30188", "Winton Group Ltd · KYC-30201", "Man Group plc · KYC-30207"].map((e) => (
+                      <li key={e} className="flex items-center gap-2 text-muted-foreground"><Building2 className="size-3 shrink-0" />{e}</li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-muted-foreground mt-3 italic">Full DRG data will load from entities.md</p>
+                </PopoverContent>
+              </Popover>
             </div>
             {headerMeta.map((m) => (
               <div key={m.label}>
@@ -1075,13 +1096,11 @@ const ExceptionReview = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Link to="/work-queue" className="text-sm text-muted-foreground hover:text-foreground px-3 py-2">Cancel</Link>
-            <button className="text-sm text-primary hover:underline px-3 py-2">Audit Log</button>
+          <div className="flex items-center gap-3 flex-wrap">
             <Popover open={reachOutOpen} onOpenChange={setReachOutOpen}>
               <PopoverTrigger asChild>
                 <button className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors">
-                  <Mail className="size-4" /> Outreach
+                  <Mail className="size-4" /> Initiate Outreach
                   {reachOutCount > 0 && (
                     <span className="size-5 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center font-semibold">
                       {reachOutCount}
@@ -1115,20 +1134,17 @@ const ExceptionReview = () => {
                 </button>
               </PopoverContent>
             </Popover>
-            <button
-              onClick={() => setOpenAgent(true)}
-              className="text-sm px-4 py-2 rounded-full border border-primary text-primary flex items-center gap-2 hover:bg-info-soft transition-colors"
-            >
-              <Sparkles className="size-4" /> QA Review
-            </button>
+            <div className="flex items-center gap-1 border border-border rounded-full overflow-hidden">
+              <Link to="/work-queue" className="text-sm text-muted-foreground hover:text-foreground px-3 py-2 hover:bg-secondary transition-colors">Cancel</Link>
+              <span className="w-px h-6 bg-border" />
             <Popover open={escalateOpen} onOpenChange={setEscalateOpen}>
               <PopoverTrigger asChild>
                 <button
                   className={cn(
-                    "text-sm px-4 py-2 rounded-full border flex items-center gap-2 transition-colors",
+                    "text-sm px-4 py-2 flex items-center gap-2 transition-colors",
                     escalation
-                      ? "border-warning bg-warning-soft text-warning-foreground"
-                      : "border-border text-muted-foreground hover:bg-secondary"
+                      ? "bg-warning-soft text-warning-foreground"
+                      : "text-muted-foreground hover:bg-secondary"
                   )}
                 >
                   <AlertTriangle className="size-4" />
@@ -1159,9 +1175,11 @@ const ExceptionReview = () => {
                 </button>
               </PopoverContent>
             </Popover>
-            <button className="text-sm px-5 py-2 rounded-full bg-primary text-primary-foreground flex items-center gap-2 shadow-sm hover:opacity-95 transition-opacity">
-              <Send className="size-4" /> Submit
-            </button>
+              <span className="w-px h-6 bg-border" />
+              <button className="text-sm px-4 py-2 bg-primary text-primary-foreground flex items-center gap-2 hover:opacity-95 transition-opacity">
+                <Send className="size-4" /> Submit
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -4099,7 +4117,7 @@ const taskTone: Record<CaseTask["status"], string> = {
   Done: "bg-success-soft text-success",
 };
 
-type CollabSubTab = "comments" | "tasks" | "watchers" | "activity";
+type CollabSubTab = "comments" | "watchers" | "activity";
 
 const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
   const [sub, setSub] = useState<CollabSubTab>("comments");
@@ -4126,12 +4144,10 @@ const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
     setDraft("");
   }, [kyc, entity]);
 
-  const tasks = TASKS_BY_KYC[kyc] ?? [];
   const watchers = WATCHERS_BY_KYC[kyc] ?? [];
 
   const subTabs: { id: CollabSubTab; label: string; count: number }[] = [
     { id: "comments", label: "Comments", count: localComments.length },
-    { id: "tasks", label: "Tasks", count: tasks.length },
     { id: "watchers", label: "Watchers", count: watchers.length },
     { id: "activity", label: "Activity", count: localActivity.length },
   ];
@@ -4248,35 +4264,6 @@ const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
               </button>
             </div>
           </div>
-        </>
-      )}
-
-      {sub === "tasks" && (
-        <>
-          <ul className="space-y-2 max-h-[360px] overflow-y-auto pr-1 -mr-1">
-            {tasks.length === 0 && (
-              <li className="text-[12px] text-muted-foreground italic text-center py-4">No tasks for this case yet.</li>
-            )}
-            {tasks.map((t, i) => (
-              <li key={i} className="rounded-lg border border-border p-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[12px] font-medium leading-snug">{t.title}</p>
-                  <span className={cn("text-[10px] px-1.5 py-0.5 rounded shrink-0", taskTone[t.status])}>{t.status}</span>
-                </div>
-                <div className="flex items-center justify-between mt-1.5">
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                    <UserCircle2 className="size-3" /> {t.assignee}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                    <Clock className="size-3" /> {t.due}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <button className="mt-3 w-full text-[12px] py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors flex items-center justify-center gap-1.5">
-            <Plus className="size-3.5" /> New task
-          </button>
         </>
       )}
 
