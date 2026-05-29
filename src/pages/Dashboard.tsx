@@ -5,7 +5,7 @@ import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { GENERATED_DASHBOARD_CASES } from "@/data/entities-generated";
 
-type FilterKey = "all" | "attention" | "urgent" | "complete";
+type FilterKey = "all" | "high" | "today";
 
 const priorityCases = [
   { priority: "High", id: "KYC-30214", entity: "Brevan Howard Asset Management LLP", note: "PSC nature-of-control change undisclosed — Companies House filing overdue.", due: "2 hrs", est: "45 min", status: "open" },
@@ -60,46 +60,63 @@ const collabMeta: Record<CollabType, { label: string; icon: typeof MessageSquare
 const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, active }: {
   label: string; value: string; unit?: string; trend?: { dir: "up" | "down"; text: string };
   accent?: "alert"; icon?: React.ReactNode; soft?: boolean; onClick?: () => void; active?: boolean;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "group rounded-xl border bg-card p-5 flex items-start justify-between gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
-      soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border",
-      active && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
-    )}>
-    <div className="min-w-0">
-      <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">{label}</p>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className={cn("text-3xl font-semibold tracking-tight tabular-nums", accent === "alert" && "text-alert")}>{value}</span>
-        {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+}) => {
+  const body = (
+    <>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">{label}</p>
+        <div className="mt-2 flex items-baseline gap-2">
+          <span className={cn("text-3xl font-semibold tracking-tight tabular-nums", accent === "alert" && "text-alert")}>{value}</span>
+          {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
+        </div>
+        {trend && (
+          <p className={cn("mt-2 text-xs flex items-center gap-1 font-medium", trend.dir === "up" ? "text-alert" : "text-success")}>
+            {trend.dir === "up" ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+            {trend.text}
+          </p>
+        )}
       </div>
-      {trend && (
-        <p className={cn("mt-2 text-xs flex items-center gap-1 font-medium", trend.dir === "up" ? "text-alert" : "text-success")}>
-          {trend.dir === "up" ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-          {trend.text}
-        </p>
+      {icon && (
+        <div className={cn(
+          "size-10 rounded-lg grid place-items-center shrink-0",
+          soft ? "bg-alert/10 text-alert" : cn("bg-secondary text-muted-foreground", onClick && "transition-colors group-hover:bg-primary/10 group-hover:text-primary"),
+          active && onClick && "bg-primary/10 text-primary"
+        )}>{icon}</div>
       )}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "group rounded-xl border bg-card p-5 flex items-start justify-between gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
+          soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border",
+          active && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
+        )}>
+        {body}
+      </button>
+    );
+  }
+  return (
+    <div className={cn(
+      "rounded-xl border bg-card p-5 flex items-start justify-between gap-4",
+      soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border"
+    )}>
+      {body}
     </div>
-    {icon && (
-      <div className={cn(
-        "size-10 rounded-lg grid place-items-center shrink-0 transition-colors",
-        soft ? "bg-alert/10 text-alert" : "bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
-        active && "bg-primary/10 text-primary"
-      )}>{icon}</div>
-    )}
-  </button>
-);
+  );
+};
 
 const dotColor = (k: string) =>
   k === "alert" ? "bg-alert" : k === "warning" ? "bg-warning" : "bg-muted-foreground/40";
 
 const filterLabel: Record<FilterKey, string> = {
   all: "All priority cases",
-  attention: "Cases requiring attention (High priority)",
-  urgent: "Cases due today or within hours",
-  complete: "Resolved cases",
+  high: "High priority cases",
+  today: "Cases due today or within hours",
 };
 
 type ChatMessage = { role: "user" | "assistant"; text: string; time: string };
@@ -164,6 +181,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const goQueue = () => navigate("/work-queue");
   const goReview = () => navigate("/work-queue/review");
+  const actionsRef = useRef<HTMLElement>(null);
   const [priorityExpanded, setPriorityExpanded] = useState(false);
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [kpiFilter, setKpiFilter] = useState<FilterKey>("all");
@@ -201,12 +219,18 @@ const Dashboard = () => {
 
   const toggleKpi = (k: FilterKey) => setKpiFilter((prev) => (prev === k ? "all" : k));
 
+  // Row 1 summary counts (static)
+  const totalCases = priorityCases.length;
+  const slaAtRisk = priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today" || c.due === "Tomorrow").length;
+  // Row 2 filter counts
+  const highPriorityCount = priorityCases.filter((c) => c.priority === "High").length;
+  const dueTodayCount = priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today").length;
+
   const filteredCases = useMemo(() => {
     switch (kpiFilter) {
-      case "attention": return priorityCases.filter((c) => c.priority === "High");
-      case "urgent": return priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today");
-      case "complete": return priorityCases.filter((c) => c.status === "complete");
-      default: return priorityCases;
+      case "high":  return priorityCases.filter((c) => c.priority === "High");
+      case "today": return priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today");
+      default:      return priorityCases;
     }
   }, [kpiFilter]);
 
@@ -225,33 +249,25 @@ const Dashboard = () => {
           <p className="text-xs text-muted-foreground">Last refreshed: Today, 8:42 AM</p>
         </div>
 
-        {/* Top stat row */}
+        {/* Top stat row — static queue summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Stat
-            label="Cases Requiring Attention"
-            value="2"
-            unit="cases"
-            trend={{ dir: "up", text: "+2 since yesterday" }}
-            icon={<AlertTriangle className="size-5" />}
-            onClick={() => toggleKpi("attention")}
-            active={kpiFilter === "attention"}
+            label="Total Cases in Queue"
+            value={String(totalCases)}
+            unit="open cases"
+            trend={{ dir: "up", text: "+3 since last week" }}
+            icon={<FileText className="size-5" />}
           />
           <Stat
-            label="Avg Response Time"
-            value="3.2"
-            unit="days"
-            trend={{ dir: "up", text: "0.4d vs yesterday" }}
-            icon={<Clock className="size-5" />}
-            onClick={() => toggleKpi("urgent")}
-            active={kpiFilter === "urgent"}
+            label="SLA at Risk"
+            value={String(slaAtRisk)}
+            unit="cases"
+            trend={{ dir: "up", text: "Due within 48 hours" }}
+            accent="alert"
+            soft
+            icon={<AlertTriangle className="size-5" />}
           />
-          <button
-            type="button"
-            onClick={() => toggleKpi("complete")}
-            className={cn(
-              "group rounded-xl border border-border bg-card p-5 flex items-start justify-between transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
-              kpiFilter === "complete" && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
-            )}>
+          <div className="rounded-xl border border-border bg-card p-5 flex items-start justify-between">
             <div>
               <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">Cases Complete</p>
               <div className="mt-2 flex items-baseline gap-1">
@@ -270,22 +286,25 @@ const Dashboard = () => {
               </svg>
               <span className="absolute inset-0 grid place-items-center text-[10px] font-semibold text-primary">48%</span>
             </div>
-          </button>
+          </div>
         </div>
 
-        {/* Second stat row — compact secondary metrics */}
+        {/* Second stat row — clickable priority shortcuts */}
         <div className="rounded-xl border border-border bg-card divide-y md:divide-y-0 md:divide-x divide-border grid grid-cols-2 md:grid-cols-4 overflow-hidden">
-          {[
-            { label: "Compliance Alerts", value: "2", icon: <AlertTriangle className="size-4" />, accent: true },
-            { label: "Decision Support", value: "13", icon: <Sparkles className="size-4" /> },
-            { label: "Next to Complete", value: "5", icon: <Timer className="size-4" /> },
-            { label: "Client Responses", value: "3", icon: <MessageSquare className="size-4" /> },
-          ].map((s) => (
+          {([
+            { label: "High Priority", value: highPriorityCount, icon: <AlertTriangle className="size-4" />, accent: true,  action: () => toggleKpi("high"),  active: kpiFilter === "high" },
+            { label: "Due Today",     value: dueTodayCount,     icon: <Clock className="size-4" />,          accent: false, action: () => toggleKpi("today"), active: kpiFilter === "today" },
+            { label: "Compliance Alerts", value: 2,             icon: <AlertTriangle className="size-4" />, accent: true,  action: goQueue,                   active: false },
+            { label: "AI Actions",    value: aiActions.length,  icon: <Sparkles className="size-4" />,      accent: false, action: () => actionsRef.current?.scrollIntoView({ behavior: "smooth" }), active: false },
+          ] as const).map((s) => (
             <button
               key={s.label}
               type="button"
-              onClick={goQueue}
-              className="text-left px-4 py-3 hover:bg-secondary/40 transition-colors focus:outline-none focus:bg-secondary/60 flex items-center gap-3"
+              onClick={s.action}
+              className={cn(
+                "text-left px-4 py-3 hover:bg-secondary/40 transition-colors focus:outline-none focus:bg-secondary/60 flex items-center gap-3",
+                s.active && "bg-info-soft"
+              )}
             >
               <span className={cn(
                 "size-8 rounded-lg grid place-items-center shrink-0",
@@ -379,7 +398,7 @@ const Dashboard = () => {
           </section>
 
           {/* Recommended Actions — 3 by default, expand to scroll */}
-          <section className="rounded-xl border border-border bg-card p-5">
+          <section ref={actionsRef} className="rounded-xl border border-border bg-card p-5">
             <header className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-semibold flex items-center gap-2">
