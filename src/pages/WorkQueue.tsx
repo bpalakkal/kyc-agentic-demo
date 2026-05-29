@@ -2,12 +2,13 @@
  * WorkQueue — entity selection table
  *
  * Displays KYC cases grouped by Dedicated Relationship Group (DRG).
+ * Entities with no DRG are shown as flat rows below the groups.
  * Analysts select one or more entities and click "Review Selected" to open
  * the ExceptionReview page with the chosen entities pre-loaded.
  *
  * Data source (current state — demo)
  * ─────────────────────────────────────
- * `groups` is built at module load time from GENERATED_WORK_ROWS, which is
+ * `groups` is built at render time from GENERATED_WORK_ROWS, which is
  * auto-generated from entities.md via parse-entities.cjs.  Adding or removing
  * an entity only requires editing entities.md and rebuilding.
  *
@@ -15,18 +16,19 @@
  * ─────────────────
  * - Replace `groups` with an API call (React Query) to a case management
  *   backend: GET /api/work-queue?analyst=<id>&status=open
- * - Add real search/filter/sort against the backend (the search box and filter
- *   button are currently non-functional UI stubs)
+ * - Add real search/filter/sort against the backend
  * - The "389 entities" count is hard-coded — derive from total API result count
  * - Locking logic should come from the backend (assigned_to !== current_user)
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { GENERATED_WORK_ROWS, GENERATED_ENTITY_DRG } from "@/data/entities-generated";
 import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
+
+type FilterTab = "all" | "periodic-refresh" | "onboarding";
 
 type Row = {
   id: string;
@@ -51,23 +53,34 @@ type Group = {
   name: string;
   priorityNote: string;
   priorityTone: "high" | "medium" | "low";
-  open?: boolean;
-  rows?: Row[];
+  rows: Row[];
 };
 
-// ─── WORK QUEUE DATA (derived from entities.md via parse-entities.cjs) ────────
-// Groups are built at module load time.  Replace with a React Query API call in
-// production: GET /api/work-queue?analyst=<id>&status=open
-function buildGroups(): Group[] {
+function buildDisplay(activeTab: FilterTab): { groups: Group[]; ungrouped: Row[] } {
+  // Filter rows by tab
+  const filtered = (GENERATED_WORK_ROWS as unknown as Row[]).filter((row) => {
+    if (activeTab === "all") return true;
+    if (activeTab === "periodic-refresh") return row.action === "Periodic Refresh";
+    if (activeTab === "onboarding") return row.action === "Onboarding";
+    return true;
+  });
+
   const drgMap = new Map<string, Row[]>();
-  for (const row of GENERATED_WORK_ROWS) {
-    const drg = GENERATED_ENTITY_DRG[row.kyc] ?? "Other";
-    if (!drgMap.has(drg)) drgMap.set(drg, []);
-    drgMap.get(drg)!.push(row as unknown as Row);
+  const ungrouped: Row[] = [];
+
+  for (const row of filtered) {
+    const drg = GENERATED_ENTITY_DRG[row.kyc ?? ""];
+    if (drg) {
+      if (!drgMap.has(drg)) drgMap.set(drg, []);
+      drgMap.get(drg)!.push(row);
+    } else {
+      ungrouped.push(row);
+    }
   }
-  return Array.from(drgMap.entries()).map(([drgName, rows], i) => {
-    const highCount = rows.filter(r => r.priority === "High").length;
-    const medCount  = rows.filter(r => r.priority === "Medium").length;
+
+  const groups: Group[] = Array.from(drgMap.entries()).map(([drgName, rows], i) => {
+    const highCount = rows.filter((r) => r.priority === "High").length;
+    const medCount  = rows.filter((r) => r.priority === "Medium").length;
     const topCount  = highCount > 0 ? highCount : medCount;
     const topLabel  = highCount > 0 ? "High" : medCount > 0 ? "Medium" : "Low";
     const tone: Group["priorityTone"] = highCount > 0 ? "high" : medCount > 0 ? "medium" : "low";
@@ -79,30 +92,104 @@ function buildGroups(): Group[] {
       rows,
     };
   });
+
+  return { groups, ungrouped };
 }
 
-const groups: Group[] = buildGroups();
+const COLS = "grid-cols-[40px_minmax(220px,1.6fr)_180px_110px_minmax(180px,1.4fr)_110px_100px_110px_70px_140px_140px]";
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {
-    case "Complete": return "text-success";
-    case "In Progress": return "text-primary";
-    case "Pending Feedback": return "text-[hsl(30_70%_40%)]";
-    case "Not Started": return "text-muted-foreground";
+    case "Complete":        return "text-success";
+    case "In Progress":     return "text-primary";
+    case "Pending Feedback":return "text-[hsl(30_70%_40%)]";
+    case "Not Started":     return "text-muted-foreground";
   }
 };
 
+const EntityRow = ({
+  r,
+  selected,
+  onToggle,
+  indent = false,
+}: {
+  r: Row;
+  selected: boolean;
+  onToggle: (id: string, checked: boolean) => void;
+  indent?: boolean;
+}) => (
+  <div
+    className={cn(
+      `grid ${COLS} gap-2 px-4 py-3 items-center text-sm border-t border-border/60 hover:bg-secondary/30`,
+      indent && "pl-8"
+    )}
+  >
+    <span className="flex justify-center">
+      {r.locked ? (
+        <Lock className="size-4 text-muted-foreground/50" title="Assigned to another analyst — read only" />
+      ) : (
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => onToggle(r.id, e.target.checked)}
+          className="size-4 accent-primary"
+        />
+      )}
+    </span>
+    <span className={cn("text-[13px]", r.locked && "text-muted-foreground")}>{r.name}</span>
+    <span>
+      <Chip variant={r.overdue ? "high" : "medium"} className="font-medium">{r.due}</Chip>
+    </span>
+    <span className="text-[13px] text-muted-foreground">{r.confidence}</span>
+    <span className="text-[13px] text-muted-foreground truncate">{r.customerType}</span>
+    <span className="text-[13px] text-muted-foreground">{r.jurisdiction}</span>
+    <span className="text-[13px]">{r.priority}</span>
+    <span className={cn(
+      "text-[13px] font-medium",
+      r.risk === "Elevated" && "text-alert",
+      r.risk === "Moderate" && "text-[hsl(30_70%_40%)]",
+      r.risk === "Minimal"  && "text-success"
+    )}>{r.risk}</span>
+    <span className="text-[13px]">{r.exc}</span>
+    <span className={cn("text-[13px] font-medium", statusColor(r.status))}>{r.status}</span>
+    <span className="text-[13px] text-muted-foreground">{r.action}</span>
+  </div>
+);
+
 const WorkQueue = () => {
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const selectedCount = Object.values(selected).filter(Boolean).length;
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
-    () => groups.length > 0 ? { [groups[0].id]: true } : {}
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  const { groups, ungrouped } = useMemo(() => buildDisplay(activeTab), [activeTab]);
+
+  // Open the first group by default when groups change
+  const firstGroupId = groups[0]?.id;
+  const effectiveOpen = useMemo<Record<string, boolean>>(() => {
+    if (firstGroupId && !Object.keys(openGroups).includes(firstGroupId)) {
+      return { [firstGroupId]: true, ...openGroups };
+    }
+    return openGroups;
+  }, [groups, openGroups, firstGroupId]);
+
+  const allRows = useMemo(
+    () => [...groups.flatMap((g) => g.rows), ...ungrouped],
+    [groups, ungrouped]
   );
 
-  const allRows = groups.flatMap((g) => g.rows ?? []);
+  const selectedCount = Object.values(selected).filter(Boolean).length;
   const selectedEntities = allRows
     .filter((r) => selected[r.id])
     .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id.toUpperCase() }));
+
+  const handleToggle = (id: string, checked: boolean) =>
+    setSelected((s) => ({ ...s, [id]: checked }));
+
+  const tabs: { id: FilterTab; label: string }[] = [
+    { id: "all",              label: "All" },
+    { id: "periodic-refresh", label: "Periodic Refresh" },
+    { id: "onboarding",       label: "Onboarding" },
+  ];
 
   return (
     <div className="px-6 py-6">
@@ -128,9 +215,20 @@ const WorkQueue = () => {
           </button>
 
           <div className="flex items-center gap-1 ml-2 p-1 rounded-full bg-secondary/60 border border-border">
-            <button className="px-4 py-1 rounded-full bg-card shadow-sm text-sm font-medium">All</button>
-            <button className="px-4 py-1 rounded-full text-sm text-muted-foreground hover:bg-card/50">Periodic Refresh</button>
-            <button className="px-4 py-1 rounded-full text-sm text-muted-foreground hover:bg-card/50">Onboarding</button>
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={cn(
+                  "px-4 py-1 rounded-full text-sm transition-colors",
+                  activeTab === t.id
+                    ? "bg-card shadow-sm font-medium"
+                    : "text-muted-foreground hover:bg-card/50"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -152,7 +250,8 @@ const WorkQueue = () => {
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-        <div className="grid grid-cols-[40px_minmax(220px,1.6fr)_180px_110px_minmax(180px,1.4fr)_110px_100px_110px_70px_140px_140px] gap-2 px-4 py-3 bg-secondary/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {/* Header row */}
+        <div className={`grid ${COLS} gap-2 px-4 py-3 bg-secondary/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground`}>
           <span />
           <span>Entity Name ⇅</span>
           <span>Due Date ↑</span>
@@ -166,16 +265,14 @@ const WorkQueue = () => {
           <span>Action ⇅</span>
         </div>
 
+        {/* DRG groups */}
         {groups.map((g) => {
-          const open = !!openGroups[g.id];
+          const open = !!effectiveOpen[g.id];
           return (
             <div key={g.id} className="border-b border-border last:border-0">
               <button
                 onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !open }))}
-                className={cn(
-                  "w-full grid grid-cols-[40px_40px_1fr] items-center gap-2 px-4 py-3 text-left hover:bg-secondary/40 transition-colors",
-                  !g.rows && "opacity-60"
-                )}
+                className="w-full grid grid-cols-[40px_40px_1fr] items-center gap-2 px-4 py-3 text-left hover:bg-secondary/40 transition-colors"
               >
                 <span className="size-4 rounded border border-border" />
                 <span className="text-muted-foreground">
@@ -185,54 +282,53 @@ const WorkQueue = () => {
                   <span className="text-sm font-semibold">{g.name}</span>
                   <span className={cn(
                     "text-xs",
-                    g.priorityTone === "high" && "text-alert",
+                    g.priorityTone === "high"   && "text-alert",
                     g.priorityTone === "medium" && "text-[hsl(30_70%_40%)]",
-                    g.priorityTone === "low" && "text-success"
+                    g.priorityTone === "low"    && "text-success"
                   )}>{g.priorityNote}</span>
                 </div>
               </button>
 
-              {open && g.rows?.map((r) => (
-                <div
+              {open && g.rows.map((r) => (
+                <EntityRow
                   key={r.id}
-                  className="grid grid-cols-[40px_minmax(220px,1.6fr)_180px_110px_minmax(180px,1.4fr)_110px_100px_110px_70px_140px_140px] gap-2 px-4 py-3 items-center text-sm border-t border-border/60 hover:bg-secondary/30"
-                >
-                  <span className="flex justify-center">
-                    {r.locked ? (
-                      <Lock className="size-4 text-muted-foreground/50" title="Assigned to another analyst — read only" />
-                    ) : (
-                      <input
-                        type="checkbox"
-                        checked={!!selected[r.id]}
-                        onChange={(e) => setSelected((s) => ({ ...s, [r.id]: e.target.checked }))}
-                        className="size-4 accent-primary"
-                      />
-                    )}
-                  </span>
-                  <span className={cn("text-[13px]", r.locked && "text-muted-foreground")}>{r.name}</span>
-                  <span>
-                    <Chip variant={r.overdue ? "high" : "medium"} className="font-medium">
-                      {r.due}
-                    </Chip>
-                  </span>
-                  <span className="text-[13px] text-muted-foreground">{r.confidence}</span>
-                  <span className="text-[13px] text-muted-foreground truncate">{r.customerType}</span>
-                  <span className="text-[13px] text-muted-foreground">{r.jurisdiction}</span>
-                  <span className="text-[13px]">{r.priority}</span>
-                  <span className={cn(
-                    "text-[13px] font-medium",
-                    r.risk === "Elevated" && "text-alert",
-                    r.risk === "Moderate" && "text-[hsl(30_70%_40%)]",
-                    r.risk === "Minimal" && "text-success"
-                  )}>{r.risk}</span>
-                  <span className="text-[13px]">{r.exc}</span>
-                  <span className={cn("text-[13px] font-medium", statusColor(r.status))}>{r.status}</span>
-                  <span className="text-[13px] text-muted-foreground">{r.action}</span>
-                </div>
+                  r={r}
+                  selected={!!selected[r.id]}
+                  onToggle={handleToggle}
+                  indent
+                />
               ))}
             </div>
           );
         })}
+
+        {/* Ungrouped entities — no DRG, shown as flat rows */}
+        {ungrouped.length > 0 && (
+          <>
+            {groups.length > 0 && (
+              <div className="px-4 py-2 bg-secondary/30 border-t border-border">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  No DRG assigned · {ungrouped.length} {ungrouped.length === 1 ? "entity" : "entities"}
+                </span>
+              </div>
+            )}
+            {ungrouped.map((r) => (
+              <EntityRow
+                key={r.id}
+                r={r}
+                selected={!!selected[r.id]}
+                onToggle={handleToggle}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Empty state */}
+        {groups.length === 0 && ungrouped.length === 0 && (
+          <div className="py-16 text-center text-sm text-muted-foreground">
+            No cases match the selected filter.
+          </div>
+        )}
       </div>
     </div>
   );
