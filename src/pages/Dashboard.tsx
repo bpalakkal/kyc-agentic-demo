@@ -3,26 +3,24 @@ import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Maximize2, M
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
-import { GENERATED_DASHBOARD_CASES } from "@/data/entities-generated";
+import { GENERATED_DASHBOARD_CASES, GENERATED_WORK_ROWS } from "@/data/entities-generated";
 
 type FilterKey = "all" | "high" | "today";
 
-const priorityCases = [
-  { priority: "High", id: "KYC-30214", entity: "Brevan Howard Asset Management LLP", note: "PSC nature-of-control change undisclosed — Companies House filing overdue.", due: "2 hrs", est: "45 min", status: "open" },
-  { priority: "High", id: "KYC-30188", entity: "Marshall Wace LLP", note: "FCA permission scope change pending evidence — SLA closes today.", due: "Today", est: "30 min", status: "open" },
-  { priority: "Medium", id: "KYC-30201", entity: "Brevan Howard Asset Management LLP", note: "Jersey-domiciled corporate member triggers EDD review.", due: "Tomorrow", est: "20 min", status: "open" },
-  { priority: "Medium", id: "KYC-30207", entity: "Marshall Wace LLP", note: "AUM disclosure 2025 not yet reconciled with FCA Gabriel return.", due: "Friday", est: "1.5 hrs", status: "open" },
-  { priority: "Medium", id: "KYC-30216", entity: "Brookfield Asset Management PIC US, LLC", note: "Risk rating discrepancy — Cayman ownership triggered High vs initial Low. Compliance sign-off pending.", due: "Jun 30", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-30222", entity: "Brevan Howard Asset Management LLP", note: "Previous company name 'Rivage Capital' chain-of-title verification.", due: "Next Week", est: "15 min", status: "open" },
-] as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
-
-// Inject generated cases (new entities only, no duplicates)
-{
-  const _existingIds = new Set(priorityCases.map(c => c.id));
-  for (const c of GENERATED_DASHBOARD_CASES) {
-    if (!_existingIds.has(c.id)) priorityCases.push(c);
-  }
-}
+// Build from the same 15 entities the work queue uses.
+// Notes come from GENERATED_DASHBOARD_CASES (exception-derived summaries).
+const _noteMap = Object.fromEntries(
+  GENERATED_DASHBOARD_CASES.map((c) => [c.id, { note: c.note, est: c.est }])
+);
+const priorityCases = GENERATED_WORK_ROWS.map((r) => ({
+  priority: r.priority,
+  id: r.kyc,
+  entity: r.name,
+  note: _noteMap[r.kyc]?.note ?? `${r.exc} open exception${r.exc !== 1 ? "s" : ""} requiring resolution.`,
+  due: r.due,
+  est: _noteMap[r.kyc]?.est ?? (r.exc > 3 ? "45 min" : "30 min"),
+  status: "open" as const,
+})) as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
 
 const aiActions = [
   { dot: "alert", title: "Sign off on KYC-30214", sub: "Brevan Howard · PSC filing overdue", chip: "Recommended", reason: "All exceptions have been resolved." },
