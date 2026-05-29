@@ -21,7 +21,7 @@ export type GenException = {
 export const GENERATED_EXCEPTIONS: GenException[] = [
   {
     id: "gen1_1", title: "US Registration Number Mismatch", confidence: 90, status: "Pending",
-    entity: "Long Focus Capital Management, LLC", kyc: "KYC-90001", category: "Registration & Compliance",
+    entity: "Long Focus Capital Management, LLC", kyc: "KYC-30215", category: "Registration & Compliance",
     flagText: "US Registration Number: 801-12345 (self-reported) (Source A · Client Onboarding Form) vs 801-67890 (retrieved 2026-05-20) (Source B · SEC IAPD (Form ADV Part 1A)).",
     narrative: "The client-provided CRD number (801-12345) maps to a separate entity, \"Long Focus Capital LLC\" — without \"Management\" — in IAPD. The legal name and registered address on the onboarding form match the entity registered under 801-67890. This is most likely a transcription error on the onboarding form and can be corrected with regulator data taken as authoritative.",
     reasoningSteps: [
@@ -66,7 +66,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen1_2", title: "Outstanding LEI Code", confidence: 90, status: "Pending",
-    entity: "Long Focus Capital Management, LLC", kyc: "KYC-90001", category: "Registration & Compliance",
+    entity: "Long Focus Capital Management, LLC", kyc: "KYC-30215", category: "Registration & Compliance",
     flagText: "LEI Code: No active LEI under entity legal name (Source A · GLEIF Registry) vs Not provided (Source B · Client Onboarding Form).",
     narrative: "No active LEI was found on GLEIF under the entity's legal name or against its SEC registration number. For an RIA with $2.4B AUM, an LEI is typically expected for swap and derivatives counterparty reporting under EMIR and Dodd-Frank. The absence may indicate the client does not transact in reportable instruments, or that LEI registration has lapsed or is pending.",
     reasoningSteps: [
@@ -111,7 +111,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen1_3", title: "Principal Place of Business Mismatch", confidence: 88, status: "Pending",
-    entity: "Long Focus Capital Management, LLC", kyc: "KYC-90001", category: "Address Verification",
+    entity: "Long Focus Capital Management, LLC", kyc: "KYC-30215", category: "Address Verification",
     flagText: "Principal Address: 123 Main Street, New York, NY 10001 (Source A · Corporate Website) vs 456 Broad Avenue, New York, NY 10005 (Source B · Form ADV Filing (SEC)).",
     narrative: "Two of three sources (Form ADV and client onboarding form) agree on 456 Broad Avenue. The corporate website shows 123 Main Street, likely a secondary office or stale content. Per KYC Policy §3.5 the regulatory filing supersedes marketing material for address determination.",
     reasoningSteps: [
@@ -156,7 +156,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen1_4", title: "Missing Compliance Officer Attestation", confidence: 92, status: "Pending",
-    entity: "Long Focus Capital Management, LLC", kyc: "KYC-90001", category: "Governance & Controls",
+    entity: "Long Focus Capital Management, LLC", kyc: "KYC-30215", category: "Governance & Controls",
     flagText: "Compliance Officer Name: Sarah Chen (Chief Compliance Officer) (Source A · Form ADV Schedule A) vs Not listed (Source B · Client Submitted Documents).",
     narrative: "The Chief Compliance Officer's identity is known via Form ADV Schedule A. What is missing is a signed attestation, not the name itself. A templated DocuSign request to the named CCO is the most direct path.",
     reasoningSteps: [
@@ -201,7 +201,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen1_5", title: "Beneficial Ownership Not Identified", confidence: 85, status: "Pending",
-    entity: "Long Focus Capital Management, LLC", kyc: "KYC-90001", category: "Beneficial Ownership",
+    entity: "Long Focus Capital Management, LLC", kyc: "KYC-30215", category: "Beneficial Ownership",
     flagText: "25%+ Beneficial Owner: Long Focus Holdings LLC (100%) — entity, not individual (Source A · Form ADV Schedule A) vs Chain terminates at Long Focus Holdings LLC; no further public data (Source B · Public Registry Traversal).",
     narrative: "The ownership chain terminates at a Delaware holding company with no publicly disclosed ownership. The FinCEN CDD Rule (31 CFR 1010.230) requires identification of natural-person beneficial owners at the 25%+ threshold, so this case cannot close until a natural person is identified or the client provides a FinCEN BOI report.",
     reasoningSteps: [
@@ -246,7 +246,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen2_1", title: "Risk Rating", confidence: 78, status: "Pending",
-    entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-90002", category: "Classification & Risk",
+    entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-30216", category: "Classification & Risk",
     flagText: "Risk Rating: High – Due to adding an optional field ownership country (Source A · Due Diligence) vs Low – Initial classification during the time of RR (Source B · Internal records).",
     narrative: "Given the change in risk rating triggered during onboarding due to the addition of Cayman-domiciled ownership entities, there is a discrepancy between the initial risk classification (Low) and the current system-generated classification (High). The client has remained cooperative throughout the process, and the ultimate parent entity, , is a well-established and known client to the firm. The current ownership structure update has led to additional drilldown requirements, which may not align with jurisdiction-specific risk interpretation.",
     reasoningSteps: [
@@ -291,7 +291,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen2_2", title: "CIP Classification and NAICS code", confidence: 78, status: "Pending",
-    entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-90002", category: "Classification & Risk",
+    entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-30216", category: "Classification & Risk",
     flagText: "CIP classification: Internal classification and Nature of business trigger indicates financial activity flag due to industry code mapping (Source A · Form ADV) vs Client confirmed the entity should be classified as NFIE (Non-Financial Entity) (Source B- Client Confirmation).",
     narrative: "During onboarding the client confirmed the entity should be classified as NFIE (Non-Financial Entity).However, an internal due diligence trigger has been raised due to the entity being mapped to Investment adviser / asset manager which is generally associated with financial investment-related activities. This creates a classification discrepancy, requiring confirmation on whether the entity should remain classified as NFIE or be reclassified as a Financial Entity (Investment Entity).",
     reasoningSteps: [
@@ -327,7 +327,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen2_3", title: "Acting Person", confidence: 85, status: "Pending",
-    entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-90002", category: "Beneficial Ownership",
+    entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-30216", category: "Beneficial Ownership",
     flagText: "Acting Person Classification: Acting Person identified, but not a member of Vorstand / Executive Management Board (Source A · Form ADV Schedule A) vs Policy states non-board Acting Persons must have documented authority (Power of Attorney or equivalent) (Source B · Client Submitted Documents).",
     narrative: "During KYC review, an Acting Person (AP) has been identified for the entity; however, the individual is not a member of the Vorstand (Executive Management Board) or equivalent governing body. As per the guidance, where the Acting Person is not part of the governing body, the individual must also be supported by documented authority, typically evidenced through a Power of Attorney (PoA) or inclusion in an authorized signatory list. In this case, no such supporting documentation has been provided, creating a gap in validating the individual’s authority to act on behalf of the entity.",
     reasoningSteps: [
@@ -363,7 +363,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen3_1", title: "Incorporation Date vs Foreign Registration Date Mismatch", confidence: 90, status: "Pending",
-    entity: "STONEPEAK ADVISORS III LLC", kyc: "KYC-90003", category: "Registration & Compliance",
+    entity: "STONEPEAK ADVISORS III LLC", kyc: "KYC-30217", category: "Registration & Compliance",
     flagText: "Incorporation / Formation Date: 05-Apr-2017 (Source A · LEI Record) vs 16-Oct-2017 (Source B · NY Dept. of State (Foreign LLC Filing)).",
     narrative: "The entity shows two different “dates” depending on the source: the Delaware formation date versus the New York foreign registration (authority to do business) date. This is a common structural difference, but it creates a KYC “date mismatch”",
     reasoningSteps: [
@@ -408,7 +408,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen3_2", title: "Registered Address", confidence: 88, status: "Pending",
-    entity: "STONEPEAK ADVISORS III LLC", kyc: "KYC-90003", category: "Address Verification",
+    entity: "STONEPEAK ADVISORS III LLC", kyc: "KYC-30217", category: "Address Verification",
     flagText: "Legal Registered Address: Corporation Trust Center, 1209 Orange St, Wilmington, DE 19801 (Source A · LEI Record) vs 28 Liberty St, New York, NY 10005 (Source B . NY Dept. of State).",
     narrative: "Different sources surface different addresses as “the Registered address”: This can cause incorrect address mapping if teams populate only one address field (e.g., principal office accidentally set to registered agent or service address).",
     reasoningSteps: [
@@ -444,7 +444,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen3_3", title: "Principal Business Address", confidence: 88, status: "Pending",
-    entity: "STONEPEAK ADVISORS III LLC", kyc: "KYC-90003", category: "Address Verification",
+    entity: "STONEPEAK ADVISORS III LLC", kyc: "KYC-30217", category: "Address Verification",
     flagText: "Principal Place of Business: 55 Hudson Yards, 550 W 34th St, 48th Floor, New York, NY 10001 (Source A · LEI Record) vs 28 Liberty St, New York, NY 10005 (Source B · NY Dept. of State & Bloomberg).",
     narrative: "Different sources surface different addresses as “the address”: This can cause incorrect address mapping if teams populate only one address field (e.g., principal office accidentally set to registered agent or service address).",
     reasoningSteps: [
@@ -480,7 +480,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen4_1", title: "CIP Classification and Legal structure", confidence: 78, status: "Pending",
-    entity: "NRPL TRUST 2018‑2", kyc: "KYC-90004", category: "Classification & Risk",
+    entity: "NRPL TRUST 2018‑2", kyc: "KYC-30218", category: "Classification & Risk",
     flagText: "Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registry (Legal Form)) vs Trust used in securitization structure (trustee-administered vehicle) (Source B · Transaction Context (Functional Role)).",
     narrative: "NRPL TRUST 20182 is legally incorporated as a Delaware statutory trust, however its operational purpose is to function as a securitization vehicle holding loan assets and issuing securities to investors. This results in classification being recorded differently across systems — “Trust” in legal registries vs “SPV” in structured finance/KYC contexts.",
     reasoningSteps: [
@@ -507,7 +507,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen5_1", title: "CIP Classification and Legal structure", confidence: 78, status: "Pending",
-    entity: "2005 Residential TRUST 3-1", kyc: "KYC-90005", category: "Classification & Risk",
+    entity: "2005 Residential TRUST 3-1", kyc: "KYC-30219", category: "Classification & Risk",
     flagText: "Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registry (Legal Form)) vs No supporting trust documentation available (Source B · Available Documentation).",
     narrative: "2005 Residential Trust 3-1 is identified as a Delaware statutory trust; however, no supporting documentation is available to validate the classification beyond registry evidence, resulting in reliance on single-source identification.",
     reasoningSteps: [
@@ -543,7 +543,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen6_1", title: "CIP Classification", confidence: 78, status: "Pending",
-    entity: "Invesco Global Equity Trust", kyc: "KYC-90006", category: "Classification & Risk",
+    entity: "Invesco Global Equity Trust", kyc: "KYC-30220", category: "Classification & Risk",
     flagText: "Regulatory Status: Indicates SEC registered / SEC-linked entity (Source A · External / Public Sources) vs Confirmed as Commingled Trust (not SEC registered) (Source B · Client Confirmation).",
     narrative: "During verification, there is a discrepancy where:",
     reasoningSteps: [
@@ -579,7 +579,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen6_2", title: "Regulator", confidence: 85, status: "Pending",
-    entity: "Invesco Global Equity Trust", kyc: "KYC-90006", category: "Compliance",
+    entity: "Invesco Global Equity Trust", kyc: "KYC-30220", category: "Compliance",
     flagText: "Regulator: Identified as SEC regulated entity (Source A · External / Public Sources) vs Commingled trusts should be regulated under OCC / banking framework (Source B · Policy / Client Confirmation).",
     narrative: "During regulatory verification, there is a discrepancy where:",
     reasoningSteps: [
@@ -606,7 +606,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen7_1", title: "CIP Classification", confidence: 78, status: "Pending",
-    entity: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-90007", category: "Classification & Risk",
+    entity: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-30221", category: "Classification & Risk",
     flagText: "Legal Entity Name: “Futu Trustee Limited as Trustee of the BZL Fellows Trust” (Source A · Client Onboarding Form) vs “Futu Trustee Limited” (Source B · Corporate Registry / Trustee Corporate Profile).",
     narrative: "The onboarding record captures the entity name including the trustee capacity, effectively combining two distinct constructs: This results in non-standard naming, where “as Trustee of” is included in the entity name, instead of being captured as a relationship or role field.",
     reasoningSteps: [
@@ -642,7 +642,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen7_2", title: "CIP Classification Ambiguity — Trust vs Trustee (FI vs Non-FI Treatment)", confidence: 78, status: "Pending",
-    entity: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-90007", category: "Classification & Risk",
+    entity: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-30221", category: "Classification & Risk",
     flagText: "Entity Classification: Trust (Source A · Client Onboarding Form) vs Corporate Trustee (Financial Services Entity) (Source B · KYC Interpretation).",
     narrative: "The entity is currently classified as a Trust, however the presence of a professional corporate trustee (Futu Trustee Limited) introduces ambiguity in CIP classification, as: This creates uncertainty on whether:",
     reasoningSteps: [
@@ -669,7 +669,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen8_1", title: "Wolfsberg FCCQ Questionnaire Signature Issue", confidence: 85, status: "Pending",
-    entity: "Kettle Hill Capital Management, LLC", kyc: "KYC-90008", category: "Compliance",
+    entity: "Kettle Hill Capital Management, LLC", kyc: "KYC-30222", category: "Compliance",
     flagText: "Name: Bryan Robert Kiss (Source A · SEC Form ADV) vs Bryan R Kiss (Source B · World Check).",
     narrative: "The Corporate Officer identified on SEC Form ADV is Bryan Robert Kiss. During WorldCheck screening, an alert was generated for a separate individual, Bryan R. Kiss, who has been linked to money laundering activity. This screening hit has been escalated to the rolling review team for further assessment.",
     reasoningSteps: [
@@ -696,7 +696,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen9_1", title: "Authorized Signatory List Missing", confidence: 85, status: "Pending",
-    entity: "FEOH INVESTMENTS UK LLP", kyc: "KYC-90009", category: "Compliance",
+    entity: "FEOH INVESTMENTS UK LLP", kyc: "KYC-30223", category: "Compliance",
     flagText: "The in-house ASL for FEOH Investments UK LLP expired less than one month ago. Outreach records indicate that third-party document certification is typ",
     narrative: "The in-house ASL for FEOH Investments UK LLP expired less than one month ago. Outreach records indicate that third-party document certification is typically a time-consuming process for end customers. Given this, the rolling review team should rely on the existing in-house documentation and pursue approval through internal channels. This approach is supported by historical data, as 76% of similar compliance exception requests have been approved based on internal records from the past 12 months.",
     reasoningSteps: [
@@ -723,7 +723,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen9_2", title: "Beneficial Ownership Threshold Difference", confidence: 85, status: "Pending",
-    entity: "FEOH INVESTMENTS UK LLP", kyc: "KYC-90009", category: "Beneficial Ownership",
+    entity: "FEOH INVESTMENTS UK LLP", kyc: "KYC-30223", category: "Beneficial Ownership",
     flagText: "Percentage: 10% (Source A · System generated Beneficial Ownership Threshold) vs 9.99% (Source B · Organizational Structure Document).",
     narrative: "Based on the entity's jurisdiction and risk rating, the system-generated beneficial ownership threshold is 10%. During outreach, the end customer confirmed that Joey Max Friedman holds a 9.99% ownership stake, which falls just 0.01% below the threshold.",
     reasoningSteps: [
@@ -750,7 +750,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen10_1", title: "Principal Place of Business Variance", confidence: 88, status: "Pending",
-    entity: "Ameritas Investment Partners, INC", kyc: "KYC-90010", category: "Address Verification",
+    entity: "Ameritas Investment Partners, INC", kyc: "KYC-30224", category: "Address Verification",
     flagText: "Principal Place of Business: 5845 R STREET, LINCOLN, Nebraska, United States, 68505 (Source A · Account Opening Form) vs 5945 R STREET, LINCOLN, Nebraska, United States, 68505 (Source B · SEC Form ADV).",
     narrative: "The Principal Place of Business listed on the in-house Account Opening Form is 5845 R Street, Lincoln, Nebraska 68505, United States, whereas the latest SEC Form ADV records the Principal Place of Business as 5945 R Street, Lincoln, Nebraska 68505, United States. The Rolling Review Team is requested to review this discrepancy.",
     reasoningSteps: [
@@ -777,7 +777,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen11_1", title: "Non-Exact Beneficial Ownership Percentage", confidence: 85, status: "Pending",
-    entity: "Brevan Howard Capital Management LP", kyc: "KYC-90011", category: "Beneficial Ownership",
+    entity: "Brevan Howard Capital Management LP", kyc: "KYC-30225", category: "Beneficial Ownership",
     flagText: "BO Percentage: >75% owned by Alta LP, which is further 75% or more owned by Alan Eldad Howard (Source A · SEC Form ADV) vs 1. Same structure captured except for the structure glossary specifying that all ownership interests are 100%, unless otherwise stated. (Source B · Org Structure Doc).",
     narrative: "The SEC Form ADV, dated May 8th, 2026, shows a different BO threshold compared to the org chart collected in 2022. Recording the higher threshold would normally require client outreach under current guidance; however, given the client’s known sensitivity and refusal to corporate further during the last outreach cycle, this outreach cannot be completed. Considering the consistency between the SEC Form ADV and the on-file org chart, the rolling review team should seek internal confirmation to complete the task.",
     reasoningSteps: [
@@ -813,7 +813,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen12_1", title: "Outstanding Wolfsberg Questionnaire", confidence: 85, status: "Pending",
-    entity: "Brevan Howard US Investment Management LP", kyc: "KYC-90012", category: "Compliance",
+    entity: "Brevan Howard US Investment Management LP", kyc: "KYC-30226", category: "Compliance",
     flagText: "Wolfsberg Questionnaire: Missing (Source A · Brevan Howard Capital Management LLP) vs Wolfsberg Questionnaire dated May 25, 2025 provided by Client during outreach (Source B · Brevan Howard Capital Management Ltd).",
     narrative: "Given the client’s known sensitivity and refusal to cooperate further during the last outreach cycle, the Wolfsberg Questionnaire for “Brevan Howard Capital Management LLP” remains outstanding. The rolling review team should leverage available internal sources as far as possible to satisfy the WBQ requirement and to help rebuild the client relationship.",
     reasoningSteps: [
@@ -849,7 +849,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen13_1", title: "Unable to Complete Sub Advisor Task", confidence: 85, status: "Pending",
-    entity: "Australiansuper RAAD Trust", kyc: "KYC-90013", category: "Compliance",
+    entity: "Australiansuper RAAD Trust", kyc: "KYC-30227", category: "Compliance",
     flagText: "Unable to Complete Sub Advisor Task identified during KYC review.",
     narrative: "Unable to Complete Sub Advisor Task identified during KYC review.",
     reasoningSteps: [
@@ -876,7 +876,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen14_1", title: "Deceased Individual – Corporate Officer", confidence: 85, status: "Pending",
-    entity: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-90014", category: "Compliance",
+    entity: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-30228", category: "Compliance",
     flagText: "Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B · Account Opening Form).",
     narrative: "Sulluman S. Olyayan is identified as a corporate officer on the Account Opening Form provided by the end customer. However, because the individual is high-profile, public records were available for review and indicate that he is deceased. The rolling review team needs to review this discrepancy.",
     reasoningSteps: [
@@ -903,7 +903,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen14_2", title: "Deceased Individual – Authorized Signatory List", confidence: 85, status: "Pending",
-    entity: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-90014", category: "Compliance",
+    entity: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-30228", category: "Compliance",
     flagText: "Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B · Account Opening Form).",
     narrative: "Sulluman S. Olyayan is identified as an authorized signor on the Account Opening Form provided by the end customer. However, because the individual is high-profile, public records were available for review and indicate that he is deceased. The rolling review team needs to review this discrepancy.",
     reasoningSteps: [
@@ -930,7 +930,7 @@ export const GENERATED_EXCEPTIONS: GenException[] = [
   },
   {
     id: "gen15_1", title: "Expired Authorized Signors List", confidence: 85, status: "Pending",
-    entity: "Brevan Howard Asset Management LLP", kyc: "KYC-90015", category: "Compliance",
+    entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", category: "Compliance",
     flagText: "The in-house ASL expired on February 1st, 2025. Due to the risk rating and jurisdiction of Brevan Howard Asset Management LLP, the ASL is required to",
     narrative: "The in-house ASL expired on February 1st, 2025. Due to the risk rating and jurisdiction of Brevan Howard Asset Management LLP, the ASL is required to be refreshed on an annual basis. As the ASL is not available through public sources, the rolling review team will need to review the expired document and re-obtain a certified ASL directly from Brevan Howard Asset Management LLP.",
     reasoningSteps: [
@@ -1154,7 +1154,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   caseFile: string;
 }> = {
   "Long Focus Capital Management, LLC": {
-    name: "Long Focus Capital Management, LLC", kyc: "KYC-90001",
+    name: "Long Focus Capital Management, LLC", kyc: "KYC-30215",
     attrs: [
       { label: "Entity Name", value: "LONG FOCUS CAPITAL MANAGEMENT, LLC", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Limited Liability Company", source: "CRM", status: "ok" },
@@ -1203,10 +1203,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "List of Subsidiaries", value: "Long Focus UK Branch", source: "CRM", status: "ok" },
       { label: "Trustee", value: "N/A", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Long Focus Capital Management, LLC\n\n**KYC ID:** KYC-90001  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United States  \n**Client Risk Rating:** High  \n**Open Exceptions:** 5\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 5 open exceptions requiring resolution.\n\n## Open Exceptions (5)\n1. **US Registration Number Mismatch** — US Registration Number: 801-12345 (self-reported) (Source A · Client Onboarding ....\n2. **Outstanding LEI Code** — LEI Code: No active LEI under entity legal name (Source A · GLEIF Registry) vs N....\n3. **Principal Place of Business Mismatch** — Principal Address: 123 Main Street, New York, NY 10001 (Source A · Corporate Web....\n4. **Missing Compliance Officer Attestation** — Compliance Officer Name: Sarah Chen (Chief Compliance Officer) (Source A · Form ....\n5. **Beneficial Ownership Not Identified** — 25%+ Beneficial Owner: Long Focus Holdings LLC (100%) — entity, not individual (....\n\n## Next Actions\n- Run SEC-ADV-Verification-Agent to confirm match, update the field to 801-67890, and log discrepancy ...\n- Request LEI from client via portal with templated outreach; defer with conditional approval if clien...\n- Accept Form ADV address (456 Broad Avenue) as authoritative; matches client form.",
+    caseFile: "# Long Focus Capital Management, LLC\n\n**KYC ID:** KYC-30215  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United States  \n**Client Risk Rating:** High  \n**Open Exceptions:** 5\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 5 open exceptions requiring resolution.\n\n## Open Exceptions (5)\n1. **US Registration Number Mismatch** — US Registration Number: 801-12345 (self-reported) (Source A · Client Onboarding ....\n2. **Outstanding LEI Code** — LEI Code: No active LEI under entity legal name (Source A · GLEIF Registry) vs N....\n3. **Principal Place of Business Mismatch** — Principal Address: 123 Main Street, New York, NY 10001 (Source A · Corporate Web....\n4. **Missing Compliance Officer Attestation** — Compliance Officer Name: Sarah Chen (Chief Compliance Officer) (Source A · Form ....\n5. **Beneficial Ownership Not Identified** — 25%+ Beneficial Owner: Long Focus Holdings LLC (100%) — entity, not individual (....\n\n## Next Actions\n- Run SEC-ADV-Verification-Agent to confirm match, update the field to 801-67890, and log discrepancy ...\n- Request LEI from client via portal with templated outreach; defer with conditional approval if clien...\n- Accept Form ADV address (456 Broad Avenue) as authoritative; matches client form.",
   },
   "BROOKFIELD ASSET MANAGEMENT PIC US, LLC": {
-    name: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-90002",
+    name: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-30216",
     attrs: [
       { label: "Entity Name", value: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Limited Liability Company", source: "CRM", status: "ok" },
@@ -1236,10 +1236,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Sub-Advisor Name", value: "Fairfield Realty Advisors LLC, Thayer Lodging Group LLC", source: "CRM", status: "ok" },
       { label: "Beneficial Owner (25%+)", value: "Brookfield Asset Management group", source: "3rd", status: "ok" },
     ],
-    caseFile: "# BROOKFIELD ASSET MANAGEMENT PIC US, LLC\n\n**KYC ID:** KYC-90002  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware) with UK branch  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 3\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 3 open exceptions requiring resolution.\n\n## Open Exceptions (3)\n1. **Risk Rating** — Risk Rating: High – Due to adding an optional field ownership country (Source A ....\n2. **CIP Classification and NAICS code** — CIP classification: Internal classification and Nature of business trigger indic....\n3. **Acting Person** — Acting Person Classification: Acting Person identified, but not a member of Vors....\n\n## Next Actions\n- Threshold Alignment Seek confirmation from Compliance to proceed with a 25% ownership drilldown thre...\n- Request a Legal team review to assess the appropriateness of the client’s NFIE (Non-Financial Entity...\n- Client reach out requesting supporting Authority Documentation Reach out to the client to obtain one...",
+    caseFile: "# BROOKFIELD ASSET MANAGEMENT PIC US, LLC\n\n**KYC ID:** KYC-30216  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware) with UK branch  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 3\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 3 open exceptions requiring resolution.\n\n## Open Exceptions (3)\n1. **Risk Rating** — Risk Rating: High – Due to adding an optional field ownership country (Source A ....\n2. **CIP Classification and NAICS code** — CIP classification: Internal classification and Nature of business trigger indic....\n3. **Acting Person** — Acting Person Classification: Acting Person identified, but not a member of Vors....\n\n## Next Actions\n- Threshold Alignment Seek confirmation from Compliance to proceed with a 25% ownership drilldown thre...\n- Request a Legal team review to assess the appropriateness of the client’s NFIE (Non-Financial Entity...\n- Client reach out requesting supporting Authority Documentation Reach out to the client to obtain one...",
   },
   "STONEPEAK ADVISORS III LLC": {
-    name: "STONEPEAK ADVISORS III LLC", kyc: "KYC-90003",
+    name: "STONEPEAK ADVISORS III LLC", kyc: "KYC-30217",
     attrs: [
       { label: "Entity Name", value: "STONEPEAK ADVISORS III LLC", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Limited Liability Company", source: "CRM", status: "ok" },
@@ -1265,10 +1265,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Assets Under Management", value: "Not directly attributable at entity level (Stonepeak group ~70–88B AUM)", source: "CRM", status: "ok" },
       { label: "Key Controller", value: "Michael Dorrell", source: "CRM", status: "ok" },
     ],
-    caseFile: "# STONEPEAK ADVISORS III LLC\n\n**KYC ID:** KYC-90003  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware)  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 3\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 3 open exceptions requiring resolution.\n\n## Open Exceptions (3)\n1. **Incorporation Date vs Foreign Registration Date Mismatch** — Incorporation / Formation Date: 05-Apr-2017 (Source A · LEI Record) vs 16-Oct-20....\n2. **Registered Address** — Legal Registered Address: Corporation Trust Center, 1209 Orange St, Wilmington, ....\n3. **Principal Business Address** — Principal Place of Business: 55 Hudson Yards, 550 W 34th St, 48th Floor, New Yor....\n\n## Next Actions\n- Update the KYC record to store:\n- Save distinct fields (recommended):\n- Save fields (recommended):",
+    caseFile: "# STONEPEAK ADVISORS III LLC\n\n**KYC ID:** KYC-30217  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware)  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 3\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 3 open exceptions requiring resolution.\n\n## Open Exceptions (3)\n1. **Incorporation Date vs Foreign Registration Date Mismatch** — Incorporation / Formation Date: 05-Apr-2017 (Source A · LEI Record) vs 16-Oct-20....\n2. **Registered Address** — Legal Registered Address: Corporation Trust Center, 1209 Orange St, Wilmington, ....\n3. **Principal Business Address** — Principal Place of Business: 55 Hudson Yards, 550 W 34th St, 48th Floor, New Yor....\n\n## Next Actions\n- Update the KYC record to store:\n- Save distinct fields (recommended):\n- Save fields (recommended):",
   },
   "NRPL TRUST 2018‑2": {
-    name: "NRPL TRUST 2018‑2", kyc: "KYC-90004",
+    name: "NRPL TRUST 2018‑2", kyc: "KYC-30218",
     attrs: [
       { label: "Entity Name", value: "NRPL TRUST 20182", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "[See Exception Below]", source: "CRM", status: "alert" },
@@ -1292,10 +1292,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Key Controller", value: "Wilmington Savings Fund Society, FSB", source: "CRM", status: "ok" },
       { label: "Trustee", value: "Wilmington Savings Fund Society, FSB", source: "CRM", status: "ok" },
     ],
-    caseFile: "# NRPL TRUST 2018‑2\n\n**KYC ID:** KYC-90004  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 4\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 4 open exceptions requiring resolution.\n\n## Open Exceptions (4)\n1. **CIP Classification and Legal structure** — Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registry....\n\n## Next Actions\n- Reach out to PQA for guidance",
+    caseFile: "# NRPL TRUST 2018‑2\n\n**KYC ID:** KYC-30218  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 4\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 4 open exceptions requiring resolution.\n\n## Open Exceptions (4)\n1. **CIP Classification and Legal structure** — Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registry....\n\n## Next Actions\n- Reach out to PQA for guidance",
   },
   "2005 Residential TRUST 3-1": {
-    name: "2005 Residential TRUST 3-1", kyc: "KYC-90005",
+    name: "2005 Residential TRUST 3-1", kyc: "KYC-30219",
     attrs: [
       { label: "Entity Name", value: "2005 Residential TRUST 3-1", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "[See Exception Below]", source: "CRM", status: "alert" },
@@ -1310,10 +1310,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Nature of Business", value: "Holds mortgage / loan assets and issues assetbacked securities (RMBS-type structure)", source: "CRM", status: "ok" },
       { label: "Sole Proprietorship", value: "No", source: "CRM", status: "ok" },
     ],
-    caseFile: "# 2005 Residential TRUST 3-1\n\n**KYC ID:** KYC-90005  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 3\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 3 open exceptions requiring resolution.\n\n## Open Exceptions (3)\n1. **CIP Classification and Legal structure** — Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registry....\n\n## Next Actions\n- Reach out to PQA for guidance",
+    caseFile: "# 2005 Residential TRUST 3-1\n\n**KYC ID:** KYC-30219  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 3\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 3 open exceptions requiring resolution.\n\n## Open Exceptions (3)\n1. **CIP Classification and Legal structure** — Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registry....\n\n## Next Actions\n- Reach out to PQA for guidance",
   },
   "Invesco Global Equity Trust": {
-    name: "Invesco Global Equity Trust", kyc: "KYC-90006",
+    name: "Invesco Global Equity Trust", kyc: "KYC-30220",
     attrs: [
       { label: "Entity Name", value: "Invesco Global Equity Trust", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Investment Trust / Unit Trust (Collective Investment Scheme)", source: "CRM", status: "alert" },
@@ -1332,10 +1332,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Source of Wealth", value: "Investment income / capital appreciation", source: "CRM", status: "ok" },
       { label: "Trustee", value: "Typically U.S. Bank / State Street", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Invesco Global Equity Trust\n\n**KYC ID:** KYC-90006  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 2\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **CIP Classification** — Regulatory Status: Indicates SEC registered / SEC-linked entity (Source A · Exte....\n2. **Regulator** — Regulator: Identified as SEC regulated entity (Source A · External / Public Sour....\n\n## Next Actions\n- Auto flag and escalate to FCC\n- Auto flag and escalate to FCC",
+    caseFile: "# Invesco Global Equity Trust\n\n**KYC ID:** KYC-30220  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 2\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **CIP Classification** — Regulatory Status: Indicates SEC registered / SEC-linked entity (Source A · Exte....\n2. **Regulator** — Regulator: Identified as SEC regulated entity (Source A · External / Public Sour....\n\n## Next Actions\n- Auto flag and escalate to FCC\n- Auto flag and escalate to FCC",
   },
   "Futu Trustee Limited AS Trustee of the BZL Fellows Trust": {
-    name: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-90007",
+    name: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-30221",
     attrs: [
       { label: "Entity Name", value: "FUTU TRUSTEE LIMITED AS TRUSTEE OF THE BZL FELLOWS TRUST", source: "CRM", status: "alert" },
       { label: "Legal Entity Type", value: "Trust", source: "CRM", status: "alert" },
@@ -1360,10 +1360,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Key Controller", value: "Futu Trustee Limited", source: "CRM", status: "ok" },
       { label: "List of Subsidiaries", value: "Not applicable (trust structure)", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Futu Trustee Limited AS Trustee of the BZL Fellows Trust\n\n**KYC ID:** KYC-90007  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 2\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **CIP Classification** — Legal Entity Name: “Futu Trustee Limited as Trustee of the BZL Fellows Trust” (S....\n2. **CIP Classification Ambiguity — Trust vs Trustee (FI vs Non-FI Treatment)** — Entity Classification: Trust (Source A · Client Onboarding Form) vs Corporate Tr....\n\n## Next Actions\n- Escalate to FCC\n- Escalate to PQA",
+    caseFile: "# Futu Trustee Limited AS Trustee of the BZL Fellows Trust\n\n**KYC ID:** KYC-30221  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 2\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **CIP Classification** — Legal Entity Name: “Futu Trustee Limited as Trustee of the BZL Fellows Trust” (S....\n2. **CIP Classification Ambiguity — Trust vs Trustee (FI vs Non-FI Treatment)** — Entity Classification: Trust (Source A · Client Onboarding Form) vs Corporate Tr....\n\n## Next Actions\n- Escalate to FCC\n- Escalate to PQA",
   },
   "Kettle Hill Capital Management, LLC": {
-    name: "Kettle Hill Capital Management, LLC", kyc: "KYC-90008",
+    name: "Kettle Hill Capital Management, LLC", kyc: "KYC-30222",
     attrs: [
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Kettle Hill Capital Management, LLC", source: "CRM", status: "ok" },
@@ -1396,10 +1396,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Corporate Officer.Legal Structure", value: "Individual", source: "CRM", status: "ok" },
       { label: "Corporate Officer.Evidence Of Existence", value: "TRUE", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Kettle Hill Capital Management, LLC\n\n**KYC ID:** KYC-90008  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United States  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Wolfsberg FCCQ Questionnaire Signature Issue** — Name: Bryan Robert Kiss (Source A · SEC Form ADV) vs Bryan R Kiss (Source B · Wo....\n\n## Next Actions\n- Review and resolve the Wolfsberg FCCQ Questionnaire Signature Issue exception.",
+    caseFile: "# Kettle Hill Capital Management, LLC\n\n**KYC ID:** KYC-30222  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United States  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Wolfsberg FCCQ Questionnaire Signature Issue** — Name: Bryan Robert Kiss (Source A · SEC Form ADV) vs Bryan R Kiss (Source B · Wo....\n\n## Next Actions\n- Review and resolve the Wolfsberg FCCQ Questionnaire Signature Issue exception.",
   },
   "FEOH INVESTMENTS UK LLP": {
-    name: "FEOH INVESTMENTS UK LLP", kyc: "KYC-90009",
+    name: "FEOH INVESTMENTS UK LLP", kyc: "KYC-30223",
     attrs: [
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "FEOH INVESTMENTS UK LLP", source: "CRM", status: "ok" },
@@ -1457,10 +1457,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Beneficial Owner.Legal Structure", value: "Individual", source: "CRM", status: "ok" },
       { label: "Beneficial Owner.Percentage Of Ownership", value: "10.0%", source: "CRM", status: "alert" },
     ],
-    caseFile: "# FEOH INVESTMENTS UK LLP\n\n**KYC ID:** KYC-90009  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** High  \n**Open Exceptions:** 2\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **Authorized Signatory List Missing** — The in-house ASL for FEOH Investments UK LLP expired less than one month ago. Ou....\n2. **Beneficial Ownership Threshold Difference** — Percentage: 10% (Source A · System generated Beneficial Ownership Threshold) vs ....\n\n## Next Actions\n- Review and resolve the Authorized Signatory List Missing exception.\n- Review and resolve the Beneficial Ownership Threshold Difference exception.",
+    caseFile: "# FEOH INVESTMENTS UK LLP\n\n**KYC ID:** KYC-30223  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** High  \n**Open Exceptions:** 2\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **Authorized Signatory List Missing** — The in-house ASL for FEOH Investments UK LLP expired less than one month ago. Ou....\n2. **Beneficial Ownership Threshold Difference** — Percentage: 10% (Source A · System generated Beneficial Ownership Threshold) vs ....\n\n## Next Actions\n- Review and resolve the Authorized Signatory List Missing exception.\n- Review and resolve the Beneficial Ownership Threshold Difference exception.",
   },
   "Ameritas Investment Partners, INC": {
-    name: "Ameritas Investment Partners, INC", kyc: "KYC-90010",
+    name: "Ameritas Investment Partners, INC", kyc: "KYC-30224",
     attrs: [
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Ameritas Investment Partners, INC", source: "CRM", status: "ok" },
@@ -1500,10 +1500,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Corporate Officer.Legal Structure", value: "Individual", source: "CRM", status: "ok" },
       { label: "Corporate Officer.Evidence Of Existence", value: "TRUE", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Ameritas Investment Partners, INC\n\n**KYC ID:** KYC-90010  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United States  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Principal Place of Business Variance** — Principal Place of Business: 5845 R STREET, LINCOLN, Nebraska, United States, 68....\n\n## Next Actions\n- Review and resolve the Principal Place of Business Variance exception.",
+    caseFile: "# Ameritas Investment Partners, INC\n\n**KYC ID:** KYC-30224  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United States  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Principal Place of Business Variance** — Principal Place of Business: 5845 R STREET, LINCOLN, Nebraska, United States, 68....\n\n## Next Actions\n- Review and resolve the Principal Place of Business Variance exception.",
   },
   "Brevan Howard Capital Management LP": {
-    name: "Brevan Howard Capital Management LP", kyc: "KYC-90011",
+    name: "Brevan Howard Capital Management LP", kyc: "KYC-30225",
     attrs: [
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Brevan Howard Capital Management LP", source: "CRM", status: "ok" },
@@ -1590,10 +1590,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Beneficial Owner.Legal Structure", value: "Individual", source: "CRM", status: "ok" },
       { label: "Beneficial Owner.Percentage Of Ownership", value: "Exception to be Resolved", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Brevan Howard Capital Management LP\n\n**KYC ID:** KYC-90011  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Non-Exact Beneficial Ownership Percentage** — BO Percentage: >75% owned by Alta LP, which is further 75% or more owned by Alan....\n\n## Next Actions\n- Seek confirmation from the internal Guidance SME team to record the higher threshold (100%) given th...",
+    caseFile: "# Brevan Howard Capital Management LP\n\n**KYC ID:** KYC-30225  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Non-Exact Beneficial Ownership Percentage** — BO Percentage: >75% owned by Alta LP, which is further 75% or more owned by Alan....\n\n## Next Actions\n- Seek confirmation from the internal Guidance SME team to record the higher threshold (100%) given th...",
   },
   "Brevan Howard US Investment Management LP": {
-    name: "Brevan Howard US Investment Management LP", kyc: "KYC-90012",
+    name: "Brevan Howard US Investment Management LP", kyc: "KYC-30226",
     attrs: [
       { label: "Entity Risk Rating", value: "Medium", source: "Forge", status: "ok" },
       { label: "Entity Jurisdiction", value: "United States", source: "CRM", status: "ok" },
@@ -1683,10 +1683,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Authorized Signatory.Legal Structure", value: "Individual", source: "CRM", status: "ok" },
       { label: "Wolfsberg Fccq Indicator", value: "[See Exception below]", source: "CRM", status: "alert" },
     ],
-    caseFile: "# Brevan Howard US Investment Management LP\n\n**KYC ID:** KYC-90012  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** Medium  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Outstanding Wolfsberg Questionnaire** — Wolfsberg Questionnaire: Missing (Source A · Brevan Howard Capital Management LL....\n\n## Next Actions\n- Request an exception from the Compliance team to satisfy the WBQ requirement for Brevan Howard Capit...",
+    caseFile: "# Brevan Howard US Investment Management LP\n\n**KYC ID:** KYC-30226  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** Medium  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Outstanding Wolfsberg Questionnaire** — Wolfsberg Questionnaire: Missing (Source A · Brevan Howard Capital Management LL....\n\n## Next Actions\n- Request an exception from the Compliance team to satisfy the WBQ requirement for Brevan Howard Capit...",
   },
   "Australiansuper RAAD Trust": {
-    name: "Australiansuper RAAD Trust", kyc: "KYC-90013",
+    name: "Australiansuper RAAD Trust", kyc: "KYC-30227",
     attrs: [
       { label: "Entity Name", value: "AustralianSuper RAAD Trust", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "TRUST", source: "CRM", status: "ok" },
@@ -1732,10 +1732,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "List of Subsidiaries", value: "N/A", source: "CRM", status: "ok" },
       { label: "Trustee", value: "AustralianSuper RAAD Pty Ltd", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Australiansuper RAAD Trust\n\n**KYC ID:** KYC-90013  \n**Entity Type:** Trust  \n**Jurisdiction:** United States  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 1\n\n## Entity Summary\nTrust with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Unable to Complete Sub Advisor Task** — Unable to Complete Sub Advisor Task identified during KYC review.\n\n## Next Actions\n- Review and resolve the Unable to Complete Sub Advisor Task exception.",
+    caseFile: "# Australiansuper RAAD Trust\n\n**KYC ID:** KYC-30227  \n**Entity Type:** Trust  \n**Jurisdiction:** United States  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 1\n\n## Entity Summary\nTrust with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Unable to Complete Sub Advisor Task** — Unable to Complete Sub Advisor Task identified during KYC review.\n\n## Next Actions\n- Review and resolve the Unable to Complete Sub Advisor Task exception.",
   },
   "Citigroup Mortgage Loan Trust 2019-B": {
-    name: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-90014",
+    name: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-30228",
     attrs: [
       { label: "Entity Name", value: "Citigroup Mortgage Loan Trust 2019-B", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "TRUST", source: "CRM", status: "ok" },
@@ -1781,10 +1781,10 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "List of Subsidiaries", value: "null", source: "CRM", status: "ok" },
       { label: "Trustee", value: "null", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Citigroup Mortgage Loan Trust 2019-B\n\n**KYC ID:** KYC-90014  \n**Entity Type:** Trust  \n**Jurisdiction:** United States  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 2\n\n## Entity Summary\nTrust with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **Deceased Individual – Corporate Officer** — Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B ·....\n2. **Deceased Individual – Authorized Signatory List** — Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B ·....\n\n## Next Actions\n- Review and resolve the Deceased Individual – Corporate Officer exception.\n- Review and resolve the Deceased Individual – Authorized Signatory List exception.",
+    caseFile: "# Citigroup Mortgage Loan Trust 2019-B\n\n**KYC ID:** KYC-30228  \n**Entity Type:** Trust  \n**Jurisdiction:** United States  \n**Client Risk Rating:** Low  \n**Open Exceptions:** 2\n\n## Entity Summary\nTrust with 2 open exceptions requiring resolution.\n\n## Open Exceptions (2)\n1. **Deceased Individual – Corporate Officer** — Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B ·....\n2. **Deceased Individual – Authorized Signatory List** — Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B ·....\n\n## Next Actions\n- Review and resolve the Deceased Individual – Corporate Officer exception.\n- Review and resolve the Deceased Individual – Authorized Signatory List exception.",
   },
   "Brevan Howard Asset Management LLP": {
-    name: "Brevan Howard Asset Management LLP", kyc: "KYC-90015",
+    name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229",
     attrs: [
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Brevan Howard Asset Management LLP", source: "CRM", status: "ok" },
@@ -1818,7 +1818,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
       { label: "Beneficial Owner.Percentage Of Ownership", value: "100%", source: "CRM", status: "ok" },
       { label: "Beneficial Owner.Evidence Of Existence", value: "TRUE", source: "CRM", status: "ok" },
     ],
-    caseFile: "# Brevan Howard Asset Management LLP\n\n**KYC ID:** KYC-90015  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Expired Authorized Signors List** — The in-house ASL expired on February 1st, 2025. Due to the risk rating and juris....\n\n## Next Actions\n- Client outreach: Outreach to the client is required to obtain the latest ASL. The rolling review ana...",
+    caseFile: "# Brevan Howard Asset Management LLP\n\n**KYC ID:** KYC-30229  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** United Kingdom  \n**Client Risk Rating:** High  \n**Open Exceptions:** 1\n\n## Entity Summary\nRegistered Investment Adviser (RIA) with 1 open exception requiring resolution.\n\n## Open Exceptions (1)\n1. **Expired Authorized Signors List** — The in-house ASL expired on February 1st, 2025. Due to the risk rating and juris....\n\n## Next Actions\n- Client outreach: Outreach to the client is required to obtain the latest ASL. The rolling review ana...",
   },
 };
 
@@ -1841,21 +1841,21 @@ export const GENERATED_ENTITY_GROUPS: Record<string, { drg: string; attrs: strin
 };
 
 export const GENERATED_ENTITY_DRG: Record<string, string> = {
-  "KYC-90001": "US Private Equity DRG",
-  "KYC-90002": "US Private Equity DRG",
-  "KYC-90003": "US Private Equity DRG",
-  "KYC-90004": "US Private Equity DRG",
-  "KYC-90005": "US Private Equity DRG",
-  "KYC-90006": "US Private Equity DRG",
-  "KYC-90007": "US Private Equity DRG",
-  "KYC-90008": "US Private Equity DRG",
-  "KYC-90009": "US Private Equity DRG",
-  "KYC-90010": "US Private Equity DRG",
-  "KYC-90011": "US Private Equity DRG",
-  "KYC-90012": "US Private Equity DRG",
-  "KYC-90013": "US Private Equity DRG",
-  "KYC-90014": "US Private Equity DRG",
-  "KYC-90015": "US Private Equity DRG",
+  "KYC-30215": "US Private Equity DRG",
+  "KYC-30216": "US Private Equity DRG",
+  "KYC-30217": "US Private Equity DRG",
+  "KYC-30218": "US Private Equity DRG",
+  "KYC-30219": "US Private Equity DRG",
+  "KYC-30220": "US Private Equity DRG",
+  "KYC-30221": "US Private Equity DRG",
+  "KYC-30222": "US Private Equity DRG",
+  "KYC-30223": "US Private Equity DRG",
+  "KYC-30224": "US Private Equity DRG",
+  "KYC-30225": "US Private Equity DRG",
+  "KYC-30226": "US Private Equity DRG",
+  "KYC-30227": "US Private Equity DRG",
+  "KYC-30228": "US Private Equity DRG",
+  "KYC-30229": "US Private Equity DRG",
 };
 
 export const GENERATED_WORK_ROWS: {
@@ -1866,7 +1866,7 @@ export const GENERATED_WORK_ROWS: {
   exc: number; status: "In Progress"; action: "Periodic Refresh"; selectable: true;
 }[] = [
   {
-    id: "gen1", name: "Long Focus Capital Management, LLC", kyc: "KYC-90001",
+    id: "gen1", name: "Long Focus Capital Management, LLC", kyc: "KYC-30215",
     due: "Jul 15, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United States",
     priority: "High",
@@ -1874,7 +1874,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 5, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen2", name: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-90002",
+    id: "gen2", name: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-30216",
     due: "Jul 22, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "US (Delaware) with UK branch",
     priority: "Low",
@@ -1882,7 +1882,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen3", name: "STONEPEAK ADVISORS III LLC", kyc: "KYC-90003",
+    id: "gen3", name: "STONEPEAK ADVISORS III LLC", kyc: "KYC-30217",
     due: "Jul 30, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "US (Delaware)",
     priority: "Low",
@@ -1890,7 +1890,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen4", name: "NRPL TRUST 2018‑2", kyc: "KYC-90004",
+    id: "gen4", name: "NRPL TRUST 2018‑2", kyc: "KYC-30218",
     due: "Aug 05, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "US",
     priority: "Low",
@@ -1898,7 +1898,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 4, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen5", name: "2005 Residential TRUST 3-1", kyc: "KYC-90005",
+    id: "gen5", name: "2005 Residential TRUST 3-1", kyc: "KYC-30219",
     due: "Aug 12, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "US",
     priority: "Low",
@@ -1906,7 +1906,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 3, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen6", name: "Invesco Global Equity Trust", kyc: "KYC-90006",
+    id: "gen6", name: "Invesco Global Equity Trust", kyc: "KYC-30220",
     due: "Jul 15, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "US",
     priority: "Low",
@@ -1914,7 +1914,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen7", name: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-90007",
+    id: "gen7", name: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-30221",
     due: "Jul 22, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "US",
     priority: "Low",
@@ -1922,7 +1922,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen8", name: "Kettle Hill Capital Management, LLC", kyc: "KYC-90008",
+    id: "gen8", name: "Kettle Hill Capital Management, LLC", kyc: "KYC-30222",
     due: "Jul 30, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United States",
     priority: "High",
@@ -1930,7 +1930,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 1, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen9", name: "FEOH INVESTMENTS UK LLP", kyc: "KYC-90009",
+    id: "gen9", name: "FEOH INVESTMENTS UK LLP", kyc: "KYC-30223",
     due: "Aug 05, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United Kingdom",
     priority: "High",
@@ -1938,7 +1938,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen10", name: "Ameritas Investment Partners, INC", kyc: "KYC-90010",
+    id: "gen10", name: "Ameritas Investment Partners, INC", kyc: "KYC-30224",
     due: "Aug 12, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United States",
     priority: "High",
@@ -1946,7 +1946,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 1, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen11", name: "Brevan Howard Capital Management LP", kyc: "KYC-90011",
+    id: "gen11", name: "Brevan Howard Capital Management LP", kyc: "KYC-30225",
     due: "Jul 15, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United Kingdom",
     priority: "High",
@@ -1954,7 +1954,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 1, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen12", name: "Brevan Howard US Investment Management LP", kyc: "KYC-90012",
+    id: "gen12", name: "Brevan Howard US Investment Management LP", kyc: "KYC-30226",
     due: "Jul 22, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United Kingdom",
     priority: "Medium",
@@ -1962,7 +1962,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 1, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen13", name: "Australiansuper RAAD Trust", kyc: "KYC-90013",
+    id: "gen13", name: "Australiansuper RAAD Trust", kyc: "KYC-30227",
     due: "Jul 30, 2026", confidence: "91%",
     customerType: "Trust", jurisdiction: "United States",
     priority: "Low",
@@ -1970,7 +1970,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 1, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen14", name: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-90014",
+    id: "gen14", name: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-30228",
     due: "Aug 05, 2026", confidence: "91%",
     customerType: "Trust", jurisdiction: "United States",
     priority: "Low",
@@ -1978,7 +1978,7 @@ export const GENERATED_WORK_ROWS: {
     exc: 2, status: "In Progress", action: "Periodic Refresh", selectable: true,
   },
   {
-    id: "gen15", name: "Brevan Howard Asset Management LLP", kyc: "KYC-90015",
+    id: "gen15", name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229",
     due: "Aug 12, 2026", confidence: "91%",
     customerType: "Registered Investment Adviser (RIA)", jurisdiction: "United Kingdom",
     priority: "High",
@@ -1991,35 +1991,35 @@ export const GENERATED_DASHBOARD_CASES: {
   priority: "High" | "Medium" | "Low"; id: string; entity: string;
   note: string; due: string; est: string; status: "open";
 }[] = [
-  { priority: "High", id: "KYC-90001", entity: "Long Focus Capital Management, LLC",
+  { priority: "High", id: "KYC-30215", entity: "Long Focus Capital Management, LLC",
     note: "US Registration Number Mismatch — US Registration Number: 801-12345 (self-reported) (Source A · Client Onboarding Form) ", due: "Jul 15", est: "45 min", status: "open" },
-  { priority: "Low", id: "KYC-90002", entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC",
+  { priority: "Low", id: "KYC-30216", entity: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC",
     note: "Risk Rating — Risk Rating: High – Due to adding an optional field ownership country (Source A · Due Diligence) vs Low – ", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-90003", entity: "STONEPEAK ADVISORS III LLC",
+  { priority: "Low", id: "KYC-30217", entity: "STONEPEAK ADVISORS III LLC",
     note: "Incorporation Date vs Foreign Registration Date Mismatch — Incorporation / Formation Date: 05-Apr-2017 (Source A · LEI R", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-90004", entity: "NRPL TRUST 2018‑2",
+  { priority: "Low", id: "KYC-30218", entity: "NRPL TRUST 2018‑2",
     note: "CIP Classification and Legal structure — Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registr", due: "Jul 15", est: "45 min", status: "open" },
-  { priority: "Low", id: "KYC-90005", entity: "2005 Residential TRUST 3-1",
+  { priority: "Low", id: "KYC-30219", entity: "2005 Residential TRUST 3-1",
     note: "CIP Classification and Legal structure — Legal structure: Delaware Domestic Statutory Trust (Source A · Delaware Registr", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-90006", entity: "Invesco Global Equity Trust",
+  { priority: "Low", id: "KYC-30220", entity: "Invesco Global Equity Trust",
     note: "CIP Classification — Regulatory Status: Indicates SEC registered / SEC-linked entity (Source A · External / Public Sourc", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-90007", entity: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust",
+  { priority: "Low", id: "KYC-30221", entity: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust",
     note: "CIP Classification — Legal Entity Name: “Futu Trustee Limited as Trustee of the BZL Fellows Trust” (Source A · Client On", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "High", id: "KYC-90008", entity: "Kettle Hill Capital Management, LLC",
+  { priority: "High", id: "KYC-30222", entity: "Kettle Hill Capital Management, LLC",
     note: "Wolfsberg FCCQ Questionnaire Signature Issue — Name: Bryan Robert Kiss (Source A · SEC Form ADV) vs Bryan R Kiss (Source", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "High", id: "KYC-90009", entity: "FEOH INVESTMENTS UK LLP",
+  { priority: "High", id: "KYC-30223", entity: "FEOH INVESTMENTS UK LLP",
     note: "Authorized Signatory List Missing — The in-house ASL for FEOH Investments UK LLP expired less than one month ago. Outrea", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "High", id: "KYC-90010", entity: "Ameritas Investment Partners, INC",
+  { priority: "High", id: "KYC-30224", entity: "Ameritas Investment Partners, INC",
     note: "Principal Place of Business Variance — Principal Place of Business: 5845 R STREET, LINCOLN, Nebraska, United States, 685", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "High", id: "KYC-90011", entity: "Brevan Howard Capital Management LP",
+  { priority: "High", id: "KYC-30225", entity: "Brevan Howard Capital Management LP",
     note: "Non-Exact Beneficial Ownership Percentage — BO Percentage: >75% owned by Alta LP, which is further 75% or more owned by ", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Medium", id: "KYC-90012", entity: "Brevan Howard US Investment Management LP",
+  { priority: "Medium", id: "KYC-30226", entity: "Brevan Howard US Investment Management LP",
     note: "Outstanding Wolfsberg Questionnaire — Wolfsberg Questionnaire: Missing (Source A · Brevan Howard Capital Management LLP)", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-90013", entity: "Australiansuper RAAD Trust",
+  { priority: "Low", id: "KYC-30227", entity: "Australiansuper RAAD Trust",
     note: "Unable to Complete Sub Advisor Task — Unable to Complete Sub Advisor Task identified during KYC review.", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "Low", id: "KYC-90014", entity: "Citigroup Mortgage Loan Trust 2019-B",
+  { priority: "Low", id: "KYC-30228", entity: "Citigroup Mortgage Loan Trust 2019-B",
     note: "Deceased Individual – Corporate Officer — Verification of Existence: FALSE (Source A · Public Records) vs TRUE (Source B", due: "Jul 15", est: "30 min", status: "open" },
-  { priority: "High", id: "KYC-90015", entity: "Brevan Howard Asset Management LLP",
+  { priority: "High", id: "KYC-30229", entity: "Brevan Howard Asset Management LLP",
     note: "Expired Authorized Signors List — The in-house ASL expired on February 1st, 2025. Due to the risk rating and jurisdictio", due: "Jul 15", est: "30 min", status: "open" },
 ];
 
@@ -2027,63 +2027,63 @@ export const GENERATED_COMMENTS: Record<string, {
   author: string; initials: string; role: string; time: string;
   kind: "comment" | "ai" | "action"; body: string;
 }[]> = {
-  "KYC-90001": [
+  "KYC-30215": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "5 exceptions detected. Top priority: US Registration Number Mismatch." },
   ],
-  "KYC-90002": [
+  "KYC-30216": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "3 exceptions detected. Top priority: Risk Rating." },
   ],
-  "KYC-90003": [
+  "KYC-30217": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "3 exceptions detected. Top priority: Incorporation Date vs Foreign Registration Date Mismatch." },
   ],
-  "KYC-90004": [
+  "KYC-30218": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "4 exceptions detected. Top priority: CIP Classification and Legal structure." },
   ],
-  "KYC-90005": [
+  "KYC-30219": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "3 exceptions detected. Top priority: CIP Classification and Legal structure." },
   ],
-  "KYC-90006": [
+  "KYC-30220": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "2 exceptions detected. Top priority: CIP Classification." },
   ],
-  "KYC-90007": [
+  "KYC-30221": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "2 exceptions detected. Top priority: CIP Classification." },
   ],
-  "KYC-90008": [
+  "KYC-30222": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "1 exception detected. Top priority: Wolfsberg FCCQ Questionnaire Signature Issue." },
   ],
-  "KYC-90009": [
+  "KYC-30223": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "2 exceptions detected. Top priority: Authorized Signatory List Missing." },
   ],
-  "KYC-90010": [
+  "KYC-30224": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "1 exception detected. Top priority: Principal Place of Business Variance." },
   ],
-  "KYC-90011": [
+  "KYC-30225": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "1 exception detected. Top priority: Non-Exact Beneficial Ownership Percentage." },
   ],
-  "KYC-90012": [
+  "KYC-30226": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "1 exception detected. Top priority: Outstanding Wolfsberg Questionnaire." },
   ],
-  "KYC-90013": [
+  "KYC-30227": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "1 exception detected. Top priority: Unable to Complete Sub Advisor Task." },
   ],
-  "KYC-90014": [
+  "KYC-30228": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "2 exceptions detected. Top priority: Deceased Individual – Corporate Officer." },
   ],
-  "KYC-90015": [
+  "KYC-30229": [
     { author: "AI Agent", initials: "AI", role: "Automated Review", time: "Today",
       kind: "ai", body: "1 exception detected. Top priority: Expired Authorized Signors List." },
   ],
@@ -2092,59 +2092,59 @@ export const GENERATED_COMMENTS: Record<string, {
 export const GENERATED_TASKS: Record<string, {
   title: string; assignee: string; due: string; status: "Open" | "In Progress" | "Done";
 }[]> = {
-  "KYC-90001": [
+  "KYC-30215": [
     { title: "Resolve: US Registration Number Mismatch", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Outstanding LEI Code", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Principal Place of Business Mismatch", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90002": [
+  "KYC-30216": [
     { title: "Resolve: Risk Rating", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: CIP Classification and NAICS code", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Acting Person", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90003": [
+  "KYC-30217": [
     { title: "Resolve: Incorporation Date vs Foreign Registration Date Mismatch", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Registered Address", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Principal Business Address", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90004": [
+  "KYC-30218": [
     { title: "Resolve: CIP Classification and Legal structure", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90005": [
+  "KYC-30219": [
     { title: "Resolve: CIP Classification and Legal structure", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90006": [
+  "KYC-30220": [
     { title: "Resolve: CIP Classification", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Regulator", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90007": [
+  "KYC-30221": [
     { title: "Resolve: CIP Classification", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: CIP Classification Ambiguity — Trust vs Trustee (FI vs Non-FI Treatment)", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90008": [
+  "KYC-30222": [
     { title: "Resolve: Wolfsberg FCCQ Questionnaire Signature Issue", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90009": [
+  "KYC-30223": [
     { title: "Resolve: Authorized Signatory List Missing", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Beneficial Ownership Threshold Difference", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90010": [
+  "KYC-30224": [
     { title: "Resolve: Principal Place of Business Variance", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90011": [
+  "KYC-30225": [
     { title: "Resolve: Non-Exact Beneficial Ownership Percentage", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90012": [
+  "KYC-30226": [
     { title: "Resolve: Outstanding Wolfsberg Questionnaire", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90013": [
+  "KYC-30227": [
     { title: "Resolve: Unable to Complete Sub Advisor Task", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90014": [
+  "KYC-30228": [
     { title: "Resolve: Deceased Individual – Corporate Officer", assignee: "Unassigned", due: "TBD", status: "Open" },
     { title: "Resolve: Deceased Individual – Authorized Signatory List", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
-  "KYC-90015": [
+  "KYC-30229": [
     { title: "Resolve: Expired Authorized Signors List", assignee: "Unassigned", due: "TBD", status: "Open" },
   ],
 };
@@ -2152,126 +2152,126 @@ export const GENERATED_TASKS: Record<string, {
 export const GENERATED_WATCHERS: Record<string, {
   name: string; initials: string; role: string;
 }[]> = {
-  "KYC-90001": [
+  "KYC-30215": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90002": [
+  "KYC-30216": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90003": [
+  "KYC-30217": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90004": [
+  "KYC-30218": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90005": [
+  "KYC-30219": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90006": [
+  "KYC-30220": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90007": [
+  "KYC-30221": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90008": [
+  "KYC-30222": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90009": [
+  "KYC-30223": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90010": [
+  "KYC-30224": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90011": [
+  "KYC-30225": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90012": [
+  "KYC-30226": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90013": [
+  "KYC-30227": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90014": [
+  "KYC-30228": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
-  "KYC-90015": [
+  "KYC-30229": [
     { name: "Priya Patel", initials: "PP", role: "KYC Analyst · L1" },
     { name: "Quinn Doe",   initials: "QD", role: "Reviewer · L2" },
   ],
 };
 
 export const GENERATED_ACTIVITY: Record<string, { time: string; text: string }[]> = {
-  "KYC-90001": [
+  "KYC-30215": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 5 exceptions during initial review" },
   ],
-  "KYC-90002": [
+  "KYC-30216": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 3 exceptions during initial review" },
   ],
-  "KYC-90003": [
+  "KYC-30217": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 3 exceptions during initial review" },
   ],
-  "KYC-90004": [
+  "KYC-30218": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 4 exceptions during initial review" },
   ],
-  "KYC-90005": [
+  "KYC-30219": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 3 exceptions during initial review" },
   ],
-  "KYC-90006": [
+  "KYC-30220": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 2 exceptions during initial review" },
   ],
-  "KYC-90007": [
+  "KYC-30221": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 2 exceptions during initial review" },
   ],
-  "KYC-90008": [
+  "KYC-30222": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 1 exception during initial review" },
   ],
-  "KYC-90009": [
+  "KYC-30223": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 2 exceptions during initial review" },
   ],
-  "KYC-90010": [
+  "KYC-30224": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 1 exception during initial review" },
   ],
-  "KYC-90011": [
+  "KYC-30225": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 1 exception during initial review" },
   ],
-  "KYC-90012": [
+  "KYC-30226": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 1 exception during initial review" },
   ],
-  "KYC-90013": [
+  "KYC-30227": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 1 exception during initial review" },
   ],
-  "KYC-90014": [
+  "KYC-30228": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 2 exceptions during initial review" },
   ],
-  "KYC-90015": [
+  "KYC-30229": [
     { time: "Today", text: "Case opened from entities.md" },
     { time: "Today", text: "AI Agent flagged 1 exception during initial review" },
   ],

@@ -313,7 +313,11 @@ function parseEntity(block) {
     if (r.length >= 2) cd[r[0].toLowerCase().replace(/\s+/g, '_')] = r[1];
   }
 
-  const kycId         = cd['case_id']              || `KYC-9${String(entityNum).padStart(4,'0')}`;
+  // parseTable() treats the first row as headers, so "| Case ID | KYC-30215 |"
+  // never lands in cd.  Extract the KYC ID directly with a regex instead.
+  const kycIdMatch    = cdBlock.match(/\|\s*Case\s*ID\s*\|\s*(KYC-[^|\s]+)\s*\|/i);
+  const kycId         = (kycIdMatch ? kycIdMatch[1].trim() : null) || `KYC-9${String(entityNum).padStart(4,'0')}`;
+
   const entityType    = cd['entity_type']           || 'Entity';
   const jurisdiction  = cd['jurisdiction']?.replace(/\\\|/g, '|').replace(/\|/g, '—') || 'US';
   const riskRating    = cd['client_risk_rating']    || 'Medium';
