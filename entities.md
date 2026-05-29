@@ -10,6 +10,7 @@
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Long Focus Capital Mgmt | Complete |
 | entity_name | LONG FOCUS CAPITAL MANAGEMENT, LLC | Complete |
 | legal_entity_type | Limited Liability Company | Complete |
 | country_of_incorporation | USA | Complete |
@@ -159,6 +160,7 @@ The ownership chain terminates at a Delaware holding company with no publicly di
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Brookfield Asset Mgmt | Complete |
 | entity_name | BROOKFIELD ASSET MANAGEMENT PIC US, LLC | Complete |
 | legal_entity_type | Limited Liability Company | Complete |
 | country_of_incorporation | United States | Complete |
@@ -294,6 +296,7 @@ During KYC review, an Acting Person (AP) has been identified for the entity; how
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Stonepeak Infrastructure Partners - United States | Complete |
 | entity_name | STONEPEAK ADVISORS III LLC | Complete |
 | legal_entity_type | Limited Liability Company | Complete |
 | country_of_incorporation | United States (Delaware) | Complete |
@@ -409,6 +412,7 @@ This can cause incorrect address mapping if teams populate only one address fiel
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | N/A | Complete |
 | entity_name | NRPL TRUST 20182 | Complete |
 | legal_entity_type | [See Exception Below] | Exception |
 | country_of_incorporation | United States (Delaware) | Complete |
@@ -490,6 +494,7 @@ NRPL TRUST 20182 is legally incorporated as a Delaware statutory trust, however 
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | N/A | Complete |
 | entity_name | 2005 Residential TRUST 3-1 | Complete |
 | legal_entity_type | [See Exception Below] | Exception |
 | country_of_incorporation | United States (Delaware) | Complete |
@@ -567,6 +572,7 @@ NRPL TRUST 20182 is legally incorporated as a Delaware statutory trust, however 
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Invesco Ltd | Complete |
 | entity_name | Invesco Global Equity Trust | Complete |
 | legal_entity_type | Investment Trust / Unit Trust (Collective Investment Scheme) | Exception |
 | country_of_incorporation | United States | Complete |
@@ -665,6 +671,7 @@ During regulatory verification, there is a discrepancy where:
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Futu Trustee Ltd on behalf of Bzl Fellows Trust | Complete |
 | entity_name | FUTU TRUSTEE LIMITED AS TRUSTEE OF THE BZL FELLOWS TRUST | Exception |
 | legal_entity_type | Trust | Exception |
 | country_of_incorporation | Hong Kong | Complete |
@@ -771,6 +778,7 @@ This creates uncertainty on whether:
 ## Attribute Coverage
 | Attributes | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Kettle Hill Capital LLC | Complete |
 | cip_classification | Registered Investment Advisor or Commodity Trading Advisor | Complete |
 | entity_name | Kettle Hill Capital Management, LLC | Complete |
 | principal_place_of_business | 747 THIRD AVENUE, 19th Floor, NEW YORK, New York, 10017 | Complete |
@@ -831,6 +839,7 @@ The Corporate Officer identified on SEC Form ADV is Bryan Robert Kiss. During Wo
 ## Attribute Coverage
 | Attributes | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Feoh Invs UK LLP | Complete |
 | cip_classification | Registered Investment Advisor or Commodity Trading Advisor | Complete |
 | entity_name | FEOH INVESTMENTS UK LLP | Complete |
 | principal_place_of_business | 15-16 Margaret Street, 4th Floor, London, W1W 8RW, UNITED KINGDOM | Complete |
@@ -932,6 +941,7 @@ Based on the entity's jurisdiction and risk rating, the system-generated benefic
 ## Attribute Coverage
 | Attributes | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | UNIFI Mutual Holding Co | Complete |
 | cip_classification | Registered Investment Advisor or Commodity Trading Advisor | Complete |
 | entity_name | Ameritas Investment Partners, INC | Complete |
 | principal_place_of_business | 5945 R STREET, LINCOLN, Nebraska, United States, 68505 | Exception |
@@ -998,6 +1008,7 @@ The Principal Place of Business listed on the in-house Account Opening Form is 5
 ## Attribute Coverage
 | Attributes | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Brevan Howard Group Holdings Ltd | Complete |
 | cip_classification | Registered Investment Advisor or Commodity Trading Advisor | Complete |
 | entity_name | Brevan Howard Capital Management LP | Complete |
 | principal_place_of_business | 15-16 Margaret Street, 4th Floor, London, W1W 8RW, UNITED KINGDOM | Complete |
@@ -1113,6 +1124,7 @@ The SEC Form ADV, dated May 8th, 2026, shows a different BO threshold compared t
 ## Attribute Coverage
 | Attributes | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Brevan Howard Group Holdings Ltd | Complete |
 | entity_risk_rating | Medium | Complete |
 | entity_jurisdiction | United States | United Kingdom |
 | | | Complete |
@@ -1234,6 +1246,7 @@ Given the client’s known sensitivity and refusal to cooperate further during t
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | AustralianSuper Pty Ltd - Melbourne | Complete |
 | entity_name | AustralianSuper RAAD Trust | Complete |
 | legal_entity_type | TRUST | Complete |
 | country_of_incorporation | Australia | Complete |
@@ -1304,6 +1317,7 @@ Given the client’s known sensitivity and refusal to cooperate further during t
 ## Attribute Coverage
 | Attribute | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | N/A | Complete |
 | entity_name | Citigroup Mortgage Loan Trust 2019-B | Complete |
 | legal_entity_type | TRUST | Complete |
 | country_of_incorporation | United States | Complete |
@@ -1389,6 +1403,7 @@ Sulluman S. Olyayan is identified as an authorized signor on the Account Opening
 ## Attribute Coverage
 | Attributes | Value | Status |
 | :--- | :--- | :--- |
+| drg_name | Brevan Howard Group Holdings Ltd | Complete |
 | cip_classification | Registered Investment Advisor or Commodity Trading Advisor | Complete |
 | entity_name | Brevan Howard Asset Management LLP | Complete |
 | principal_place_of_business | 82 Baker Street, London, W1U 6AE, United Kingdom | Complete |
@@ -1435,3 +1450,4 @@ The in-house ASL expired on February 1st, 2025. Due to the risk rating and juris
 * Internal guidance requires this document to be refreshed annually. As a result, the document has now expired.
 #### Actions
 * Option 1 – Client outreach: Outreach to the client is required to obtain the latest ASL. The rolling review analyst should provide the specific certification language up front to avoid unnecessary back-and-forth during the outreach process. Based on historical outreach records, more than 62% of ASL-related client outreach results in multiple reach-outs, as the certification completed by the end customer often does not meet our internal guidance.
+

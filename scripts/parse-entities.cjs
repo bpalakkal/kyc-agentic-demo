@@ -336,6 +336,11 @@ function parseEntity(block) {
       source: getAttrSource(r[0]),
     }));
 
+  // Extract drg_name from the Attribute Coverage table
+  const drgNameRow = attrTable.rows.find(r => r[0] === 'drg_name');
+  const rawDrgName = drgNameRow ? cleanCell(drgNameRow[1] || '') : '';
+  const drgName = (rawDrgName && rawDrgName.toLowerCase() !== 'n/a') ? rawDrgName : '';
+
   // Exceptions
   const excSection = block.match(/##\s+Exceptions\s*\n([\s\S]+?)(?=\n##[^#]|$)/)?.[1] || '';
   const excBlocks  = excSection.split(/(?=###\s+Exception\s+\d+)/);
@@ -343,7 +348,7 @@ function parseEntity(block) {
     .filter(b => b.trim().startsWith('###'))
     .map((b, i) => parseException(b, kycId, entityName, entityNum, i + 1));
 
-  return { entityNum, entityName, kycId, entityType, jurisdiction, riskRating, openExceptions, attrs, exceptions };
+  return { entityNum, entityName, kycId, entityType, jurisdiction, riskRating, openExceptions, attrs, exceptions, drgName };
 }
 
 function parseEntities(md) {
@@ -495,9 +500,12 @@ function generateTypeScript(entities) {
   out.push(``);
 
   // ── GENERATED_ENTITY_DRG (helper for WorkQueue) ──
+  // Only emit entries where drg_name is set and not "N/A" — omitted entries appear as flat rows.
   out.push(`export const GENERATED_ENTITY_DRG: Record<string, string> = {`);
   for (const ent of entities) {
-    out.push(`  ${esc(ent.kycId)}: ${esc(getDrg(ent.jurisdiction))},`);
+    if (ent.drgName) {
+      out.push(`  ${esc(ent.kycId)}: ${esc(ent.drgName)},`);
+    }
   }
   out.push(`};`);
   out.push(``);

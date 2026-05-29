@@ -44,7 +44,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_ENTITY_GROUPS, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
+import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_ENTITY_GROUPS, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY, GENERATED_ENTITY_DRG, GENERATED_WORK_ROWS } from "@/data/entities-generated";
 
 
 
@@ -968,6 +968,11 @@ const ExceptionReview = () => {
 
   const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0] ?? exceptions[0])!;
 
+  const activeDrg = GENERATED_ENTITY_DRG[active.kyc] ?? null;
+  const drgEntities = activeDrg
+    ? GENERATED_WORK_ROWS.filter((r) => GENERATED_ENTITY_DRG[r.kyc] === activeDrg)
+    : [];
+
   // Keep agent context in sync with the currently viewed entity so "Run Agent" dropdown knows what to search
   useEffect(() => {
     setEntityContext({ name: active.entity, kyc: active.kyc });
@@ -1064,25 +1069,34 @@ const ExceptionReview = () => {
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-1.5 hover:text-primary transition-colors group">
-                    <h1 className="text-[15px] font-semibold group-hover:underline underline-offset-2">London Alternatives DRG</h1>
+                    <h1 className="text-[15px] font-semibold group-hover:underline underline-offset-2">
+                      {activeDrg ?? "No DRG Assigned"}
+                    </h1>
                     <Info className="size-3.5 text-muted-foreground group-hover:text-primary" />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-80 p-4">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-3">DRG Details</p>
-                  <div className="space-y-2 text-sm mb-3">
-                    <div className="flex justify-between"><span className="text-muted-foreground">DRG ID</span><span className="font-medium">DRG-001</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">DRG Name</span><span className="font-medium">London Alternatives</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Region</span><span className="font-medium">EMEA</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Relationship Manager</span><span className="font-medium">RM Anderson</span></div>
-                  </div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Entities in DRG</p>
-                  <ul className="space-y-1 text-[12px]">
-                    {["Brevan Howard Asset Management LLP · KYC-30214", "Marshall Wace LLP · KYC-30188", "Winton Group Ltd · KYC-30201", "Man Group plc · KYC-30207"].map((e) => (
-                      <li key={e} className="flex items-center gap-2 text-muted-foreground"><Building2 className="size-3 shrink-0" />{e}</li>
-                    ))}
-                  </ul>
-                  <p className="text-[10px] text-muted-foreground mt-3 italic">Full DRG data will load from entities.md</p>
+                  {activeDrg ? (
+                    <>
+                      <div className="space-y-2 text-sm mb-3">
+                        <div className="flex justify-between"><span className="text-muted-foreground">DRG Name</span><span className="font-medium">{activeDrg}</span></div>
+                      </div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                        Entities in DRG ({drgEntities.length})
+                      </p>
+                      <ul className="space-y-1 text-[12px]">
+                        {drgEntities.map((r) => (
+                          <li key={r.kyc} className="flex items-center gap-2 text-muted-foreground">
+                            <Building2 className="size-3 shrink-0" />
+                            {r.name} · {r.kyc}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">This entity is not assigned to a DRG.</p>
+                  )}
                 </PopoverContent>
               </Popover>
             </div>

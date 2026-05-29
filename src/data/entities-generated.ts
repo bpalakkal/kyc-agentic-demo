@@ -1156,6 +1156,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Long Focus Capital Management, LLC": {
     name: "Long Focus Capital Management, LLC", kyc: "KYC-30215",
     attrs: [
+      { label: "Drg Name", value: "Long Focus Capital Mgmt", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "LONG FOCUS CAPITAL MANAGEMENT, LLC", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Limited Liability Company", source: "CRM", status: "ok" },
       { label: "Country of Incorporation", value: "USA", source: "3rd", status: "ok" },
@@ -1208,6 +1209,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "BROOKFIELD ASSET MANAGEMENT PIC US, LLC": {
     name: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", kyc: "KYC-30216",
     attrs: [
+      { label: "Drg Name", value: "Brookfield Asset Mgmt", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Limited Liability Company", source: "CRM", status: "ok" },
       { label: "Country of Incorporation", value: "United States", source: "3rd", status: "ok" },
@@ -1241,6 +1243,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "STONEPEAK ADVISORS III LLC": {
     name: "STONEPEAK ADVISORS III LLC", kyc: "KYC-30217",
     attrs: [
+      { label: "Drg Name", value: "Stonepeak Infrastructure Partners - United States", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "STONEPEAK ADVISORS III LLC", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Limited Liability Company", source: "CRM", status: "ok" },
       { label: "Country of Incorporation", value: "United States (Delaware)", source: "3rd", status: "ok" },
@@ -1270,6 +1273,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "NRPL TRUST 2018‑2": {
     name: "NRPL TRUST 2018‑2", kyc: "KYC-30218",
     attrs: [
+      { label: "Drg Name", value: "N/A", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "NRPL TRUST 20182", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "[See Exception Below]", source: "CRM", status: "alert" },
       { label: "Country of Incorporation", value: "United States (Delaware)", source: "3rd", status: "ok" },
@@ -1297,6 +1301,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "2005 Residential TRUST 3-1": {
     name: "2005 Residential TRUST 3-1", kyc: "KYC-30219",
     attrs: [
+      { label: "Drg Name", value: "N/A", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "2005 Residential TRUST 3-1", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "[See Exception Below]", source: "CRM", status: "alert" },
       { label: "Country of Incorporation", value: "United States (Delaware)", source: "3rd", status: "ok" },
@@ -1315,6 +1320,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Invesco Global Equity Trust": {
     name: "Invesco Global Equity Trust", kyc: "KYC-30220",
     attrs: [
+      { label: "Drg Name", value: "Invesco Ltd", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "Invesco Global Equity Trust", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "Investment Trust / Unit Trust (Collective Investment Scheme)", source: "CRM", status: "alert" },
       { label: "Country of Incorporation", value: "United States", source: "3rd", status: "ok" },
@@ -1337,6 +1343,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Futu Trustee Limited AS Trustee of the BZL Fellows Trust": {
     name: "Futu Trustee Limited AS Trustee of the BZL Fellows Trust", kyc: "KYC-30221",
     attrs: [
+      { label: "Drg Name", value: "Futu Trustee Ltd on behalf of Bzl Fellows Trust", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "FUTU TRUSTEE LIMITED AS TRUSTEE OF THE BZL FELLOWS TRUST", source: "CRM", status: "alert" },
       { label: "Legal Entity Type", value: "Trust", source: "CRM", status: "alert" },
       { label: "Country of Incorporation", value: "Hong Kong", source: "3rd", status: "ok" },
@@ -1365,6 +1372,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Kettle Hill Capital Management, LLC": {
     name: "Kettle Hill Capital Management, LLC", kyc: "KYC-30222",
     attrs: [
+      { label: "Drg Name", value: "Kettle Hill Capital LLC", source: "CRM", status: "ok" },
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Kettle Hill Capital Management, LLC", source: "CRM", status: "ok" },
       { label: "Principal Place of Business", value: "747 THIRD AVENUE, 19th Floor, NEW YORK, New York, 10017", source: "CRM", status: "ok" },
@@ -1401,6 +1409,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "FEOH INVESTMENTS UK LLP": {
     name: "FEOH INVESTMENTS UK LLP", kyc: "KYC-30223",
     attrs: [
+      { label: "Drg Name", value: "Feoh Invs UK LLP", source: "CRM", status: "ok" },
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "FEOH INVESTMENTS UK LLP", source: "CRM", status: "ok" },
       { label: "Principal Place of Business", value: "15-16 Margaret Street, 4th Floor, London, W1W 8RW, UNITED KINGDOM", source: "CRM", status: "ok" },
@@ -1462,6 +1471,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Ameritas Investment Partners, INC": {
     name: "Ameritas Investment Partners, INC", kyc: "KYC-30224",
     attrs: [
+      { label: "Drg Name", value: "UNIFI Mutual Holding Co", source: "CRM", status: "ok" },
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Ameritas Investment Partners, INC", source: "CRM", status: "ok" },
       { label: "Principal Place of Business", value: "5945 R STREET, LINCOLN, Nebraska, United States, 68505", source: "CRM", status: "alert" },
@@ -1505,6 +1515,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Brevan Howard Capital Management LP": {
     name: "Brevan Howard Capital Management LP", kyc: "KYC-30225",
     attrs: [
+      { label: "Drg Name", value: "Brevan Howard Group Holdings Ltd", source: "CRM", status: "ok" },
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Brevan Howard Capital Management LP", source: "CRM", status: "ok" },
       { label: "Principal Place of Business", value: "15-16 Margaret Street, 4th Floor, London, W1W 8RW, UNITED KINGDOM", source: "CRM", status: "ok" },
@@ -1595,6 +1606,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Brevan Howard US Investment Management LP": {
     name: "Brevan Howard US Investment Management LP", kyc: "KYC-30226",
     attrs: [
+      { label: "Drg Name", value: "Brevan Howard Group Holdings Ltd", source: "CRM", status: "ok" },
       { label: "Entity Risk Rating", value: "Medium", source: "Forge", status: "ok" },
       { label: "Entity Jurisdiction", value: "United States", source: "CRM", status: "ok" },
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
@@ -1688,6 +1700,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Australiansuper RAAD Trust": {
     name: "Australiansuper RAAD Trust", kyc: "KYC-30227",
     attrs: [
+      { label: "Drg Name", value: "AustralianSuper Pty Ltd - Melbourne", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "AustralianSuper RAAD Trust", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "TRUST", source: "CRM", status: "ok" },
       { label: "Country of Incorporation", value: "Australia", source: "3rd", status: "ok" },
@@ -1737,6 +1750,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Citigroup Mortgage Loan Trust 2019-B": {
     name: "Citigroup Mortgage Loan Trust 2019-B", kyc: "KYC-30228",
     attrs: [
+      { label: "Drg Name", value: "N/A", source: "CRM", status: "ok" },
       { label: "Entity Name", value: "Citigroup Mortgage Loan Trust 2019-B", source: "CRM", status: "ok" },
       { label: "Legal Entity Type", value: "TRUST", source: "CRM", status: "ok" },
       { label: "Country of Incorporation", value: "United States", source: "3rd", status: "ok" },
@@ -1786,6 +1800,7 @@ export const GENERATED_ENTITY_PROFILES: Record<string, {
   "Brevan Howard Asset Management LLP": {
     name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229",
     attrs: [
+      { label: "Drg Name", value: "Brevan Howard Group Holdings Ltd", source: "CRM", status: "ok" },
       { label: "CIP Classification", value: "Registered Investment Advisor or Commodity Trading Advisor", source: "Forge", status: "ok" },
       { label: "Entity Name", value: "Brevan Howard Asset Management LLP", source: "CRM", status: "ok" },
       { label: "Principal Place of Business", value: "82 Baker Street, London, W1U 6AE, United Kingdom", source: "CRM", status: "ok" },
@@ -1841,21 +1856,18 @@ export const GENERATED_ENTITY_GROUPS: Record<string, { drg: string; attrs: strin
 };
 
 export const GENERATED_ENTITY_DRG: Record<string, string> = {
-  "KYC-30215": "US Private Equity DRG",
-  "KYC-30216": "US Private Equity DRG",
-  "KYC-30217": "US Private Equity DRG",
-  "KYC-30218": "US Private Equity DRG",
-  "KYC-30219": "US Private Equity DRG",
-  "KYC-30220": "US Private Equity DRG",
-  "KYC-30221": "US Private Equity DRG",
-  "KYC-30222": "US Private Equity DRG",
-  "KYC-30223": "US Private Equity DRG",
-  "KYC-30224": "US Private Equity DRG",
-  "KYC-30225": "US Private Equity DRG",
-  "KYC-30226": "US Private Equity DRG",
-  "KYC-30227": "US Private Equity DRG",
-  "KYC-30228": "US Private Equity DRG",
-  "KYC-30229": "US Private Equity DRG",
+  "KYC-30215": "Long Focus Capital Mgmt",
+  "KYC-30216": "Brookfield Asset Mgmt",
+  "KYC-30217": "Stonepeak Infrastructure Partners - United States",
+  "KYC-30220": "Invesco Ltd",
+  "KYC-30221": "Futu Trustee Ltd on behalf of Bzl Fellows Trust",
+  "KYC-30222": "Kettle Hill Capital LLC",
+  "KYC-30223": "Feoh Invs UK LLP",
+  "KYC-30224": "UNIFI Mutual Holding Co",
+  "KYC-30225": "Brevan Howard Group Holdings Ltd",
+  "KYC-30226": "Brevan Howard Group Holdings Ltd",
+  "KYC-30227": "AustralianSuper Pty Ltd - Melbourne",
+  "KYC-30229": "Brevan Howard Group Holdings Ltd",
 };
 
 export const GENERATED_WORK_ROWS: {
