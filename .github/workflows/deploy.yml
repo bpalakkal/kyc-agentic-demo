@@ -4,11 +4,19 @@ on:
   push:
     branches: [main]
 
+# Cancel any in-progress deploy for the same branch so concurrent pushes
+# don't race and corrupt the gh-pages branch.
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      id-token: write
 
     steps:
       - name: Checkout
