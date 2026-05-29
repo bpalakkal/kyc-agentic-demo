@@ -80,14 +80,11 @@ function buildDisplay(activeTab: FilterTab): { groups: Group[]; ungrouped: Row[]
 
   const groups: Group[] = Array.from(drgMap.entries()).map(([drgName, rows], i) => {
     const highCount = rows.filter((r) => r.priority === "High").length;
-    const medCount  = rows.filter((r) => r.priority === "Medium").length;
-    const topCount  = highCount > 0 ? highCount : medCount;
-    const topLabel  = highCount > 0 ? "High" : medCount > 0 ? "Medium" : "Low";
-    const tone: Group["priorityTone"] = highCount > 0 ? "high" : medCount > 0 ? "medium" : "low";
+    const tone: Group["priorityTone"] = highCount > 0 ? "high" : rows.some((r) => r.priority === "Medium") ? "medium" : "low";
     return {
       id: `drg-${i}`,
       name: drgName,
-      priorityNote: `${topCount} ${topLabel} Priority Item${topCount !== 1 ? "s" : ""}`,
+      priorityNote: `${highCount} High Priority Item${highCount !== 1 ? "s" : ""}`,
       priorityTone: tone,
       rows,
     };
