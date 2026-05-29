@@ -181,10 +181,10 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const goQueue = () => navigate("/work-queue");
   const goReview = () => navigate("/work-queue/review");
-  const actionsRef = useRef<HTMLElement>(null);
   const [priorityExpanded, setPriorityExpanded] = useState(false);
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [kpiFilter, setKpiFilter] = useState<FilterKey>("all");
+  const [actionsFilter, setActionsFilter] = useState<"all" | "today">("all");
   const [collabFilters, setCollabFilters] = useState<Record<CollabType, boolean>>({
     comment: true, ai: true, document: true, action: true,
   });
@@ -233,6 +233,10 @@ const Dashboard = () => {
       default:      return priorityCases;
     }
   }, [kpiFilter]);
+
+  const filteredAiActions = actionsFilter === "today"
+    ? aiActions.filter((a) => a.dot === "alert")
+    : aiActions;
 
   const filteredCollab = collab.filter((c) => collabFilters[c.type]);
 
@@ -295,7 +299,7 @@ const Dashboard = () => {
             { label: "High Priority", value: highPriorityCount, icon: <AlertTriangle className="size-4" />, accent: true,  action: () => toggleKpi("high"),  active: kpiFilter === "high" },
             { label: "Due Today",     value: dueTodayCount,     icon: <Clock className="size-4" />,          accent: false, action: () => toggleKpi("today"), active: kpiFilter === "today" },
             { label: "Compliance Alerts", value: 2,             icon: <AlertTriangle className="size-4" />, accent: true,  action: goQueue,                   active: false },
-            { label: "AI Actions",    value: aiActions.length,  icon: <Sparkles className="size-4" />,      accent: false, action: () => actionsRef.current?.scrollIntoView({ behavior: "smooth" }), active: false },
+            { label: "AI Actions for Today", value: aiActions.filter((a) => a.dot === "alert").length, icon: <Sparkles className="size-4" />, accent: false, action: () => setActionsFilter((p) => p === "today" ? "all" : "today"), active: actionsFilter === "today" },
           ] as const).map((s) => (
             <button
               key={s.label}
@@ -325,7 +329,7 @@ const Dashboard = () => {
           <section className="rounded-xl border border-border bg-card p-5">
             <header className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <h2 className="text-[15px] font-semibold">Priority Cases</h2>
+                <h2 className="text-[15px] font-semibold">All Cases</h2>
                 <Chip variant="high"><AlertTriangle className="size-3 mr-1" />2 High</Chip>
               </div>
               <button
@@ -398,19 +402,24 @@ const Dashboard = () => {
           </section>
 
           {/* Recommended Actions — 3 by default, expand to scroll */}
-          <section ref={actionsRef} className="rounded-xl border border-border bg-card p-5">
+          <section className="rounded-xl border border-border bg-card p-5">
             <header className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-semibold flex items-center gap-2">
                   <Sparkles className="size-4 text-primary" /> Recommended Actions
                 </h2>
                 <Chip variant="high">{aiActions.filter((a) => a.dot === "alert").length} Urgent</Chip>
+                {actionsFilter === "today" && (
+                  <span className="text-[11px] text-primary font-medium px-2 py-0.5 rounded-full border border-primary/30 bg-info-soft">
+                    Today only
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setActionsExpanded((v) => !v)}
                 className="text-xs font-medium text-primary flex items-center gap-1 hover:underline"
               >
-                {actionsExpanded ? "Show less" : `Show all (${aiActions.length})`}
+                {actionsExpanded ? "Show less" : `Show all (${filteredAiActions.length})`}
                 <ChevronDown className={cn("size-3 transition-transform", actionsExpanded && "rotate-180")} />
               </button>
             </header>
@@ -419,7 +428,7 @@ const Dashboard = () => {
               "divide-y divide-border",
               actionsExpanded && "max-h-[400px] overflow-y-auto pr-1 -mr-1"
             )}>
-              {(actionsExpanded ? aiActions : aiActions.slice(0, 3)).map((a) => (
+              {(actionsExpanded ? filteredAiActions : filteredAiActions.slice(0, 3)).map((a) => (
                 <li key={a.title}>
                   <button
                     type="button"
