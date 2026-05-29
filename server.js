@@ -53,8 +53,19 @@ const { ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET } = process.env;
 
 const app = express();
 
-// TODO: lock this down to the GitHub Pages origin in production
-app.use(cors({ origin: "*" }));
+const ALLOWED_ORIGINS = [
+  "https://bpalakkal.github.io",
+  "http://localhost:5173",
+  "http://localhost:8080",
+  "http://localhost:3001",
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow server-to-server requests (no Origin header) and whitelisted origins
+    if (!origin || ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+}));
 app.use(express.json());
 
 // ─── Zoom ─────────────────────────────────────────────────────────────────────
@@ -75,8 +86,13 @@ async function getZoomToken() {
 
 app.post("/api/zoom/create-meeting", async (req, res) => {
   try {
+    const { topic, agenda, start_time, duration } = req.body ?? {};
+    if (typeof topic !== "string" || !topic.trim()) return res.status(400).json({ error: "topic is required" });
+    if (typeof start_time !== "string" || !start_time.trim()) return res.status(400).json({ error: "start_time is required" });
+    const durationInt = parseInt(duration, 10);
+    if (!Number.isFinite(durationInt) || durationInt < 15 || durationInt > 480) return res.status(400).json({ error: "duration must be 15–480 minutes" });
+
     const token = await getZoomToken();
-    const { topic, agenda, start_time, duration } = req.body;
 
     const response = await fetch("https://api.zoom.us/v2/users/me/meetings", {
       method: "POST",
@@ -85,7 +101,7 @@ app.post("/api/zoom/create-meeting", async (req, res) => {
         topic,
         type: 2,
         start_time,
-        duration: parseInt(duration, 10),
+        duration: durationInt,
         agenda,
         settings: {
           host_video: true,

@@ -151,7 +151,7 @@ export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string
 
 // VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
 // Locally it falls back to the Express proxy on 3001 (`npm start`).
-const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
+export const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
 // EntityCtx is set by ExceptionReview when an entity is open, giving
 // Live Data Source agents the entity name to search for.

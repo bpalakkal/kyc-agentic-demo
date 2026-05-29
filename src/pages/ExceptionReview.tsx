@@ -39,12 +39,12 @@ import {
   ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAgents, type AgentId } from "@/components/AgentSystem";
+import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_ENTITY_GROUPS, GENERATED_COMMENTS, GENERATED_TASKS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
+import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_ENTITY_GROUPS, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
 
 
 
@@ -1895,7 +1895,7 @@ const ExceptionReview = () => {
                       const agenda = (document.getElementById("zoom-agenda") as HTMLTextAreaElement)?.value ?? "";
                       const durationMins = parseInt(zoomDuration);
                       const startTime = new Date("2026-05-27T10:00:00Z").toISOString();
-                      const res = await fetch("http://localhost:3001/api/zoom/create-meeting", {
+                      const res = await fetch(`${AGENT_API_BASE}/api/zoom/create-meeting`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -4019,29 +4019,7 @@ const kindTone: Record<CaseComment["kind"], string> = {
   action: "bg-secondary text-foreground",
 };
 
-// ---------- Tasks / Follow-ups, Watchers, Activity ----------
-
-type CaseTask = { title: string; assignee: string; due: string; status: "Open" | "In Progress" | "Done" };
-const TASKS_BY_KYC: Record<string, CaseTask[]> = {
-  "KYC-30214": [
-    { title: "Chase PSC02 correction filing from client", assignee: "Quinn Doe", due: "Apr 28", status: "In Progress" },
-    { title: "Complete Jersey EDD pack on BH Partnership Holdings", assignee: "Aanya Sharma", due: "Apr 30", status: "Open" },
-    { title: "Backfill 'Rivage Capital' alias in CRM", assignee: "You", due: "May 02", status: "Open" },
-  ],
-  "KYC-30188": [
-    { title: "Request AIFMD Article 23 pack from RM", assignee: "Marcus Lee", due: "Apr 27", status: "In Progress" },
-    { title: "Add cleared PSC pair to sanctions allowlist", assignee: "You", due: "Apr 26", status: "Done" },
-  ],
-  "KYC-30215": [
-    { title: "Obtain GLEIF LEI re-issue confirmation", assignee: "Marcus Lee", due: "Apr 29", status: "Open" },
-    { title: "Re-verify Form ADV compliance officer attestation", assignee: "You", due: "May 03", status: "Open" },
-  ],
-  "KYC-30216": [
-    { title: "Obtain Compliance sign-off on 25% threshold", assignee: "Priya Patel", due: "Jun 15", status: "In Progress" },
-    { title: "Request Power of Attorney from client", assignee: "You", due: "Jun 10", status: "Open" },
-    { title: "Legal review — NFIE vs Financial Entity classification", assignee: "Dana Ortiz", due: "Jun 20", status: "Open" },
-  ],
-};
+// ---------- Watchers, Activity ----------
 
 type Watcher = { name: string; initials: string; role: string };
 const WATCHERS_BY_KYC: Record<string, Watcher[]> = {
@@ -4106,16 +4084,9 @@ const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
     if (!_staticGroups.has(k)) (ENTITY_GROUPS as Record<string, typeof v>)[k] = v;
   }
   for (const [k, v] of Object.entries(GENERATED_COMMENTS))  { if (!COMMENTS_BY_KYC[k])  (COMMENTS_BY_KYC as Record<string, typeof v>)[k]  = v; }
-  for (const [k, v] of Object.entries(GENERATED_TASKS))     { if (!TASKS_BY_KYC[k])     (TASKS_BY_KYC    as Record<string, typeof v>)[k]  = v; }
   for (const [k, v] of Object.entries(GENERATED_WATCHERS))  { if (!WATCHERS_BY_KYC[k])  (WATCHERS_BY_KYC as Record<string, typeof v>)[k]  = v; }
   for (const [k, v] of Object.entries(GENERATED_ACTIVITY))  { if (!ACTIVITY_BY_KYC[k])  (ACTIVITY_BY_KYC as Record<string, typeof v>)[k]  = v; }
 }
-
-const taskTone: Record<CaseTask["status"], string> = {
-  Open: "bg-secondary text-foreground",
-  "In Progress": "bg-info-soft text-primary",
-  Done: "bg-success-soft text-success",
-};
 
 type CollabSubTab = "comments" | "watchers" | "activity";
 
