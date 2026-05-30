@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Bell, User, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip } from "@/components/AgentSystem";
+import kpmgLogo from "@/assets/kpmg-logo-white.svg";
 
 const tabs = [
   { to: "/", label: "Dashboard", end: true },
@@ -17,9 +18,7 @@ const AppLayout = () => {
         <header className="bg-nav text-nav-foreground">
           <div className="px-6 h-14 flex items-center gap-8">
             <div className="flex items-center gap-3">
-              <div className="bg-primary text-primary-foreground font-bold text-sm tracking-tight px-2 py-1 rounded-sm">
-                KPMG
-              </div>
+              <img src={kpmgLogo} alt="KPMG" className="h-5 w-auto" />
               <span className="font-semibold text-[15px]">KYC Platform</span>
             </div>
 
