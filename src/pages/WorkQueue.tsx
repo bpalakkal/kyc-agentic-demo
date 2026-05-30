@@ -197,7 +197,7 @@ const WorkQueue = () => {
   return (
     <div className="px-6 py-6">
       <div className="mb-5">
-        <h1 className="text-[22px] font-semibold tracking-tight">Work Queue</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight">Alex's Work Queue</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Select entities to begin a review session. Locked rows are read-only.</p>
       </div>
 
