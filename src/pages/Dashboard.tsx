@@ -22,14 +22,14 @@ const priorityCases = GENERATED_WORK_ROWS.map((r) => ({
   status: "open" as const,
 })) as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
 
-const aiActions = [
-  { dot: "alert", title: "Sign off on KYC-30214", sub: "Brevan Howard · PSC filing overdue", chip: "Recommended", reason: "All exceptions have been resolved." },
-  { dot: "alert", title: "Escalate KYC-30188 FCA scope", sub: "Marshall Wace · SLA breach today", reason: "SLA breaches in <4 hours with no client response." },
-  { dot: "warning", title: "Run EDD on Jersey corporate member", sub: "BH Partnership Holdings Limited", reason: "Jurisdiction matches EDD policy POL-EDD-23." },
-  { dot: "warning", title: "Reconcile Marshall Wace AUM", sub: "FCA Gabriel vs CRM mismatch", reason: "AUM delta of £180m detected between sources." },
-  { dot: "muted", title: "Backfill 'Rivage Capital' name alias", sub: "Brevan Howard · CRM history sync", reason: "Companies House name history not yet in CRM." },
-  { dot: "muted", title: "Request AIFMD Article 23 pack", sub: "Marshall Wace · client outreach", reason: "New 'Managing an AIF' permission added on 02/11/2026." },
-  { dot: "muted", title: "Add cleared name pair to sanctions allowlist", sub: "Marshall Wace PSC · false positive", reason: "Identity divergence on DOB and nationality confirmed." },
+const aiActions: { dot: string; title: string; sub: string; chip?: string; reason: string; entity: CaseRef }[] = [
+  { dot: "alert",   title: "Sign off on KYC-30214",                   sub: "Brevan Howard · PSC filing overdue",       chip: "Recommended", reason: "All exceptions have been resolved.",                                    entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
+  { dot: "alert",   title: "Escalate KYC-30188 FCA scope",            sub: "Marshall Wace · SLA breach today",                              reason: "SLA breaches in <4 hours with no client response.",                    entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
+  { dot: "warning", title: "Run EDD on Jersey corporate member",       sub: "BH Partnership Holdings Limited",                               reason: "Jurisdiction matches EDD policy POL-EDD-23.",                         entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
+  { dot: "warning", title: "Reconcile Marshall Wace AUM",             sub: "FCA Gabriel vs CRM mismatch",                                    reason: "AUM delta of £180m detected between sources.",                        entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
+  { dot: "muted",   title: "Backfill 'Rivage Capital' name alias",    sub: "Brevan Howard · CRM history sync",                               reason: "Companies House name history not yet in CRM.",                        entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
+  { dot: "muted",   title: "Request AIFMD Article 23 pack",           sub: "Marshall Wace · client outreach",                                reason: "New 'Managing an AIF' permission added on 02/11/2026.",               entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
+  { dot: "muted",   title: "Add cleared name pair to sanctions allowlist", sub: "Marshall Wace PSC · false positive",                        reason: "Identity divergence on DOB and nationality confirmed.",                entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
 ];
 
 type CollabType = "comment" | "ai" | "document" | "action";
@@ -178,7 +178,6 @@ const renderMd = (text: string) =>
 const Dashboard = () => {
   const navigate = useNavigate();
   const goQueue = () => navigate("/work-queue");
-  const goReview = () => navigate("/work-queue/review");
   const [priorityExpanded, setPriorityExpanded] = useState(false);
   const [actionsExpanded, setActionsExpanded] = useState(false);
   const [kpiFilter, setKpiFilter] = useState<FilterKey>("all");
@@ -372,6 +371,7 @@ const Dashboard = () => {
                 <li key={c.id}>
                   <Link
                     to="/work-queue/review"
+                    state={{ entities: [{ name: c.entity, kyc: c.id }] }}
                     className="grid grid-cols-[80px_1fr_auto] gap-3 py-3 items-start hover:bg-secondary/30 -mx-2 px-2 rounded-md transition-colors cursor-pointer"
                   >
                     <Chip
@@ -430,7 +430,7 @@ const Dashboard = () => {
                 <li key={a.title}>
                   <button
                     type="button"
-                    onClick={goReview}
+                    onClick={() => navigate("/work-queue/review", { state: { entities: [a.entity] } })}
                     className="w-full text-left py-3 flex items-start gap-3 hover:bg-secondary/30 -mx-2 px-2 rounded-md transition-colors"
                   >
                     <span className={cn("mt-1.5 size-2 rounded-full shrink-0", dotColor(a.dot))} />
