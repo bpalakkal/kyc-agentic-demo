@@ -14,7 +14,8 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -25,6 +26,12 @@ import ExceptionReview from "./pages/ExceptionReview";
 import { Reports } from "./pages/Placeholders";
 import NotFound from "./pages/NotFound";
 
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+};
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -33,6 +40,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter basename="/kyc-agentic2">
+        <ScrollToTop />
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
