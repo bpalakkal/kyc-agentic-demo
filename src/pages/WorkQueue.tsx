@@ -78,7 +78,13 @@ function buildDisplay(activeTab: FilterTab): { groups: Group[]; ungrouped: Row[]
     }
   }
 
-  const groups: Group[] = Array.from(drgMap.entries()).map(([drgName, rows], i) => {
+  // DRGs with only 1 case are shown as flat rows — no need for a group header
+  for (const [, rows] of drgMap.entries()) {
+    if (rows.length === 1) ungrouped.push(rows[0]);
+  }
+  const multiDrgMap = new Map([...drgMap.entries()].filter(([, rows]) => rows.length > 1));
+
+  const groups: Group[] = Array.from(multiDrgMap.entries()).map(([drgName, rows], i) => {
     const highCount = rows.filter((r) => r.priority === "High").length;
     const tone: Group["priorityTone"] = highCount > 0 ? "high" : rows.some((r) => r.priority === "Medium") ? "medium" : "low";
     return {

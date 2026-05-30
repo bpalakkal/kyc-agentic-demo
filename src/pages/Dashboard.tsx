@@ -244,8 +244,8 @@ const Dashboard = () => {
         {/* Page heading */}
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-[22px] font-semibold tracking-tight">Binoy's Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Real-time view of cases, SLAs and AI-recommended actions across your DRGs.</p>
+            <h1 className="text-[22px] font-semibold tracking-tight">KYC Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Real-time view of cases, SLAs and AI-recommended actions across your cases.</p>
           </div>
           <p className="text-xs text-muted-foreground">Last refreshed: Today, 8:42 AM</p>
         </div>
