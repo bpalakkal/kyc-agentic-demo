@@ -51,6 +51,14 @@ try {
 
 const { ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET } = process.env;
 
+// ─── Neo4j ────────────────────────────────────────────────────────────────────
+// Import lazily so the server starts even when Neo4j creds are absent.
+let neo4jModule = null;
+async function getNeo4j() {
+  if (!neo4jModule) neo4jModule = await import('./src/db/neo4j.js');
+  return neo4jModule;
+}
+
 const app = express();
 
 const ALLOWED_ORIGINS = [
@@ -201,6 +209,77 @@ app.get("/api/agent-run/:runId", async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
+});
+
+// ─── Neo4j API endpoints ──────────────────────────────────────────────────────
+
+// GET /api/neo4j/entities — fetch all KYC entities from Neo4j
+// TODO: replace GENERATED_WORK_ROWS with this in production
+app.get("/api/neo4j/entities", async (_req, res) => {
+  try {
+    const { runQuery } = await getNeo4j();
+    const rows = await runQuery(
+      `MATCH (e:Entity)
+       RETURN e.kycId        AS kycId,
+              e.name         AS name,
+              e.riskRating   AS riskRating,
+              e.jurisdiction AS jurisdiction,
+              e.drgName      AS drgName,
+              e.entityType   AS entityType,
+              e.dueDate      AS dueDate,
+              e.openExceptions AS openExceptions
+       ORDER BY e.kycId`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/neo4j/entity/:kycId — fetch a single entity with its exceptions
+app.get("/api/neo4j/entity/:kycId", async (req, res) => {
+  try {
+    const { runQuery } = await getNeo4j();
+    const [entity] = await runQuery(
+      `MATCH (e:Entity { kycId: $kycId })
+       OPTIONAL MATCH (e)-[:HAS_EXCEPTION]->(exc:Exception)
+       RETURN e, collect(exc) AS exceptions`,
+      { kycId: req.params.kycId }
+    );
+    if (!entity) return res.status(404).json({ error: "Entity not found" });
+    res.json(entity);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/neo4j/drg/:drgName — fetch all entities belonging to a DRG
+app.get("/api/neo4j/drg/:drgName", async (req, res) => {
+  try {
+    const { runQuery } = await getNeo4j();
+    const rows = await runQuery(
+      `MATCH (e:Entity { drgName: $drgName })
+       RETURN e.kycId AS kycId, e.name AS name, e.riskRating AS riskRating
+       ORDER BY e.kycId`,
+      { drgName: req.params.drgName }
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/neo4j/query — run an arbitrary read-only Cypher query (dev/admin use)
+app.post("/api/neo4j/query", async (req, res) => {
+  const { cypher, params } = req.body ?? {};
+  if (!cypher) return res.status(400).json({ error: "cypher is required" });
+  try {
+    const { runQuery } = await getNeo4j();
+    const rows = await runQuery(cypher, params ?? {});
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
