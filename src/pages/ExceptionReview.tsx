@@ -3244,7 +3244,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
           {categoryCards.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">No attributes to display.</p>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 items-start">
             {categoryCards.map(({ category, items, pending }) => (
               <div key={category} className="rounded-xl border border-border bg-card p-3">
                 <div className="flex items-center justify-between mb-2 gap-1">
