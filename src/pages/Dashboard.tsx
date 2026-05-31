@@ -3,24 +3,59 @@ import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Maximize2, M
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
-import { GENERATED_DASHBOARD_CASES, GENERATED_WORK_ROWS } from "@/data/entities-generated";
+import { AGENT_API_BASE } from "@/components/AgentSystem";
+
+type ApiEntity = {
+  kyc_ref: string;
+  entity_name: string;
+  entity_type: string | null;
+  jurisdiction: string | null;
+  risk_rating: "High" | "Medium" | "Low" | null;
+  priority: "High" | "Medium" | "Low";
+  status: string;
+  due_date: string | null;
+  open_exceptions_count: number;
+  drgs: { name: string } | null;
+};
+
+type PriorityCase = {
+  priority: "High" | "Medium" | "Low";
+  id: string;
+  entity: string;
+  note: string;
+  due: string;
+  est: string;
+  status: "open" | "complete";
+  dueToday: boolean;
+  slaRisk: boolean;
+};
+
+function toPriorityCase(e: ApiEntity): PriorityCase {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const afterTomorrow = new Date(today); afterTomorrow.setDate(afterTomorrow.getDate() + 2);
+  const dueDate = e.due_date ? new Date(e.due_date) : null;
+  if (dueDate) dueDate.setHours(0, 0, 0, 0);
+  const dueToday = dueDate ? dueDate <= today : false;
+  const slaRisk = dueDate ? dueDate < afterTomorrow : false;
+  let due: string;
+  if (!dueDate) due = "—";
+  else if (dueDate < today) due = "Overdue";
+  else if (dueDate.getTime() === today.getTime()) due = "Today";
+  else if (dueDate.getTime() === tomorrow.getTime()) due = "Tomorrow";
+  else due = dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return {
+    priority: e.priority,
+    id: e.kyc_ref,
+    entity: e.entity_name,
+    note: `${e.open_exceptions_count} open exception${e.open_exceptions_count !== 1 ? "s" : ""} requiring resolution.`,
+    due, dueToday, slaRisk,
+    est: e.open_exceptions_count > 3 ? "45 min" : "30 min",
+    status: e.status === "complete" ? "complete" : "open",
+  };
+}
 
 type FilterKey = "all" | "high" | "today";
-
-// Build from the same 15 entities the work queue uses.
-// Notes come from GENERATED_DASHBOARD_CASES (exception-derived summaries).
-const _noteMap = Object.fromEntries(
-  GENERATED_DASHBOARD_CASES.map((c) => [c.id, { note: c.note, est: c.est }])
-);
-const priorityCases = GENERATED_WORK_ROWS.map((r) => ({
-  priority: r.priority,
-  id: r.kyc,
-  entity: r.name,
-  note: _noteMap[r.kyc]?.note ?? `${r.exc} open exception${r.exc !== 1 ? "s" : ""} requiring resolution.`,
-  due: r.due,
-  est: _noteMap[r.kyc]?.est ?? (r.exc > 3 ? "45 min" : "30 min"),
-  status: "open" as const,
-})) as { priority: "High" | "Medium" | "Low"; id: string; entity: string; note: string; due: string; est: string; status: "open" | "complete" }[];
 
 const aiActions: { dot: string; title: string; sub: string; chip?: string; reason: string; entity: CaseRef }[] = [
   { dot: "alert",   title: "Sign off on KYC-30214",                   sub: "Brevan Howard · PSC filing overdue",       chip: "Recommended", reason: "All exceptions have been resolved.",                                    entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
@@ -34,19 +69,6 @@ const aiActions: { dot: string; title: string; sub: string; chip?: string; reaso
 
 type CollabType = "comment" | "ai" | "document" | "action";
 type CaseRef = { name: string; kyc: string };
-const BREVAN: CaseRef = { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" };
-const MW: CaseRef = { name: "Marshall Wace LLP", kyc: "KYC-30188" };
-const LONG_FOCUS: CaseRef = { name: "Long Focus Capital Management, LLC", kyc: "KYC-30215" };
-
-const collab: { type: CollabType; title: string; time: string; case: CaseRef; snippet?: string }[] = [
-  { type: "comment", title: "Quinn Doe commented on Brevan Howard case file", time: "Today, 7:08 AM", case: BREVAN, snippet: "PSC02 should land within SLA — sent reminder to client compliance." },
-  { type: "ai", title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM", case: BREVAN, snippet: "Auto-refreshed CS01 + PSC register for OC302636." },
-  { type: "action", title: "You confirmed PSC for Marshall Wace LLP", time: "April 22, 2026, 7:18 AM", case: MW },
-  { type: "comment", title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM", case: BREVAN, snippet: "BH Partnership Holdings (Jersey) needs source-of-funds before sign-off." },
-  { type: "document", title: "Form CS01 uploaded to KYC-30214", time: "April 21, 2026, 4:40 PM", case: BREVAN },
-  { type: "ai", title: "AI Agent auto-cleared 1 sanctions false positive", time: "April 21, 2026, 2:11 PM", case: MW, snippet: "DOB + nationality divergence confirmed, cleared by sanctions agent." },
-  { type: "comment", title: "Marcus Lee left a note on Long Focus Capital", time: "April 21, 2026, 11:02 AM", case: LONG_FOCUS, snippet: "LEI mismatch with GLEIF — need re-issue confirmation from client." },
-];
 
 const collabMeta: Record<CollabType, { label: string; icon: typeof MessageSquare; tone: string }> = {
   comment: { label: "Comments", icon: MessageSquare, tone: "bg-info-soft text-primary" },
@@ -186,6 +208,44 @@ const Dashboard = () => {
     comment: true, ai: true, document: true, action: true,
   });
 
+  const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
+
+  useEffect(() => {
+    fetch(`${AGENT_API_BASE}/api/entities`)
+      .then(async r => { if (r.ok) return r.json() as Promise<ApiEntity[]>; })
+      .then(data => { if (data) setApiEntities(data); })
+      .catch(() => {});
+  }, []);
+
+  const entityByKyc = useMemo(
+    () => Object.fromEntries(apiEntities.map(e => [e.kyc_ref, e])),
+    [apiEntities]
+  );
+
+  const priorityCases = useMemo(() => apiEntities.map(toPriorityCase), [apiEntities]);
+
+  const { collab, aiActionsLive } = useMemo(() => {
+    const ref = (kyc: string, fallback: string): CaseRef => ({
+      name: entityByKyc[kyc]?.entity_name ?? fallback,
+      kyc,
+    });
+    const BREVAN    = ref("KYC-30214", "Brevan Howard Asset Management LLP");
+    const MW        = ref("KYC-30188", "Marshall Wace LLP");
+    const LONG_FOCUS = ref("KYC-30215", "Long Focus Capital Management, LLC");
+    return {
+      collab: [
+        { type: "comment" as CollabType, title: "Quinn Doe commented on Brevan Howard case file", time: "Today, 7:08 AM", case: BREVAN, snippet: "PSC02 should land within SLA — sent reminder to client compliance." },
+        { type: "ai" as CollabType, title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM", case: BREVAN, snippet: "Auto-refreshed CS01 + PSC register for OC302636." },
+        { type: "action" as CollabType, title: "You confirmed PSC for Marshall Wace LLP", time: "April 22, 2026, 7:18 AM", case: MW },
+        { type: "comment" as CollabType, title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM", case: BREVAN, snippet: "BH Partnership Holdings (Jersey) needs source-of-funds before sign-off." },
+        { type: "document" as CollabType, title: "Form CS01 uploaded to KYC-30214", time: "April 21, 2026, 4:40 PM", case: BREVAN },
+        { type: "ai" as CollabType, title: "AI Agent auto-cleared 1 sanctions false positive", time: "April 21, 2026, 2:11 PM", case: MW, snippet: "DOB + nationality divergence confirmed, cleared by sanctions agent." },
+        { type: "comment" as CollabType, title: "Marcus Lee left a note on Long Focus Capital", time: "April 21, 2026, 11:02 AM", case: LONG_FOCUS, snippet: "LEI mismatch with GLEIF — need re-issue confirmation from client." },
+      ],
+      aiActionsLive: aiActions.map(a => ({ ...a, entity: ref(a.entity.kyc, a.entity.name) })),
+    };
+  }, [entityByKyc]);
+
   const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const [messages, setMessages] = useState<ChatMessage[]>([{
     role: "assistant",
@@ -217,26 +277,24 @@ const Dashboard = () => {
 
   const toggleKpi = (k: FilterKey) => setKpiFilter((prev) => (prev === k ? "all" : k));
 
-  // Row 1 summary counts (static)
   const totalCases = priorityCases.length;
-  const slaAtRisk = priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today" || c.due === "Tomorrow").length;
-  // Row 2 filter counts
-  const highPriorityCount = priorityCases.filter((c) => c.priority === "High").length;
-  const dueTodayCount = priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today").length;
+  const slaAtRisk = priorityCases.filter(c => c.slaRisk).length;
+  const highPriorityCount = priorityCases.filter(c => c.priority === "High").length;
+  const dueTodayCount = priorityCases.filter(c => c.dueToday).length;
 
   const filteredCases = useMemo(() => {
     switch (kpiFilter) {
-      case "high":  return priorityCases.filter((c) => c.priority === "High");
-      case "today": return priorityCases.filter((c) => c.due.includes("hr") || c.due === "Today");
+      case "high":  return priorityCases.filter(c => c.priority === "High");
+      case "today": return priorityCases.filter(c => c.dueToday);
       default:      return priorityCases;
     }
-  }, [kpiFilter]);
+  }, [kpiFilter, priorityCases]);
 
   const filteredAiActions = actionsFilter === "today"
-    ? aiActions.filter((a) => a.dot === "alert")
-    : aiActions;
+    ? aiActionsLive.filter(a => a.dot === "alert")
+    : aiActionsLive;
 
-  const filteredCollab = collab.filter((c) => collabFilters[c.type]);
+  const filteredCollab = collab.filter(c => collabFilters[c.type]);
 
   return (
     <div className="px-6 py-6 grid grid-cols-12 gap-6">
@@ -297,7 +355,7 @@ const Dashboard = () => {
             { label: "High Priority", value: highPriorityCount, icon: <AlertTriangle className="size-4" />, accent: true,  action: () => toggleKpi("high"),  active: kpiFilter === "high" },
             { label: "Due Today",     value: dueTodayCount,     icon: <Clock className="size-4" />,          accent: false, action: () => toggleKpi("today"), active: kpiFilter === "today" },
             { label: "Compliance Alerts", value: 2,             icon: <AlertTriangle className="size-4" />, accent: true,  action: goQueue,                   active: false },
-            { label: "AI Actions for Today", value: aiActions.filter((a) => a.dot === "alert").length, icon: <Sparkles className="size-4" />, accent: false, action: () => setActionsFilter((p) => p === "today" ? "all" : "today"), active: actionsFilter === "today" },
+            { label: "AI Actions for Today", value: aiActionsLive.filter(a => a.dot === "alert").length, icon: <Sparkles className="size-4" />, accent: false, action: () => setActionsFilter((p) => p === "today" ? "all" : "today"), active: actionsFilter === "today" },
           ] as const).map((s) => (
             <button
               key={s.label}
@@ -328,7 +386,7 @@ const Dashboard = () => {
             <header className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-semibold">All Cases</h2>
-                <Chip variant="high"><AlertTriangle className="size-3 mr-1" />2 High</Chip>
+                <Chip variant="high"><AlertTriangle className="size-3 mr-1" />{highPriorityCount} High</Chip>
               </div>
               <button
                 onClick={() => setPriorityExpanded((v) => !v)}
@@ -389,7 +447,7 @@ const Dashboard = () => {
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{c.note}</p>
                     </div>
                     <div className="text-right">
-                      <p className={cn("text-xs font-medium", c.due.includes("hr") || c.due === "Today" ? "text-alert" : "text-foreground")}>{c.due}</p>
+                      <p className={cn("text-xs font-medium", c.dueToday ? "text-alert" : "text-foreground")}>{c.due}</p>
                       <span className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border text-[10px] text-muted-foreground">
                         <Timer className="size-2.5" /> {c.est}
                       </span>
@@ -407,7 +465,7 @@ const Dashboard = () => {
                 <h2 className="text-[15px] font-semibold flex items-center gap-2">
                   <Sparkles className="size-4 text-primary" /> Recommended Actions
                 </h2>
-                <Chip variant="high">{aiActions.filter((a) => a.dot === "alert").length} Urgent</Chip>
+                <Chip variant="high">{aiActionsLive.filter(a => a.dot === "alert").length} Urgent</Chip>
                 {actionsFilter === "today" && (
                   <span className="text-[11px] text-primary font-medium px-2 py-0.5 rounded-full border border-primary/30 bg-info-soft">
                     Today only
