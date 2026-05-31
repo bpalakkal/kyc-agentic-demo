@@ -42,6 +42,7 @@ type Row = {
   id: string;
   name: string;
   kyc?: string;
+  drg?: string;
   due: string;
   overdue?: boolean;
   confidence: string;
@@ -94,6 +95,7 @@ function toRow(e: ApiEntity): Row {
     id: e.kyc_ref,
     name: e.entity_name,
     kyc: e.kyc_ref,
+    drg: e.drgs?.name ?? undefined,
     due: formatDate(e.due_date),
     overdue: due ? due < today : false,
     confidence: "High",
@@ -197,7 +199,15 @@ const EntityRow = ({
         />
       )}
     </span>
-    <span className={cn("text-[13px]", r.locked && "text-muted-foreground")}>{r.name}</span>
+    <Link
+      to="/work-queue/review"
+      state={{ entities: [{ name: r.name, kyc: r.kyc ?? r.id, drg: r.drg }] }}
+      className={cn(
+        "text-[13px] hover:underline hover:text-primary transition-colors truncate",
+        r.locked ? "text-muted-foreground pointer-events-none" : "text-foreground"
+      )}
+      onClick={(e) => e.stopPropagation()}
+    >{r.name}</Link>
     <span>
       <Chip variant={r.overdue ? "high" : "medium"} className="font-medium">{r.due}</Chip>
     </span>
