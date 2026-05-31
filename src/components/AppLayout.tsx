@@ -14,7 +14,7 @@ const AppLayout = () => {
   const location = useLocation();
   return (
     <AgentProvider>
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="h-full bg-background flex flex-col">
         <header className="bg-nav text-nav-foreground">
           <div className="px-6 h-14 flex items-center gap-8">
             <div className="flex items-center gap-3">
@@ -69,7 +69,7 @@ const AppLayout = () => {
 
         <AgentRecommendationStrip route={location.pathname} />
 
-        <main className="flex-1">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
