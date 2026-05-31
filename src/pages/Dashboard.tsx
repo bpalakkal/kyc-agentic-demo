@@ -194,7 +194,6 @@ const Dashboard = () => {
   }]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -503,7 +502,6 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Suggestion chips — always visible */}
