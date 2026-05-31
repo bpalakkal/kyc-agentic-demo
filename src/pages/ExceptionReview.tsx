@@ -2928,6 +2928,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
   const [showOnlyPending, setShowOnlyPending] = useState(false);
   // entity::category -> open
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+  const [viewMode, setViewMode] = useState<"cards" | "tree">("cards");
   // Reset disclosures when switching attribute
   useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); }, [selected]);
 
@@ -3171,26 +3172,111 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
     return idx === 0; // first non-empty category expanded by default
   };
 
-  return (
-    <div className="relative pt-2 space-y-6">
-      <div className="flex items-center justify-end gap-2 text-[11px]">
-        <span className="text-muted-foreground">Show only pending actions</span>
+  // ── Cards view data ──────────────────────────────────────────────────────────
+  const allItems = entitiesForTree.flatMap(({ entity, attrs }) =>
+    categorize(entity, attrs).flatMap(({ category, items }) =>
+      items.map(item => ({ ...item, entity, category }))
+    )
+  );
+  const pendingItems = allItems.filter(i => i.flagged);
+  const categoryCards = ATTR_CATEGORY_ORDER
+    .map(cat => ({
+      category: cat,
+      items: allItems.filter(i => i.category === cat),
+      pending: allItems.filter(i => i.category === cat && i.flagged).length,
+    }))
+    .filter(c => c.items.length > 0);
+  const multiEntity = entitiesForTree.length > 1;
+
+  // ── Shared controls ───────────────────────────────────────────────────────────
+  const controls = (
+    <div className="flex items-center justify-between text-[11px]">
+      <div className="inline-flex rounded-md border border-border overflow-hidden font-medium">
+        <button
+          onClick={() => setViewMode("cards")}
+          className={cn("px-2.5 py-1 transition-colors", viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/60")}
+        >Cards</button>
+        <button
+          onClick={() => setViewMode("tree")}
+          className={cn("px-2.5 py-1 border-l border-border transition-colors", viewMode === "tree" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/60")}
+        >Tree</button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground">Show only pending</span>
         <button
           onClick={() => setShowOnlyPending((v) => !v)}
-          className={cn(
-            "relative h-5 w-9 rounded-full transition-colors",
-            showOnlyPending ? "bg-primary" : "bg-muted"
-          )}
+          className={cn("relative h-5 w-9 rounded-full transition-colors", showOnlyPending ? "bg-primary" : "bg-muted")}
           aria-pressed={showOnlyPending}
         >
-          <span
-            className={cn(
-              "absolute top-0.5 size-4 rounded-full bg-background shadow transition-all",
-              showOnlyPending ? "left-[18px]" : "left-0.5"
-            )}
-          />
+          <span className={cn("absolute top-0.5 size-4 rounded-full bg-background shadow transition-all", showOnlyPending ? "left-[18px]" : "left-0.5")} />
         </button>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="relative pt-2 space-y-3">
+      {controls}
+
+      {/* ── Cards view ────────────────────────────────────────────────────── */}
+      {viewMode === "cards" && (
+        <div className="space-y-3">
+          {/* Pending summary strip — hidden when "show only pending" is on (redundant) */}
+          {!showOnlyPending && pendingItems.length > 0 && (
+            <div className="rounded-xl border border-alert-soft-border bg-alert-soft/30 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-alert mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="size-3" /> {pendingItems.length} pending
+              </p>
+              <div className="space-y-1.5">
+                {pendingItems.map(item => (
+                  <div key={`${item.entity}::${item.label}`} className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">{attrNode(item.label, item.entity, true)}</div>
+                    {multiEntity && (
+                      <span className="text-[9px] text-muted-foreground shrink-0 max-w-[72px] truncate">{item.entity.split(" ")[0]}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Category cards — 2 column grid */}
+          {categoryCards.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-6">No attributes to display.</p>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {categoryCards.map(({ category, items, pending }) => (
+              <div key={category} className="rounded-xl border border-border bg-card p-3">
+                <div className="flex items-center justify-between mb-2 gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{category}</span>
+                  {pending > 0 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-medium shrink-0">{pending}</span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {multiEntity
+                    ? entitiesForTree.map(({ entity }) => {
+                        const ei = items.filter(i => i.entity === entity);
+                        if (!ei.length) return null;
+                        return (
+                          <div key={entity}>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium mb-1 truncate">{entity.split(" ")[0]}</p>
+                            {ei.map(item => <div key={item.label} className="mb-1">{attrNode(item.label, entity, item.flagged)}</div>)}
+                          </div>
+                        );
+                      })
+                    : items.map(item => <div key={item.label}>{attrNode(item.label, item.entity, item.flagged)}</div>)
+                  }
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tree view ─────────────────────────────────────────────────────── */}
+      {viewMode === "tree" && (
+        <div className="space-y-6">
       {drgEntries.map(([drgName, group]) => (
         <div key={drgName}>
           <div className="flex flex-col items-center">
@@ -3259,7 +3345,8 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
       )}
 
       <p className="text-[10px] text-muted-foreground italic">Tip: click an entity name to drill into its full profile. Click an attribute to see its agent trace.</p>
-
+        </div>
+      )}
 
       {openEntity && (
         <EntityDetailPanel
