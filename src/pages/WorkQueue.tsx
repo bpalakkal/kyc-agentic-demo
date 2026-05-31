@@ -229,8 +229,11 @@ const WorkQueue = () => {
 
   useEffect(() => {
     fetch(`${AGENT_API_BASE}/api/entities`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(`Server returned ${r.status}: ${body?.error ?? 'unknown error'}`);
+        }
         return r.json() as Promise<ApiEntity[]>;
       })
       .then((data) => { setApiEntities(data); setLoading(false); })
