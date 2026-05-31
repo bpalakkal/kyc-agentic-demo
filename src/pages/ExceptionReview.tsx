@@ -2990,16 +2990,134 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
   const attrNode = (label: string, entity: string, flagged: boolean) => {
     const isSel = selected?.label === label && selected?.entity === entity;
     return (
-      <button
-        onClick={() => setSelected(isSel ? null : { label, entity })}
-        className={cn(
-          "w-full rounded-lg border px-3 py-2 flex items-center justify-between text-left transition-colors",
-          isSel ? "border-primary bg-info-soft" : flagged ? "border-alert hover:bg-alert-soft/30" : "border-border hover:bg-secondary/40"
+      <Popover open={isSel} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+        <PopoverTrigger asChild>
+          <button
+            onClick={() => setSelected(isSel ? null : { label, entity })}
+            className={cn(
+              "w-full rounded-lg border px-3 py-2 flex items-center justify-between text-left transition-colors",
+              isSel ? "border-primary bg-info-soft shadow-sm" : flagged ? "border-alert hover:bg-alert-soft/30" : "border-border hover:bg-secondary/40"
+            )}
+          >
+            <span className="text-[12px] font-medium truncate">{label}</span>
+            {flagged ? <AlertTriangle className="size-4 text-alert shrink-0" /> : <CheckCircle2 className="size-4 text-success shrink-0" />}
+          </button>
+        </PopoverTrigger>
+        {trace && (
+          <PopoverContent side="left" align="start" sideOffset={8} className="w-[360px] p-0 max-h-[72vh] overflow-y-auto">
+            <div className="p-4 space-y-3">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
+                    <Sparkles className="size-3 text-primary" /> Agent Trace
+                  </p>
+                  <p className="text-[13px] font-semibold leading-tight">{label}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{trace.value}</p>
+                </div>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0 mt-0.5",
+                  trace.status === "verified"
+                    ? "bg-success-soft text-success border-success-soft-border"
+                    : "bg-alert-soft text-alert border-alert-soft-border"
+                )}>
+                  {trace.status === "verified" ? "Verified" : "Flagged"} · {trace.confidence}%
+                </span>
+              </div>
+
+              {/* Conclusion */}
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
+                  <ShieldCheck className="size-3 text-success" /> Conclusion
+                </p>
+                <p className="text-[12px] leading-snug">{trace.conclusion}</p>
+              </div>
+
+              {/* Reasoning steps */}
+              <button
+                onClick={() => setTraceStepsOpen((v) => !v)}
+                className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
+              >
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <Sparkles className="size-3 text-primary" /> Reasoning steps ({trace.agents.length})
+                </span>
+                <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
+              </button>
+              {traceStepsOpen && (
+                <ol className="space-y-2.5 px-1">
+                  {trace.agents.map((a, i) => (
+                    <li key={a.id} className="relative pl-7">
+                      <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-medium">{i + 1}</span>
+                      {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
+                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                        <p className="text-[12px] font-medium">{a.name}</p>
+                        <ChevronRight className="size-3 text-muted-foreground" />
+                        <p className="text-[12px] text-muted-foreground">{a.action}</p>
+                      </div>
+                      <p className="text-[12px] text-muted-foreground leading-snug italic">"{a.thought}"</p>
+                      <p className="text-[10px] text-primary mt-1 flex items-center gap-1">
+                        <Database className="size-2.5" /> {a.source}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {/* Source documents */}
+              {traceDocs.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setTraceDocsOpen((v) => !v)}
+                    className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <Paperclip className="size-3 text-primary" /> Source documents ({traceDocs.length})
+                    </span>
+                    <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
+                  </button>
+                  {traceDocsOpen && (
+                    <div className="space-y-1.5">
+                      {traceDocs.map(({ doc, attr: docAttr, entity: docEntity }) => {
+                        const meta = DOC_KIND_META[doc.kind];
+                        return (
+                          <button
+                            key={`${docEntity}-${doc.id}`}
+                            onClick={() => setViewDoc({ doc, attr: docAttr, entity: docEntity })}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-primary hover:bg-info-soft/40 text-left transition-colors group"
+                          >
+                            <FileText className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] font-medium truncate">{doc.title}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{docEntity} · {doc.source}</p>
+                            </div>
+                            <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
+                              {meta.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-1 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsUp className="size-3.5" /></button>
+                  <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsDown className="size-3.5" /></button>
+                </div>
+                <button
+                  onClick={() => runAgents(trace.agents.map((a) => a.id), `Re-verify: ${label}`)}
+                  className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5"
+                >
+                  <Play className="size-3" /> Re-run
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
         )}
-      >
-        <span className="text-[12px] font-medium truncate">{label}</span>
-        {flagged ? <AlertTriangle className="size-4 text-alert shrink-0" /> : <CheckCircle2 className="size-4 text-success shrink-0" />}
-      </button>
+      </Popover>
     );
   };
 
@@ -3146,123 +3264,8 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
         <p className="text-xs text-muted-foreground text-center py-6">No entities selected.</p>
       )}
 
-      <p className="text-[10px] text-muted-foreground italic">Tip: click an entity name to view its full attribute set & case file. Click an attribute to see its agent trace.</p>
+      <p className="text-[10px] text-muted-foreground italic">Tip: click an entity name to drill into its full profile. Click an attribute to see its agent trace.</p>
 
-
-
-
-
-      {trace && (
-        <div className="mt-5 rounded-xl border border-border bg-secondary/30 p-4">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
-                <Sparkles className="size-3 text-primary" /> Agent Trace · How this was determined
-              </p>
-              <p className="text-[13px] font-semibold leading-tight">{selected?.label}</p>
-              <p className="text-[10px] text-muted-foreground">{selected?.entity}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">{trace.value}</p>
-            </div>
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0",
-              trace.status === "verified"
-                ? "bg-success-soft text-success border-success-soft-border"
-                : "bg-alert-soft text-alert border-alert-soft-border"
-            )}>
-              {trace.status === "verified" ? "ID & Verified" : "Flagged"} · {trace.confidence}%
-            </span>
-          </div>
-
-          <div className="rounded-lg border border-border bg-card p-3 mb-3">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
-              <ShieldCheck className="size-3 text-success" /> Verification Conclusion
-            </p>
-            <p className="text-[12px] leading-snug">{trace.conclusion}</p>
-          </div>
-
-          <button
-            onClick={() => setTraceStepsOpen((v) => !v)}
-            className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 mb-2 hover:bg-secondary/40 transition-colors"
-          >
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="size-3 text-primary" /> Reasoning steps ({trace.agents.length})
-            </span>
-            <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
-          </button>
-          {traceStepsOpen && (
-            <ol className="space-y-2.5 mb-3 px-1">
-              {trace.agents.map((a, i) => (
-                <li key={a.id} className="relative pl-7">
-                  <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-medium">{i + 1}</span>
-                  {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <p className="text-[12px] font-medium">{a.name}</p>
-                    <ChevronRight className="size-3 text-muted-foreground" />
-                    <p className="text-[12px] text-muted-foreground">{a.action}</p>
-                  </div>
-                  <p className="text-[12px] text-muted-foreground leading-snug italic">"{a.thought}"</p>
-                  <p className="text-[10px] text-primary mt-1 flex items-center gap-1">
-                    <Database className="size-2.5" /> {a.source}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {traceDocs.length > 0 && (
-            <>
-              <button
-                onClick={() => setTraceDocsOpen((v) => !v)}
-                className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 mb-2 hover:bg-secondary/40 transition-colors"
-              >
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                  <Paperclip className="size-3 text-primary" /> Source documents ({traceDocs.length})
-                </span>
-                <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
-              </button>
-              {traceDocsOpen && (
-                <div className="space-y-1.5 mb-3">
-                  {traceDocs.map(({ doc, attr, entity }) => {
-                    const meta = DOC_KIND_META[doc.kind];
-                    return (
-                      <button
-                        key={`${entity}-${doc.id}`}
-                        onClick={() => setViewDoc({ doc, attr, entity })}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-primary hover:bg-info-soft/40 text-left transition-colors group"
-                      >
-                        <FileText className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-medium truncate">{doc.title}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{entity} · {doc.source} · {doc.date}</p>
-                        </div>
-                        <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
-                          {meta.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-
-
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsUp className="size-3.5" /></button>
-              <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsDown className="size-3.5" /></button>
-            </div>
-            <button
-              onClick={() => runAgents(trace.agents.map((a) => a.id), `Re-verify: ${selected?.label}`)}
-              className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5"
-            >
-              <Play className="size-3" /> Re-run agent trace
-            </button>
-          </div>
-        </div>
-      )}
 
       {openEntity && (
         <EntityDetailPanel
