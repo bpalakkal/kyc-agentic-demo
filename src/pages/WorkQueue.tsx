@@ -6,27 +6,35 @@
  * Analysts select one or more entities and click "Review Selected" to open
  * the ExceptionReview page with the chosen entities pre-loaded.
  *
- * Data source (current state — demo)
- * ─────────────────────────────────────
- * `groups` is built at render time from GENERATED_WORK_ROWS, which is
- * auto-generated from entities.md via parse-entities.cjs.  Adding or removing
- * an entity only requires editing entities.md and rebuilding.
- *
- * TODO (production)
- * ─────────────────
- * - Replace `groups` with an API call (React Query) to a case management
- *   backend: GET /api/work-queue?analyst=<id>&status=open
- * - Add real search/filter/sort against the backend
- * - The "389 entities" count is hard-coded — derive from total API result count
- * - Locking logic should come from the backend (assigned_to !== current_user)
+ * Data source
+ * ──────────────────────────────────────────────────────────────
+ * Fetches from GET /api/entities (Supabase-backed) at mount.
+ * Falls back to an error banner if the server is unreachable.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { GENERATED_WORK_ROWS, GENERATED_ENTITY_DRG } from "@/data/entities-generated";
-import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2 } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
+import { AGENT_API_BASE } from "@/components/AgentSystem";
+
+// ─── API types ────────────────────────────────────────────────────────────────
+
+type ApiEntity = {
+  kyc_ref: string;
+  entity_name: string;
+  entity_type: string | null;
+  jurisdiction: string | null;
+  risk_rating: "High" | "Medium" | "Low" | null;
+  priority: "High" | "Medium" | "Low";
+  status: string;
+  due_date: string | null;
+  open_exceptions_count: number;
+  drgs: { name: string } | null;
+};
+
+// ─── Row type ─────────────────────────────────────────────────────────────────
 
 type FilterTab = "all" | "periodic-refresh" | "onboarding";
 
@@ -56,9 +64,57 @@ type Group = {
   rows: Row[];
 };
 
-function buildDisplay(activeTab: FilterTab): { groups: Group[]; ungrouped: Row[] } {
-  // Filter rows by tab
-  const filtered = (GENERATED_WORK_ROWS as unknown as Row[]).filter((row) => {
+// ─── Mapping helpers ──────────────────────────────────────────────────────────
+
+function mapRisk(r: ApiEntity["risk_rating"]): Row["risk"] {
+  if (r === "High") return "Elevated";
+  if (r === "Medium") return "Moderate";
+  return "Minimal";
+}
+
+function mapStatus(s: string): Row["status"] {
+  switch (s) {
+    case "complete":          return "Complete";
+    case "pending_feedback":  return "Pending Feedback";
+    case "escalated":         return "In Progress";
+    default:                  return "Not Started";
+  }
+}
+
+function formatDate(d: string | null): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function toRow(e: ApiEntity): Row {
+  const today = new Date();
+  const due = e.due_date ? new Date(e.due_date) : null;
+  return {
+    id: e.kyc_ref,
+    name: e.entity_name,
+    kyc: e.kyc_ref,
+    due: formatDate(e.due_date),
+    overdue: due ? due < today : false,
+    confidence: "High",
+    customerType: e.entity_type ?? "—",
+    jurisdiction: e.jurisdiction ?? "—",
+    priority: e.priority,
+    risk: mapRisk(e.risk_rating),
+    exc: e.open_exceptions_count,
+    status: mapStatus(e.status),
+    action: "Periodic Refresh",
+  };
+}
+
+// ─── Display builder ──────────────────────────────────────────────────────────
+
+function buildDisplay(
+  rows: Row[],
+  drgByKyc: Record<string, string>,
+  activeTab: FilterTab,
+): { groups: Group[]; ungrouped: Row[] } {
+  const filtered = rows.filter((row) => {
     if (activeTab === "all") return true;
     if (activeTab === "periodic-refresh") return row.action === "Periodic Refresh";
     if (activeTab === "onboarding") return row.action === "Onboarding";
@@ -69,7 +125,7 @@ function buildDisplay(activeTab: FilterTab): { groups: Group[]; ungrouped: Row[]
   const ungrouped: Row[] = [];
 
   for (const row of filtered) {
-    const drg = GENERATED_ENTITY_DRG[row.kyc ?? ""];
+    const drg = drgByKyc[row.kyc ?? ""];
     if (drg) {
       if (!drgMap.has(drg)) drgMap.set(drg, []);
       drgMap.get(drg)!.push(row);
@@ -78,35 +134,37 @@ function buildDisplay(activeTab: FilterTab): { groups: Group[]; ungrouped: Row[]
     }
   }
 
-  // DRGs with only 1 case are shown as flat rows — no need for a group header
-  for (const [, rows] of drgMap.entries()) {
-    if (rows.length === 1) ungrouped.push(rows[0]);
+  // DRGs with only 1 case → flat rows
+  for (const [, drgRows] of drgMap.entries()) {
+    if (drgRows.length === 1) ungrouped.push(drgRows[0]);
   }
-  const multiDrgMap = new Map([...drgMap.entries()].filter(([, rows]) => rows.length > 1));
+  const multiDrgMap = new Map([...drgMap.entries()].filter(([, r]) => r.length > 1));
 
-  const groups: Group[] = Array.from(multiDrgMap.entries()).map(([drgName, rows], i) => {
-    const highCount = rows.filter((r) => r.priority === "High").length;
-    const tone: Group["priorityTone"] = highCount > 0 ? "high" : rows.some((r) => r.priority === "Medium") ? "medium" : "low";
+  const groups: Group[] = Array.from(multiDrgMap.entries()).map(([drgName, drgRows], i) => {
+    const highCount = drgRows.filter((r) => r.priority === "High").length;
+    const tone: Group["priorityTone"] = highCount > 0 ? "high" : drgRows.some((r) => r.priority === "Medium") ? "medium" : "low";
     return {
       id: `drg-${i}`,
       name: drgName,
       priorityNote: `${highCount} High Priority Item${highCount !== 1 ? "s" : ""}`,
       priorityTone: tone,
-      rows,
+      rows: drgRows,
     };
   });
 
   return { groups, ungrouped };
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 const COLS = "grid-cols-[40px_minmax(220px,1.6fr)_180px_110px_minmax(180px,1.4fr)_110px_100px_110px_70px_140px_140px]";
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {
-    case "Complete":        return "text-success";
-    case "In Progress":     return "text-primary";
-    case "Pending Feedback":return "text-[hsl(30_70%_40%)]";
-    case "Not Started":     return "text-muted-foreground";
+    case "Complete":         return "text-success";
+    case "In Progress":      return "text-primary";
+    case "Pending Feedback": return "text-[hsl(30_70%_40%)]";
+    case "Not Started":      return "text-muted-foreground";
   }
 };
 
@@ -159,14 +217,41 @@ const EntityRow = ({
   </div>
 );
 
+// ─── Page component ───────────────────────────────────────────────────────────
+
 const WorkQueue = () => {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { groups, ungrouped } = useMemo(() => buildDisplay(activeTab), [activeTab]);
+  useEffect(() => {
+    fetch(`${AGENT_API_BASE}/api/entities`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Server returned ${r.status}`);
+        return r.json() as Promise<ApiEntity[]>;
+      })
+      .then((data) => { setApiEntities(data); setLoading(false); })
+      .catch((err: Error) => { setError(err.message); setLoading(false); });
+  }, []);
 
-  // Open the first group by default when groups change
+  const rows = useMemo(() => apiEntities.map(toRow), [apiEntities]);
+  const drgByKyc = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const e of apiEntities) {
+      if (e.drgs?.name) m[e.kyc_ref] = e.drgs.name;
+    }
+    return m;
+  }, [apiEntities]);
+
+  const { groups, ungrouped } = useMemo(
+    () => buildDisplay(rows, drgByKyc, activeTab),
+    [rows, drgByKyc, activeTab],
+  );
+
+  // Open first group by default
   const firstGroupId = groups[0]?.id;
   const effectiveOpen = useMemo<Record<string, boolean>>(() => {
     if (firstGroupId && !Object.keys(openGroups).includes(firstGroupId)) {
@@ -177,7 +262,7 @@ const WorkQueue = () => {
 
   const allRows = useMemo(
     () => [...groups.flatMap((g) => g.rows), ...ungrouped],
-    [groups, ungrouped]
+    [groups, ungrouped],
   );
 
   const selectedCount = Object.values(selected).filter(Boolean).length;
@@ -209,7 +294,9 @@ const WorkQueue = () => {
               className="w-full h-10 pl-9 pr-12 text-sm rounded-full border border-border bg-card outline-none focus:ring-2 focus:ring-ring/30"
               placeholder="Search entities…"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">389</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+              {loading ? "…" : apiEntities.length}
+            </span>
           </div>
 
           <button className="h-10 px-4 rounded-full border border-primary text-primary text-sm flex items-center gap-2 hover:bg-info-soft transition-colors">
@@ -268,8 +355,24 @@ const WorkQueue = () => {
           <span>Action ⇅</span>
         </div>
 
+        {/* Loading state */}
+        {loading && (
+          <div className="py-16 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Loading entities…
+          </div>
+        )}
+
+        {/* Error state */}
+        {!loading && error && (
+          <div className="py-16 text-center text-sm text-alert">
+            Failed to load entities: {error}
+            <br />
+            <span className="text-muted-foreground text-xs">Make sure the server is running (<code>npm run server</code>)</span>
+          </div>
+        )}
+
         {/* DRG groups */}
-        {groups.map((g) => {
+        {!loading && !error && groups.map((g) => {
           const open = !!effectiveOpen[g.id];
           return (
             <div key={g.id} className="border-b border-border last:border-0">
@@ -305,8 +408,8 @@ const WorkQueue = () => {
           );
         })}
 
-        {/* Ungrouped entities — no DRG, shown as flat rows */}
-        {ungrouped.length > 0 && (
+        {/* Ungrouped entities */}
+        {!loading && !error && ungrouped.length > 0 && (
           <>
             {groups.length > 0 && (
               <div className="px-4 py-2 bg-secondary/30 border-t border-border">
@@ -327,7 +430,7 @@ const WorkQueue = () => {
         )}
 
         {/* Empty state */}
-        {groups.length === 0 && ungrouped.length === 0 && (
+        {!loading && !error && groups.length === 0 && ungrouped.length === 0 && (
           <div className="py-16 text-center text-sm text-muted-foreground">
             No cases match the selected filter.
           </div>

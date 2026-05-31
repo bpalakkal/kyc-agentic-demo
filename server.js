@@ -51,6 +51,14 @@ try {
 
 const { ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET } = process.env;
 
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+// Import lazily so the server starts even when Supabase creds are absent.
+let sbModule = null;
+async function getSb() {
+  if (!sbModule) sbModule = await import('./src/db/supabase.js');
+  return sbModule;
+}
+
 // ─── Neo4j ────────────────────────────────────────────────────────────────────
 // Import lazily so the server starts even when Neo4j creds are absent.
 let neo4jModule = null;
@@ -209,6 +217,81 @@ app.get("/api/agent-run/:runId", async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
+});
+
+// ─── Supabase API endpoints ───────────────────────────────────────────────────
+
+// GET /api/entities — work queue list
+app.get('/api/entities', async (_req, res) => {
+  try {
+    const { getEntities } = await getSb();
+    res.json(await getEntities());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef — single entity row
+app.get('/api/entity/:kycRef', async (req, res) => {
+  try {
+    const { getEntity } = await getSb();
+    res.json(await getEntity(req.params.kycRef));
+  } catch (err) {
+    const status = err.message?.includes('No rows') ? 404 : 500;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef/snapshot — latest Forge JSON snapshot
+app.get('/api/entity/:kycRef/snapshot', async (req, res) => {
+  try {
+    const { getLatestSnapshot } = await getSb();
+    const snap = await getLatestSnapshot(req.params.kycRef);
+    if (!snap) return res.status(404).json({ error: 'No snapshot found' });
+    res.json(snap);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/entity/:kycRef/snapshot — save a new Forge JSON snapshot
+// Body: { data: <Forge JSON object>, agentId?: string, runId?: string }
+app.post('/api/entity/:kycRef/snapshot', async (req, res) => {
+  const { data, agentId, runId } = req.body ?? {};
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({ error: 'body.data (object) is required' });
+  }
+  try {
+    const { saveSnapshot } = await getSb();
+    const row = await saveSnapshot(req.params.kycRef, data, { agentId, runId });
+    res.status(201).json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef/exceptions — all exceptions for an entity
+app.get('/api/entity/:kycRef/exceptions', async (req, res) => {
+  try {
+    const { getExceptions } = await getSb();
+    res.json(await getExceptions(req.params.kycRef));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/entity/:kycRef/exception/:num/resolve — mark exception resolved
+// Body: { resolutionOption?: number, resolution?: string, resolvedBy?: string }
+app.patch('/api/entity/:kycRef/exception/:num/resolve', async (req, res) => {
+  const num = parseInt(req.params.num, 10);
+  if (!Number.isFinite(num)) return res.status(400).json({ error: 'num must be an integer' });
+  try {
+    const { resolveException } = await getSb();
+    const row = await resolveException(req.params.kycRef, num, req.body ?? {});
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── Neo4j API endpoints ──────────────────────────────────────────────────────

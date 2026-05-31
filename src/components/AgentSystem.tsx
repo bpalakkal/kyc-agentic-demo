@@ -509,9 +509,33 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
     // Snapshot entity context at call time (ref is always current)
     const ctx = entityContextRef.current;
 
-    newRuns.forEach((run) => {
+    newRuns.forEach(async (run) => {
       const cfg = AGENT_API_CONFIGS[run.agentId];
       if (!cfg) return;
+
+      const kycRef = ctx?.kyc;
+
+      // Fetch latest Forge snapshot to pass as current_data to the agent
+      let currentData: unknown = null;
+      if (kycRef) {
+        try {
+          const sr = await fetch(`${AGENT_API_BASE}/api/entity/${kycRef}/snapshot`);
+          if (sr.ok) {
+            const snap = await sr.json() as { data?: unknown };
+            currentData = snap?.data ?? null;
+          }
+        } catch { /* non-fatal — agent runs without prior snapshot */ }
+      }
+
+      // Fire-and-forget snapshot save after agent completes
+      const saveSnapshot = (data: unknown, runId?: string) => {
+        if (!kycRef) return;
+        fetch(`${AGENT_API_BASE}/api/entity/${kycRef}/snapshot`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data, agentId: cfg.slug, runId: runId ?? null }),
+        }).catch(() => { /* non-fatal */ });
+      };
 
       const markDone = (thoughts: string[], result?: unknown) => {
         setRuns((prev) => {
@@ -544,7 +568,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         let polls = 0;
         const poll = async () => {
           polls++;
-          if (polls > 1800) { markDone(["⚠ Agent run timed out after 60 minutes"]); return; }
+          if (polls > 1800) { markDone(["⚠ Agent run timed out after 60 minutes"]); saveSnapshot(null, runId); return; }
 
           // Fetch latest thinking steps and show them live
           try {
@@ -570,6 +594,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                   rd,
                 );
               } catch { markDone(buildThoughtsFromResult(rd, run.agentId), rd); }
+              saveSnapshot(rd, runId);
               return;
             }
             if (["failed", "error", "cancelled"].includes(status)) {
@@ -598,6 +623,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...cfg.buildBody(ctx),
+          ...(currentData ? { current_data: currentData } : {}),
           ...(cfg.asyncMode ? { async: true } : {}),
         }),
       })
@@ -629,6 +655,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
               } catch { /* fall through */ }
             }
             markDone(thoughts.length > 0 ? thoughts : buildThoughtsFromResult(data, run.agentId), data);
+            saveSnapshot(data, String(runId ?? ""));
             return;
           }
 

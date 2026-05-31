@@ -884,7 +884,68 @@ const DEFAULT_SELECTED_ENTITIES = [
   { name: "Marshall Wace LLP", kyc: "KYC-30188" },
 ];
 
+// KYC refs that have fully-curated exceptions in the hardcoded array above
+const HARDCODED_KYCS = new Set(exceptions.map((e) => e.kyc));
 
+// ─── DB exception types ───────────────────────────────────────────────────────
+
+type DbExcRow = {
+  id: string;
+  kyc_ref: string;
+  exception_number: number;
+  field_name: string | null;
+  title: string;
+  sources: {
+    source_a: string;
+    source_b: string;
+    rows: { field: string; source_a: string; source_b: string }[];
+  } | null;
+  reasoning: string[];
+  recommended_actions: { option: number; description: string }[];
+  status: string;
+};
+
+function dbRowToExc(row: DbExcRow, entityName: string): Exc {
+  return {
+    id: `db-${row.kyc_ref}-${row.exception_number}`,
+    title: row.title,
+    confidence: 82,
+    status: row.status === "open" ? "Pending" : "Addressed",
+    entity: entityName,
+    kyc: row.kyc_ref,
+    category: row.field_name ?? "General",
+    flagText: row.reasoning[0] ?? row.title,
+    narrative: row.reasoning.slice(1).join(" "),
+    reasoningSteps: row.reasoning,
+    evidenceRationale: "Based on source data comparison. Refer to the comparison table for field-level evidence.",
+    evidence: [],
+    acceptability: "Review the comparison sources and apply the recommended resolution option.",
+    resolutions: row.recommended_actions.map((ra) => ({
+      id: `r${ra.option}`,
+      title: ra.description,
+      desc: ra.description,
+      recommended: ra.option === 1,
+      agents: [] as AgentId[],
+      agentLabel: ra.description,
+      postRunSummary: `Resolution option ${ra.option} applied.`,
+      updates: [],
+    })),
+  };
+}
+
+function dbSourcesToCompare(sources: DbExcRow["sources"]): Compare | null {
+  if (!sources?.rows?.length) return null;
+  return {
+    aLabel: sources.source_a ?? "Source A",
+    bLabel: sources.source_b ?? "Source B",
+    rows: sources.rows.map((r) => ({
+      field: r.field,
+      a: r.source_a,
+      b: r.source_b,
+      conflict: r.source_a !== r.source_b,
+    })),
+  };
+}
 
 type ResolvedInfo = { resolutionId: string; resolutionTitle: string; agentLabel: string };
 
@@ -924,10 +985,37 @@ const ExceptionReview = () => {
     resolutions: [],
   });
 
-  const effectiveExceptions = useMemo(
-    () => (filteredExceptions.length > 0 ? filteredExceptions : selectedEntities.map(buildStubException)),
-    [filteredExceptions, selectedEntities],
-  );
+  // DB-fetched exceptions for entities not in the hardcoded set
+  const [dbExceptions, setDbExceptions] = useState<Exc[]>([]);
+  const [dynamicComparisons, setDynamicComparisons] = useState<Record<string, Compare>>({});
+
+  useEffect(() => {
+    const missing = selectedEntities.filter((e) => !HARDCODED_KYCS.has(e.kyc));
+    if (missing.length === 0) { setDbExceptions([]); return; }
+
+    Promise.all(
+      missing.map((ent) =>
+        fetch(`${AGENT_API_BASE}/api/entity/${ent.kyc}/exceptions`)
+          .then((r) => (r.ok ? r.json() : Promise.resolve([])) as Promise<DbExcRow[]>)
+          .then((rows) => rows.map((row) => ({ exc: dbRowToExc(row, ent.name), cmp: dbSourcesToCompare(row.sources), excId: `db-${row.kyc_ref}-${row.exception_number}` })))
+          .catch(() => [])
+      )
+    ).then((results) => {
+      const flat = results.flat();
+      setDbExceptions(flat.map((r) => r.exc));
+      const comps: Record<string, Compare> = {};
+      for (const { excId, cmp } of flat) {
+        if (cmp) comps[excId] = cmp;
+      }
+      setDynamicComparisons(comps);
+    });
+  }, [selectedEntities]);
+
+  const effectiveExceptions = useMemo(() => {
+    const all = [...filteredExceptions, ...dbExceptions];
+    if (all.length > 0) return all;
+    return selectedEntities.map(buildStubException);
+  }, [filteredExceptions, dbExceptions, selectedEntities]);
   const initialActiveId = effectiveExceptions[0]?.id ?? exceptions[0].id;
 
   const [activeId, setActiveId] = useState(initialActiveId);
@@ -1342,7 +1430,7 @@ const ExceptionReview = () => {
                 <p className="text-[13px]">{active.flagText}</p>
               </div>
               {(() => {
-                const cmp = COMPARISONS[active.id];
+                const cmp = COMPARISONS[active.id] ?? dynamicComparisons[active.id];
                 if (!cmp) {
                   return (
                     <p className={cn("text-[13px] text-muted-foreground leading-relaxed", !showReasoning && "line-clamp-2")}>
