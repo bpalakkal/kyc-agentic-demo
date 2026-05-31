@@ -78,6 +78,7 @@ type Exc = {
   evidence: Evidence[];
   acceptability: string;
   resolutions: Resolution[];
+  attrLabel?: string; // field_name from DB — the attribute this exception is tied to
 };
 
 const exceptions: Exc[] = [
@@ -914,6 +915,7 @@ function dbRowToExc(row: DbExcRow, entityName: string): Exc {
     entity: entityName,
     kyc: row.kyc_ref,
     category: row.field_name ?? "General",
+    attrLabel: row.field_name ?? undefined,
     flagText: row.reasoning[0] ?? row.title,
     narrative: row.reasoning.slice(1).join(" "),
     reasoningSteps: row.reasoning,
@@ -3117,14 +3119,19 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
   const entitiesForTree = selectedEntities.map((e) => {
     const profile = ENTITY_PROFILES[e.name];
     const profileLabels = profile?.attrs.map((a) => a.label) ?? [];
-    const excLabels = profileLabels.length === 0
-      ? excs.filter((exc) => exc.kyc === e.kyc && !exc.id.startsWith('stub-')).map((exc) => exc.title)
+    // For entities with no curated profile, fall back to exception titles as attr labels
+    const excTitleLabels = profileLabels.length === 0
+      ? excs.filter((exc) => exc.kyc === e.kyc && !exc.id.startsWith('stub-') && !exc.attrLabel).map((exc) => exc.title)
       : [];
+    // Always surface DB exception field_names as attrs, regardless of whether a profile exists
+    const dbAttrLabels = excs
+      .filter((exc) => exc.kyc === e.kyc && exc.attrLabel)
+      .map((exc) => exc.attrLabel!);
     return {
       entity: e.name,
       kyc: e.kyc,
       drg: e.drg ?? 'No DRG Assigned',
-      attrs: Array.from(new Set([...profileLabels, ...excLabels])),
+      attrs: Array.from(new Set([...profileLabels, ...excTitleLabels, ...dbAttrLabels])),
     };
   });
 
@@ -3141,7 +3148,10 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
     const isFlagged = (label: string) => {
       const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
       const pa = profile?.attrs.find((x) => x.label === label);
-      const excFlagged = excs.some((exc) => exc.entity === entity && exc.title === label && exc.status === "Pending");
+      const excFlagged = excs.some(
+        (exc) => exc.entity === entity && exc.status === "Pending" &&
+          (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
+      );
       return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
     };
     const filtered = showOnlyPending ? attrs.filter(isFlagged) : attrs;
