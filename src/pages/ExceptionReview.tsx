@@ -36,7 +36,7 @@ import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
@@ -45,6 +45,7 @@ import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
+import { GraphView } from "@/components/GraphView";
 
 
 
@@ -1027,6 +1028,7 @@ const ExceptionReview = () => {
   const [showReasoning, setShowReasoning] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
+  const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"attrs" | "locker" | "collab">("attrs");
   const [escalateOpen, setEscalateOpen] = useState(false);
@@ -1149,6 +1151,14 @@ const ExceptionReview = () => {
 
 
   return (
+    <>
+    {graphOpen && (
+      <GraphView
+        kycId={active.kyc}
+        entityName={active.entity}
+        onClose={() => setGraphOpen(false)}
+      />
+    )}
     <div className="px-6 py-6 max-w-[1480px] mx-auto">
       {/* Top header */}
       <div className="rounded-xl border border-border bg-card p-4 mb-4">
@@ -1201,6 +1211,12 @@ const ExceptionReview = () => {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setGraphOpen(true)}
+              className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors"
+            >
+              <Network className="size-4" /> Graph View
+            </button>
             <Popover open={reachOutOpen} onOpenChange={setReachOutOpen}>
               <PopoverTrigger asChild>
                 <button className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors">
@@ -2034,6 +2050,7 @@ const ExceptionReview = () => {
       )}
 
     </div>
+    </>
   );
 };
 

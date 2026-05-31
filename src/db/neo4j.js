@@ -19,11 +19,9 @@
 
 import neo4j from 'neo4j-driver';
 
-const {
-  NEO4J_URI      = 'neo4j://localhost:7687',
-  NEO4J_USER     = 'neo4j',
-  NEO4J_PASSWORD = '',
-} = process.env;
+const NEO4J_URI      = process.env.NEO4J_URI      ?? 'neo4j://localhost:7687';
+const NEO4J_USER     = process.env.NEO4J_USER     ?? process.env.NEO4J_USERNAME ?? 'neo4j';
+const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD ?? '';
 
 let _driver = null;
 
@@ -55,6 +53,65 @@ export async function runQuery(cypher, params = {}) {
       }
       return obj;
     });
+  } finally {
+    await session.close();
+  }
+}
+
+function unwrapVal(v) {
+  if (neo4j.isInt(v)) return v.toNumber();
+  if (v !== null && typeof v === 'object' && !Array.isArray(v) && typeof v.low === 'number') return neo4j.int(v.low, v.high).toNumber();
+  return v;
+}
+
+function unwrapProps(props) {
+  const out = {};
+  for (const [k, v] of Object.entries(props ?? {})) out[k] = unwrapVal(v);
+  return out;
+}
+
+function isNode(v) {
+  return v != null && typeof v === 'object' && Array.isArray(v.labels) && typeof v.elementId === 'string' && !('type' in v && 'startNodeElementId' in v);
+}
+
+function isRel(v) {
+  return v != null && typeof v === 'object' && typeof v.type === 'string' && typeof v.startNodeElementId === 'string';
+}
+
+/**
+ * Run a Cypher query and return Cytoscape-ready { nodes, edges }.
+ * Handles OPTIONAL MATCH nulls safely.
+ */
+export async function runGraphQuery(cypher, params = {}) {
+  const session = getDriver().session();
+  try {
+    const result = await session.run(cypher, params);
+    const nodeMap  = new Map(); // cyId  → node data
+    const elemIdToCyId = new Map(); // elementId → cyId
+    const edgeMap  = new Map(); // elementId → edge data
+
+    for (const rec of result.records) {
+      for (const key of rec.keys) {
+        const val = rec.get(key);
+        if (isNode(val)) {
+          const props = unwrapProps(val.properties);
+          const cyId = props.kycId ?? val.elementId;
+          elemIdToCyId.set(val.elementId, cyId);
+          if (!nodeMap.has(cyId)) nodeMap.set(cyId, { id: cyId, label: val.labels[0] ?? 'Node', ...props });
+        }
+      }
+      for (const key of rec.keys) {
+        const val = rec.get(key);
+        if (isRel(val) && !edgeMap.has(val.elementId)) {
+          const src = elemIdToCyId.get(val.startNodeElementId);
+          const tgt = elemIdToCyId.get(val.endNodeElementId);
+          if (src != null && tgt != null) {
+            edgeMap.set(val.elementId, { id: val.elementId, source: src, target: tgt, label: val.type, ...unwrapProps(val.properties) });
+          }
+        }
+      }
+    }
+    return { nodes: [...nodeMap.values()], edges: [...edgeMap.values()] };
   } finally {
     await session.close();
   }

@@ -352,6 +352,22 @@ app.get("/api/neo4j/drg/:drgName", async (req, res) => {
   }
 });
 
+// GET /api/neo4j/entity/:kycId/graph — Cytoscape-ready graph for a single entity
+app.get('/api/neo4j/entity/:kycId/graph', async (req, res) => {
+  try {
+    const { runGraphQuery } = await getNeo4j();
+    const graph = await runGraphQuery(
+      `MATCH (center:Entity { kycId: $kycId })
+       OPTIONAL MATCH (center)-[r]-(neighbor)
+       RETURN center, r, neighbor`,
+      { kycId: req.params.kycId }
+    );
+    res.json(graph);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/neo4j/query — run an arbitrary read-only Cypher query (dev/admin use)
 app.post("/api/neo4j/query", async (req, res) => {
   const { cypher, params } = req.body ?? {};
