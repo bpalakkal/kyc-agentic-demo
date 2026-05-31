@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
 
@@ -11,29 +12,38 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
 }
 
-export const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+export const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  realtime: { transport: ws },
+});
 
 // ─── Work queue ───────────────────────────────────────────────────────────────
 
+/** Build a drg_id → { name } lookup from the drgs table. */
+async function drgLookup() {
+  const { data, error } = await sb.from('drgs').select('id, name');
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map(d => [d.id, { name: d.name }]));
+}
+
 /** Fetch all entities with their DRG name for the work queue. */
 export async function getEntities() {
-  const { data, error } = await sb
-    .from('entities')
-    .select('*, drgs(name)')
-    .order('kyc_ref');
-  if (error) throw error;
-  return data;
+  const [entRes, drgMap] = await Promise.all([
+    sb.from('entities').select('*').order('kyc_ref'),
+    drgLookup(),
+  ]);
+  if (entRes.error) throw entRes.error;
+  return (entRes.data ?? []).map(e => ({ ...e, drgs: e.drg_id ? (drgMap[e.drg_id] ?? null) : null }));
 }
 
 /** Fetch a single entity row. */
 export async function getEntity(kycRef) {
-  const { data, error } = await sb
-    .from('entities')
-    .select('*, drgs(name)')
-    .eq('kyc_ref', kycRef)
-    .single();
-  if (error) throw error;
-  return data;
+  const [entRes, drgMap] = await Promise.all([
+    sb.from('entities').select('*').eq('kyc_ref', kycRef).single(),
+    drgLookup(),
+  ]);
+  if (entRes.error) throw entRes.error;
+  const e = entRes.data;
+  return { ...e, drgs: e.drg_id ? (drgMap[e.drg_id] ?? null) : null };
 }
 
 // ─── Snapshots ────────────────────────────────────────────────────────────────
