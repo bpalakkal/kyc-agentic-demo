@@ -3223,11 +3223,11 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
           {categoryCards.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">No attributes to display.</p>
           )}
-          <div className="grid grid-cols-2 gap-3 items-start">
+          <div className="columns-2 gap-3">
             {categoryCards.map(({ category, items, pending }) => {
               const sorted = [...items].sort((a, b) => Number(b.flagged) - Number(a.flagged));
               return (
-                <div key={category} className="rounded-xl border border-border bg-card p-3">
+                <div key={category} className="rounded-xl border border-border bg-card p-3 mb-3 break-inside-avoid">
                   <div className="flex items-center justify-between mb-2 gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{category}</span>
                     {pending > 0 && (
