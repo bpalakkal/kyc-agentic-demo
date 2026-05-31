@@ -3178,7 +3178,6 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
       items.map(item => ({ ...item, entity, category }))
     )
   );
-  const pendingItems = allItems.filter(i => i.flagged);
   const categoryCards = ATTR_CATEGORY_ORDER
     .map(cat => ({
       category: cat,
@@ -3221,55 +3220,38 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
       {/* ── Cards view ────────────────────────────────────────────────────── */}
       {viewMode === "cards" && (
         <div className="space-y-3">
-          {/* Pending summary strip — hidden when "show only pending" is on (redundant) */}
-          {!showOnlyPending && pendingItems.length > 0 && (
-            <div className="rounded-xl border border-alert-soft-border bg-alert-soft/30 p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-alert mb-2 flex items-center gap-1.5">
-                <AlertTriangle className="size-3" /> {pendingItems.length} pending
-              </p>
-              <div className="space-y-1.5">
-                {pendingItems.map(item => (
-                  <div key={`${item.entity}::${item.label}`} className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0">{attrNode(item.label, item.entity, true)}</div>
-                    {multiEntity && (
-                      <span className="text-[9px] text-muted-foreground shrink-0 max-w-[72px] truncate">{item.entity.split(" ")[0]}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Category cards — 2 column grid */}
           {categoryCards.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">No attributes to display.</p>
           )}
           <div className="grid grid-cols-2 gap-3 items-start">
-            {categoryCards.map(({ category, items, pending }) => (
-              <div key={category} className="rounded-xl border border-border bg-card p-3">
-                <div className="flex items-center justify-between mb-2 gap-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{category}</span>
-                  {pending > 0 && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-medium shrink-0">{pending}</span>
-                  )}
+            {categoryCards.map(({ category, items, pending }) => {
+              const sorted = [...items].sort((a, b) => Number(b.flagged) - Number(a.flagged));
+              return (
+                <div key={category} className="rounded-xl border border-border bg-card p-3">
+                  <div className="flex items-center justify-between mb-2 gap-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{category}</span>
+                    {pending > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-medium shrink-0">{pending}</span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {multiEntity
+                      ? entitiesForTree.map(({ entity }) => {
+                          const ei = sorted.filter(i => i.entity === entity);
+                          if (!ei.length) return null;
+                          return (
+                            <div key={entity}>
+                              <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium mb-1 truncate">{entity.split(" ")[0]}</p>
+                              {ei.map(item => <div key={item.label} className="mb-1">{attrNode(item.label, entity, item.flagged)}</div>)}
+                            </div>
+                          );
+                        })
+                      : sorted.map(item => <div key={item.label}>{attrNode(item.label, item.entity, item.flagged)}</div>)
+                    }
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  {multiEntity
-                    ? entitiesForTree.map(({ entity }) => {
-                        const ei = items.filter(i => i.entity === entity);
-                        if (!ei.length) return null;
-                        return (
-                          <div key={entity}>
-                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium mb-1 truncate">{entity.split(" ")[0]}</p>
-                            {ei.map(item => <div key={item.label} className="mb-1">{attrNode(item.label, entity, item.flagged)}</div>)}
-                          </div>
-                        );
-                      })
-                    : items.map(item => <div key={item.label}>{attrNode(item.label, item.entity, item.flagged)}</div>)
-                  }
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
