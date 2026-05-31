@@ -268,7 +268,7 @@ const WorkQueue = () => {
   const selectedCount = Object.values(selected).filter(Boolean).length;
   const selectedEntities = allRows
     .filter((r) => selected[r.id])
-    .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id.toUpperCase() }));
+    .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id, drg: drgByKyc[r.id] ?? undefined }));
 
   const handleToggle = (id: string, checked: boolean) =>
     setSelected((s) => ({ ...s, [id]: checked }));

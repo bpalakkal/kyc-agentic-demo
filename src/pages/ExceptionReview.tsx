@@ -44,7 +44,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_ENTITY_GROUPS, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY, GENERATED_ENTITY_DRG, GENERATED_WORK_ROWS } from "@/data/entities-generated";
+import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
 
 
 
@@ -880,8 +880,8 @@ const buildHeaderMeta = (addressed: number, total: number) => [
 ];
 
 const DEFAULT_SELECTED_ENTITIES = [
-  { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" },
-  { name: "Marshall Wace LLP", kyc: "KYC-30188" },
+  { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", drg: "London Alternatives DRG" },
+  { name: "Marshall Wace LLP", kyc: "KYC-30188", drg: "London Alternatives DRG" },
 ];
 
 // KYC refs that have fully-curated exceptions in the hardcoded array above
@@ -951,7 +951,7 @@ type ResolvedInfo = { resolutionId: string; resolutionTitle: string; agentLabel:
 
 const ExceptionReview = () => {
   const location = useLocation();
-  const navState = location.state as { entities?: { name: string; kyc: string }[] } | null;
+  const navState = location.state as { entities?: { name: string; kyc: string; drg?: string }[] } | null;
   const selectedEntities = useMemo(
     () => (navState?.entities && navState.entities.length > 0 ? navState.entities : DEFAULT_SELECTED_ENTITIES),
     [navState],
@@ -1056,9 +1056,9 @@ const ExceptionReview = () => {
 
   const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0] ?? exceptions[0])!;
 
-  const activeDrg = GENERATED_ENTITY_DRG[active.kyc] ?? null;
+  const activeDrg = selectedEntities.find((e) => e.kyc === active.kyc)?.drg ?? null;
   const drgEntities = activeDrg
-    ? GENERATED_WORK_ROWS.filter((r) => GENERATED_ENTITY_DRG[r.kyc] === activeDrg)
+    ? selectedEntities.filter((e) => e.drg === activeDrg)
     : [];
 
   // Keep agent context in sync with the currently viewed entity so "Run Agent" dropdown knows what to search
@@ -1712,7 +1712,7 @@ const ExceptionReview = () => {
               </div>
             </div>
 
-            {rightTab === "attrs" && <AttributeTree selectedEntities={selectedEntities} />}
+            {rightTab === "attrs" && <AttributeTree selectedEntities={selectedEntities} exceptions={effectiveExceptions} />}
             {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
             {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
           </aside>
@@ -2810,25 +2810,6 @@ const DocumentLocker = ({ selectedEntityNames }: { selectedEntityNames: string[]
 };
 
 
-const ENTITY_GROUPS: Record<string, { drg: string; attrs: string[] }> = {
-  "Brevan Howard Asset Management LLP": {
-    drg: "London Alternatives DRG",
-    attrs: ["Controllers", "Persons with Significant Control", "Principal Place of Business", "FCA Regulatory Permissions"],
-  },
-  "Marshall Wace LLP": {
-    drg: "London Alternatives DRG",
-    attrs: ["Controllers", "Previous Company Names", "Principal Place of Business", "Sanctions Screening"],
-  },
-  "Long Focus Capital Management, LLC": {
-    drg: "US Private Equity DRG",
-    attrs: ["US Registration Number", "LEI Code", "Principal Place of Business", "Compliance Officer Attestation", "Beneficial Owner (25%+)"],
-  },
-  "Brookfield Asset Management PIC US, LLC": {
-    drg: "US Private Equity DRG",
-    attrs: ["Entity Risk Rating", "CIP Classification", "Acting Person", "Entity Classification"],
-  },
-};
-
 // Attribute category taxonomy — ordered; first category is expanded by default
 const ATTR_CATEGORY_ORDER = [
   "Entity Identification",
@@ -2936,7 +2917,7 @@ const categoryOf = (label: string): AttrCategory =>
 
 type SelectedAttr = { label: string; entity: string };
 
-const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string; kyc: string }[] }) => {
+const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntities: { name: string; kyc: string; drg?: string }[]; exceptions: Exc[] }) => {
   const [selected, setSelected] = useState<SelectedAttr | null>(null);
   const [openEntity, setOpenEntity] = useState<string | null>(null);
   const [viewDoc, setViewDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
@@ -3131,18 +3112,20 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
     </button>
   );
 
-  // Build dynamic tree from selected entities
-  const baseEntities = selectedEntities.length > 0
-    ? selectedEntities.filter((e) => ENTITY_GROUPS[e.name]).map((e) => ({ entity: e.name, ...ENTITY_GROUPS[e.name] }))
-    : Object.entries(ENTITY_GROUPS).filter(([n]) => n !== "Long Focus Capital Management, LLC").map(([entity, v]) => ({ entity, ...v }));
-
-  // Always merge in every attribute the entity profile knows about so the tree
-  // can group them by category.
-  const entitiesForTree = baseEntities.map((e) => {
-    const profile = ENTITY_PROFILES[e.entity];
-    const allLabels = profile?.attrs.map((a) => a.label) ?? [];
-    const merged = Array.from(new Set([...e.attrs, ...allLabels]));
-    return { ...e, attrs: merged };
+  // Build tree entries from the live selectedEntities, falling back to exception
+  // titles for Supabase-backed entities that have no curated profile.
+  const entitiesForTree = selectedEntities.map((e) => {
+    const profile = ENTITY_PROFILES[e.name];
+    const profileLabels = profile?.attrs.map((a) => a.label) ?? [];
+    const excLabels = profileLabels.length === 0
+      ? excs.filter((exc) => exc.kyc === e.kyc && !exc.id.startsWith('stub-')).map((exc) => exc.title)
+      : [];
+    return {
+      entity: e.name,
+      kyc: e.kyc,
+      drg: e.drg ?? 'No DRG Assigned',
+      attrs: Array.from(new Set([...profileLabels, ...excLabels])),
+    };
   });
 
   // Group by DRG parent
@@ -3158,7 +3141,8 @@ const AttributeTree = ({ selectedEntities }: { selectedEntities: { name: string;
     const isFlagged = (label: string) => {
       const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
       const pa = profile?.attrs.find((x) => x.label === label);
-      return traceFlagged || pa?.status === "alert" || pa?.status === "warn";
+      const excFlagged = excs.some((exc) => exc.entity === entity && exc.title === label && exc.status === "Pending");
+      return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
     };
     const filtered = showOnlyPending ? attrs.filter(isFlagged) : attrs;
     const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
@@ -4183,10 +4167,6 @@ const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
   const _staticProfiles = new Set(Object.keys(ENTITY_PROFILES));
   for (const [k, v] of Object.entries(GENERATED_ENTITY_PROFILES)) {
     if (!_staticProfiles.has(k)) (ENTITY_PROFILES as Record<string, typeof v>)[k] = v;
-  }
-  const _staticGroups = new Set(Object.keys(ENTITY_GROUPS));
-  for (const [k, v] of Object.entries(GENERATED_ENTITY_GROUPS)) {
-    if (!_staticGroups.has(k)) (ENTITY_GROUPS as Record<string, typeof v>)[k] = v;
   }
   for (const [k, v] of Object.entries(GENERATED_COMMENTS))  { if (!COMMENTS_BY_KYC[k])  (COMMENTS_BY_KYC as Record<string, typeof v>)[k]  = v; }
   for (const [k, v] of Object.entries(GENERATED_WATCHERS))  { if (!WATCHERS_BY_KYC[k])  (WATCHERS_BY_KYC as Record<string, typeof v>)[k]  = v; }
