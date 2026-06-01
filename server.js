@@ -354,14 +354,36 @@ app.get("/api/neo4j/drg/:drgName", async (req, res) => {
 });
 
 // GET /api/neo4j/entity/:kycId/graph — Cytoscape-ready graph for a single entity
+// Only returns Entity and Person neighbours (filters out Exception/Attribute/Action noise).
 app.get('/api/neo4j/entity/:kycId/graph', async (req, res) => {
   try {
     const { runGraphQuery } = await getNeo4j();
     const graph = await runGraphQuery(
       `MATCH (center:Entity { caseId: $kycId })
        OPTIONAL MATCH (center)-[r]-(neighbor)
+       WHERE neighbor:Entity OR neighbor:Person
        RETURN center, r, neighbor`,
       { kycId: req.params.kycId }
+    );
+    res.json(graph);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/neo4j/expand — expand a node by its internal elementId
+// Body: { elementId: string }
+app.post('/api/neo4j/expand', async (req, res) => {
+  const { elementId } = req.body ?? {};
+  if (!elementId) return res.status(400).json({ error: 'elementId is required' });
+  try {
+    const { runGraphQuery } = await getNeo4j();
+    const graph = await runGraphQuery(
+      `MATCH (center) WHERE elementId(center) = $elementId
+       OPTIONAL MATCH (center)-[r]-(neighbor)
+       WHERE neighbor:Entity OR neighbor:Person
+       RETURN center, r, neighbor`,
+      { elementId }
     );
     res.json(graph);
   } catch (err) {
