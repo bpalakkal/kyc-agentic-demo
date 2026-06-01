@@ -74,6 +74,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:8080",
   "http://localhost:3001",
+  "http://localhost:3002",
 ];
 app.use(cors({
   origin: (origin, cb) => {
@@ -357,7 +358,7 @@ app.get('/api/neo4j/entity/:kycId/graph', async (req, res) => {
   try {
     const { runGraphQuery } = await getNeo4j();
     const graph = await runGraphQuery(
-      `MATCH (center:Entity { kycId: $kycId })
+      `MATCH (center:Entity { caseId: $kycId })
        OPTIONAL MATCH (center)-[r]-(neighbor)
        RETURN center, r, neighbor`,
       { kycId: req.params.kycId }

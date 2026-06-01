@@ -95,7 +95,7 @@ export async function runGraphQuery(cypher, params = {}) {
         const val = rec.get(key);
         if (isNode(val)) {
           const props = unwrapProps(val.properties);
-          const cyId = props.kycId ?? val.elementId;
+          const cyId = props.caseId ?? props.case_id ?? props.kycId ?? val.elementId;
           elemIdToCyId.set(val.elementId, cyId);
           if (!nodeMap.has(cyId)) nodeMap.set(cyId, { id: cyId, label: val.labels[0] ?? 'Node', ...props });
         }
