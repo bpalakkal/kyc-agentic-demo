@@ -37,6 +37,18 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import Anthropic from "@anthropic-ai/sdk";
 
+// Lazy Anthropic client — created on first use so the server starts even when
+// ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
+let _anthropic = null;
+function getAnthropic() {
+  if (!_anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set. Add it in the Railway Variables dashboard.");
+    _anthropic = new Anthropic({ apiKey });
+  }
+  return _anthropic;
+}
+
 // Load .env manually so the server has zero extra dependencies in production.
 // Railway and other platforms inject env vars directly, so this is a no-op there.
 try {
@@ -337,8 +349,6 @@ app.post('/api/neo4j/expand', async (req, res) => {
 
 // ─── AI Chat (Claude + Tool Use + SSE streaming) ──────────────────────────────
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 const KYC_TOOLS = [
   {
     name: "get_entity",
@@ -461,7 +471,7 @@ Always use tools to retrieve live data before answering factual questions. Be co
     let currentMessages = [...anthropicMessages];
 
     while (continueLoop) {
-      const stream = await anthropic.messages.stream({
+      const stream = await getAnthropic().messages.stream({
         model:      "claude-sonnet-4-6",
         max_tokens: 1024,
         system:     systemPrompt,
