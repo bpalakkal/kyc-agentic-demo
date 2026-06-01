@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Bell, User, MessageCircle, Bot, Send, X, Sparkles } from "lucide-react";
+import { Bell, User, BotMessageSquare, Bot, Send, X, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip, useAgents, AGENT_API_BASE } from "@/components/AgentSystem";
 import kpmgLogo from "@/assets/kpmg-logo-white.svg";
@@ -289,7 +289,7 @@ const AiChatFloating = () => {
           className="size-14 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
           aria-label="Open AI Assistant"
         >
-          <MessageCircle className="size-6" />
+          <BotMessageSquare className="size-6" />
         </button>
       )}
     </div>
