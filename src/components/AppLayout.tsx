@@ -242,13 +242,13 @@ const AiChatFloating = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggestion chips — horizontal scroll */}
-          <div className="px-4 pb-2.5 flex gap-1.5 overflow-x-auto shrink-0 [&::-webkit-scrollbar]:hidden">
+          {/* Suggestion chips — wrapping grid */}
+          <div className="px-4 pb-2.5 flex flex-wrap gap-1.5 shrink-0">
             {CHAT_SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => handleSend(s)}
-                className="whitespace-nowrap text-[11px] px-3 py-1 rounded-full border border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors shrink-0"
+                className="text-[11px] px-3 py-1 rounded-full border border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors"
               >
                 {s}
               </button>
