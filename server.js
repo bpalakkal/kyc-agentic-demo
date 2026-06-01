@@ -73,7 +73,6 @@ const ALLOWED_ORIGINS = [
   "https://bpalakkal.github.io",
   "http://localhost:5173",
   "http://localhost:8080",
-  "http://localhost:3001",
   "http://localhost:3002",
 ];
 app.use(cors({
@@ -297,62 +296,6 @@ app.patch('/api/entity/:kycRef/exception/:num/resolve', async (req, res) => {
 
 // ─── Neo4j API endpoints ──────────────────────────────────────────────────────
 
-// GET /api/neo4j/entities — fetch all KYC entities from Neo4j
-// TODO: replace GENERATED_WORK_ROWS with this in production
-app.get("/api/neo4j/entities", async (_req, res) => {
-  try {
-    const { runQuery } = await getNeo4j();
-    const rows = await runQuery(
-      `MATCH (e:Entity)
-       RETURN e.kycId        AS kycId,
-              e.name         AS name,
-              e.riskRating   AS riskRating,
-              e.jurisdiction AS jurisdiction,
-              e.drgName      AS drgName,
-              e.entityType   AS entityType,
-              e.dueDate      AS dueDate,
-              e.openExceptions AS openExceptions
-       ORDER BY e.kycId`
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/neo4j/entity/:kycId — fetch a single entity with its exceptions
-app.get("/api/neo4j/entity/:kycId", async (req, res) => {
-  try {
-    const { runQuery } = await getNeo4j();
-    const [entity] = await runQuery(
-      `MATCH (e:Entity { kycId: $kycId })
-       OPTIONAL MATCH (e)-[:HAS_EXCEPTION]->(exc:Exception)
-       RETURN e, collect(exc) AS exceptions`,
-      { kycId: req.params.kycId }
-    );
-    if (!entity) return res.status(404).json({ error: "Entity not found" });
-    res.json(entity);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/neo4j/drg/:drgName — fetch all entities belonging to a DRG
-app.get("/api/neo4j/drg/:drgName", async (req, res) => {
-  try {
-    const { runQuery } = await getNeo4j();
-    const rows = await runQuery(
-      `MATCH (e:Entity { drgName: $drgName })
-       RETURN e.kycId AS kycId, e.name AS name, e.riskRating AS riskRating
-       ORDER BY e.kycId`,
-      { drgName: req.params.drgName }
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // GET /api/neo4j/entity/:kycId/graph — Cytoscape-ready graph for a single entity
 // Only returns Entity and Person neighbours (filters out Exception/Attribute/Action noise).
 app.get('/api/neo4j/entity/:kycId/graph', async (req, res) => {
@@ -386,19 +329,6 @@ app.post('/api/neo4j/expand', async (req, res) => {
       { elementId }
     );
     res.json(graph);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/neo4j/query — run an arbitrary read-only Cypher query (dev/admin use)
-app.post("/api/neo4j/query", async (req, res) => {
-  const { cypher, params } = req.body ?? {};
-  if (!cypher) return res.status(400).json({ error: "cypher is required" });
-  try {
-    const { runQuery } = await getNeo4j();
-    const rows = await runQuery(cypher, params ?? {});
-    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

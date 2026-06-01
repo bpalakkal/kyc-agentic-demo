@@ -133,20 +133,16 @@ export const AGENTS: Agent[] = [
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
 
-// ─── Simulated agents (no live API yet) ──────────────────────────────────────
-// defaultThoughts are shown while the agent "runs" in simulation mode.
-// Replace with real API configs in AGENT_API_CONFIGS when agents are deployed.
-
 // ─── Recommended bundles ─────────────────────────────────────────────────────
 // One bundle per route.  The strip picks the matching route; falls back to
 // the last entry.  TODO: drive this from a backend config (per-user, per-case).
 export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string; agents: AgentId[] }[] = [
-  { route: "/work-queue/review", label: "Resolve Title Discrepancy", reason: "Recommended for this exception · 92% historical resolution rate",
-    agents: ["identity", "document", "regulatory", "audit"] },
-  { route: "/work-queue", label: "Bulk Triage Selected Cases", reason: "Best for high-risk DRG entities in queue",
-    agents: ["sanctions", "pep", "adverse-media", "risk-scoring"] },
-  { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · refreshes screening + risk",
-    agents: ["sanctions", "pep", "adverse-media", "beneficial-owner", "risk-scoring"] },
+  { route: "/work-queue/review", label: "Resolve Title Discrepancy", reason: "Recommended for this exception · UK registry + FCA check",
+    agents: ["uk-parent-flow"] },
+  { route: "/work-queue", label: "Bulk Triage Selected Cases", reason: "Best for UK-registered entities in queue",
+    agents: ["companies-house", "fca", "jersey-fsc"] },
+  { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · full UK entity orchestration",
+    agents: ["uk-parent-flow"] },
 ];
 
 // VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
@@ -781,7 +777,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                   <p className="text-[11px] text-muted-foreground">Recommended pre-selected · pick any combination</p>
                 </div>
                 <div className="max-h-[380px] overflow-y-auto py-1">
-                  {AGENTS.map((a) => {
+                  {AGENTS.filter((a) => !!AGENT_API_CONFIGS[a.id]).map((a) => {
                     const Icon = a.icon;
                     const isSel = selected.has(a.id);
                     const isRec = bundle.agents.includes(a.id);

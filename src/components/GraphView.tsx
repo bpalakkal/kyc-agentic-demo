@@ -160,11 +160,6 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
     const newNodes = nodes.filter(n => !existingNodeIds.has(String(n.id)));
     const newEdges = edges.filter(e => !existingEdgeIds.has(String(e.id)));
 
-    // Mark the expanded node
-    cy.getElementById(elementId.includes(":") ? String(nodes.find(n => n._elementId === elementId)?.id ?? "") : elementId)
-      .data("expanded", true);
-
-    // Also mark by iterating cy nodes with matching _elementId
     cy.nodes().forEach(n => { if (n.data("_elementId") === elementId) n.data("expanded", true); });
 
     if (newNodes.length > 0 || newEdges.length > 0) {
