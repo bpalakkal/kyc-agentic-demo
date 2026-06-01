@@ -494,7 +494,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         agentId: id,
         state: (i === 0 ? "running" : "pending") as StepState,
         thoughts: hasReal
-          ? [...AGENTS_BY_ID[id].defaultThoughts, "Awaiting API response…"]
+          ? ["Connecting to live API…"]
           : AGENTS_BY_ID[id].defaultThoughts,
         currentThought: 0,
         startedAt: Date.now(),
@@ -786,7 +786,6 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                     const isSel = selected.has(a.id);
                     const isRec = bundle.agents.includes(a.id);
                     const isLive = !!AGENT_API_CONFIGS[a.id];
-                    const canRunLive = isLive && !!entityContext?.name;
                     return (
                       <button
                         key={a.id}
@@ -816,25 +815,6 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                             <p className="text-[10px] text-amber-500/80 mt-0.5">Open an entity in the review page to run live</p>
                           )}
                         </div>
-                        {isLive && (
-                          <span
-                            role="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!canRunLive) return;
-                              runAgents([a.id], `${a.name} Lookup`);
-                              setOpen(false);
-                            }}
-                            className={cn(
-                              "text-[11px] font-medium shrink-0 mt-1 px-2 py-0.5 rounded border transition-colors",
-                              canRunLive
-                                ? "text-success border-success-soft-border hover:bg-success-soft cursor-pointer"
-                                : "text-muted-foreground border-border cursor-not-allowed opacity-40"
-                            )}
-                          >
-                            Run →
-                          </span>
-                        )}
                       </button>
                     );
                   })}
