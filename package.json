@@ -9,7 +9,7 @@
   "homepage": "https://bpalakkal.github.io/kyc-agentic2",
   "scripts": {
     "dev": "vite",
-    "server": "NODE_TLS_REJECT_UNAUTHORIZED=0 node server.js",
+    "server": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 node server.js",
     "start": "concurrently \"npm run dev\" \"npm run server\"",
     "generate": "node scripts/parse-entities.cjs",
     "prebuild": "node scripts/parse-entities.cjs",
@@ -94,6 +94,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
