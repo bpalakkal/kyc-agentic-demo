@@ -35,6 +35,7 @@ import cors from "cors";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import Anthropic from "@anthropic-ai/sdk";
 
 // Load .env manually so the server has zero extra dependencies in production.
 // Railway and other platforms inject env vars directly, so this is a no-op there.
@@ -331,6 +332,194 @@ app.post('/api/neo4j/expand', async (req, res) => {
     res.json(graph);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── AI Chat (Claude + Tool Use + SSE streaming) ──────────────────────────────
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const KYC_TOOLS = [
+  {
+    name: "get_entity",
+    description: "Get full details for a single entity by KYC reference (e.g. KYC-30214). Returns entity row including risk rating, status, jurisdiction, DRG, and due date.",
+    input_schema: {
+      type: "object",
+      properties: { kyc_ref: { type: "string", description: "KYC reference, e.g. KYC-30214" } },
+      required: ["kyc_ref"],
+    },
+  },
+  {
+    name: "list_entities",
+    description: "List entities in the work queue. Can filter by risk_rating or priority. Returns up to `limit` rows (default 15).",
+    input_schema: {
+      type: "object",
+      properties: {
+        risk_rating: { type: "string", enum: ["High", "Medium", "Low"] },
+        priority:    { type: "string", enum: ["High", "Medium", "Low"] },
+        limit:       { type: "number" },
+      },
+    },
+  },
+  {
+    name: "get_exceptions",
+    description: "Get all open compliance exceptions for an entity, including exception type, status, and resolution details.",
+    input_schema: {
+      type: "object",
+      properties: { kyc_ref: { type: "string" } },
+      required: ["kyc_ref"],
+    },
+  },
+  {
+    name: "search_entities",
+    description: "Search for entities by partial name match.",
+    input_schema: {
+      type: "object",
+      properties: { name: { type: "string", description: "Partial or full entity name" } },
+      required: ["name"],
+    },
+  },
+  {
+    name: "query_graph",
+    description: "Query the Neo4j ownership / relationship graph for an entity. Returns nodes (Entity, Person) and their relationships (beneficial ownership, directorships, etc.).",
+    input_schema: {
+      type: "object",
+      properties: { kyc_id: { type: "string", description: "Entity caseId in Neo4j — same format as KYC ref, e.g. KYC-30214" } },
+      required: ["kyc_id"],
+    },
+  },
+];
+
+async function executeTool(name, input) {
+  try {
+    if (name === "get_entity") {
+      const { getEntity } = await getSb();
+      return await getEntity(input.kyc_ref);
+    }
+    if (name === "list_entities") {
+      const { getEntities } = await getSb();
+      let rows = await getEntities();
+      if (input.risk_rating) rows = rows.filter(e => e.risk_rating === input.risk_rating);
+      if (input.priority)    rows = rows.filter(e => e.priority    === input.priority);
+      return rows.slice(0, input.limit ?? 15);
+    }
+    if (name === "get_exceptions") {
+      const { getExceptions } = await getSb();
+      return await getExceptions(input.kyc_ref);
+    }
+    if (name === "search_entities") {
+      const { getEntities } = await getSb();
+      const q = input.name.toLowerCase();
+      const rows = await getEntities();
+      return rows.filter(e => (e.entity_name ?? "").toLowerCase().includes(q)).slice(0, 10);
+    }
+    if (name === "query_graph") {
+      const { runGraphQuery } = await getNeo4j();
+      return await runGraphQuery(
+        `MATCH (center:Entity { caseId: $kycId })
+         OPTIONAL MATCH (center)-[r]-(neighbor)
+         WHERE neighbor:Entity OR neighbor:Person
+         RETURN center, r, neighbor`,
+        { kycId: input.kyc_id }
+      );
+    }
+    return { error: `Unknown tool: ${name}` };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// POST /api/chat — streaming KYC assistant backed by Claude + live DB tools.
+// Streams SSE events: { type:"text"|"tool_call"|"done"|"error", ... }
+app.post("/api/chat", async (req, res) => {
+  const { messages = [], entityContext } = req.body ?? {};
+
+  res.setHeader("Content-Type",  "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection",    "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // disable Railway/Nginx response buffering
+
+  const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
+  const systemPrompt = `You are an AI assistant embedded in a KYC (Know Your Customer) compliance platform. You have real-time access to the entity work queue, compliance exceptions, and an ownership graph database.
+
+Key facts about the data model:
+- Entities have a kyc_ref (e.g. KYC-30214), risk_rating (High/Medium/Low), priority, status, jurisdiction, and due_date.
+- Exceptions are compliance issues linked to an entity — they have a type, status (open/resolved), and optional resolution.
+- The Neo4j graph contains Entity and Person nodes connected by relationships like IS_BENEFICIAL_OWNER_OF, IS_DIRECTOR_OF, IS_SHAREHOLDER_OF.
+- The KYC ref and Neo4j caseId are the same value.
+
+${entityContext?.name ? `The analyst currently has **${entityContext.name}${entityContext.kyc ? ` (${entityContext.kyc})` : ""}** open.` : ""}
+
+Always use tools to retrieve live data before answering factual questions. Be concise and precise. Highlight risk signals, overdue items, and actionable next steps.`;
+
+  // Convert chat history to Anthropic message format
+  const anthropicMessages = messages.map(m => ({ role: m.role, content: m.text }));
+
+  try {
+    let continueLoop = true;
+    let currentMessages = [...anthropicMessages];
+
+    while (continueLoop) {
+      const stream = await anthropic.messages.stream({
+        model:      "claude-sonnet-4-6",
+        max_tokens: 1024,
+        system:     systemPrompt,
+        tools:      KYC_TOOLS,
+        messages:   currentMessages,
+      });
+
+      const assistantContent = [];
+      let currentTool = null;
+      let inputBuffer  = "";
+
+      for await (const event of stream) {
+        if (event.type === "content_block_start") {
+          if (event.content_block.type === "text") {
+            assistantContent.push({ type: "text", text: "" });
+          } else if (event.content_block.type === "tool_use") {
+            currentTool = { type: "tool_use", id: event.content_block.id, name: event.content_block.name, input: {} };
+            inputBuffer = "";
+            assistantContent.push(currentTool);
+          }
+        } else if (event.type === "content_block_delta") {
+          if (event.delta.type === "text_delta") {
+            const last = assistantContent[assistantContent.length - 1];
+            if (last?.type === "text") last.text += event.delta.text;
+            send({ type: "text", content: event.delta.text });
+          } else if (event.delta.type === "input_json_delta") {
+            inputBuffer += event.delta.partial_json;
+          }
+        } else if (event.type === "content_block_stop" && currentTool) {
+          try { currentTool.input = JSON.parse(inputBuffer); } catch { /* partial */ }
+          currentTool = null;
+          inputBuffer = "";
+        }
+      }
+
+      const finalMsg = await stream.finalMessage();
+
+      if (finalMsg.stop_reason === "tool_use") {
+        currentMessages.push({ role: "assistant", content: assistantContent });
+
+        const toolResults = [];
+        for (const block of assistantContent.filter(b => b.type === "tool_use")) {
+          send({ type: "tool_call", name: block.name });
+          const result = await executeTool(block.name, block.input);
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+        }
+        currentMessages.push({ role: "user", content: toolResults });
+      } else {
+        continueLoop = false;
+      }
+    }
+
+    send({ type: "done" });
+    res.end();
+  } catch (err) {
+    console.error("[chat]", err.message);
+    send({ type: "error", message: err.message });
+    res.end();
   }
 });
 

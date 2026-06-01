@@ -1,5 +1,5 @@
-import { useMemo, useState, useRef, useEffect } from "react";
-import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Maximize2, MessageSquare, FileText, Bot, ArrowUpRight, ArrowDownRight, Timer, CheckCircle2, X, Send } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Maximize2, MessageSquare, FileText, Bot, ArrowUpRight, ArrowDownRight, Timer, CheckCircle2, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
@@ -77,16 +77,34 @@ const collabMeta: Record<CollabType, { label: string; icon: typeof MessageSquare
   action: { label: "User actions", icon: CheckCircle2, tone: "bg-secondary text-foreground" },
 };
 
+type AccentVariant = "alert" | "warning" | "success";
+
+const ACCENT_TEXT: Record<AccentVariant, string> = {
+  alert:   "text-alert",
+  warning: "text-warning",
+  success: "text-success",
+};
+const ACCENT_ICON: Record<AccentVariant, string> = {
+  alert:   "bg-alert/10 text-alert",
+  warning: "bg-warning/10 text-warning",
+  success: "bg-success/10 text-success",
+};
+const ACCENT_CARD: Record<AccentVariant, string> = {
+  alert:   "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card",
+  warning: "border-warning-soft-border bg-gradient-to-br from-warning-soft to-card",
+  success: "border-success-soft-border bg-gradient-to-br from-success-soft to-card",
+};
+
 const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, active }: {
   label: string; value: string; unit?: string; trend?: { dir: "up" | "down"; text: string };
-  accent?: "alert"; icon?: React.ReactNode; soft?: boolean; onClick?: () => void; active?: boolean;
+  accent?: AccentVariant; icon?: React.ReactNode; soft?: boolean; onClick?: () => void; active?: boolean;
 }) => {
   const body = (
     <>
       <div className="min-w-0">
         <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">{label}</p>
         <div className="mt-2 flex items-baseline gap-2">
-          <span className={cn("text-3xl font-semibold tracking-tight tabular-nums", accent === "alert" && "text-alert")}>{value}</span>
+          <span className={cn("text-3xl font-semibold tracking-tight tabular-nums", accent && ACCENT_TEXT[accent])}>{value}</span>
           {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
         </div>
         {trend && (
@@ -99,12 +117,14 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
       {icon && (
         <div className={cn(
           "size-10 rounded-lg grid place-items-center shrink-0",
-          soft ? "bg-alert/10 text-alert" : cn("bg-secondary text-muted-foreground", onClick && "transition-colors group-hover:bg-primary/10 group-hover:text-primary"),
+          soft && accent ? ACCENT_ICON[accent] : cn("bg-secondary text-muted-foreground", onClick && "transition-colors group-hover:bg-primary/10 group-hover:text-primary"),
           active && onClick && "bg-primary/10 text-primary"
         )}>{icon}</div>
       )}
     </>
   );
+
+  const cardBg = soft && accent ? ACCENT_CARD[accent] : "border-border";
 
   if (onClick) {
     return (
@@ -113,7 +133,7 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
         onClick={onClick}
         className={cn(
           "group rounded-xl border bg-card p-5 flex items-start justify-between gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
-          soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border",
+          cardBg,
           active && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
         )}>
         {body}
@@ -121,10 +141,7 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
     );
   }
   return (
-    <div className={cn(
-      "rounded-xl border bg-card p-5 flex items-start justify-between gap-4",
-      soft ? "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card" : "border-border"
-    )}>
+    <div className={cn("rounded-xl border bg-card p-5 flex items-start justify-between gap-4", cardBg)}>
       {body}
     </div>
   );
@@ -138,64 +155,6 @@ const filterLabel: Record<FilterKey, string> = {
   high: "High priority cases",
   today: "Cases due today or within hours",
 };
-
-type ChatMessage = { role: "user" | "assistant"; text: string; time: string };
-
-const SUGGESTIONS = [
-  "Which cases need my attention?",
-  "What's overdue?",
-  "Top recommended actions",
-  "Summarise my queue",
-];
-
-const getMockResponse = (q: string): string => {
-  const lq = q.toLowerCase();
-
-  if (lq.match(/attention|urgent|important|critical|high.?prior|escalat/)) {
-    return `**2 High Priority cases need your immediate attention:**\n\n**KYC-30214 — Brevan Howard Asset Management LLP**\nPSC nature-of-control change undisclosed. Companies House filing overdue. Due in **2 hours**.\n\n**KYC-30188 — Marshall Wace LLP**\nFCA permission scope change pending evidence. SLA closes **today**.\n\nI recommend starting with KYC-30214 — all exceptions are resolved and it's ready for sign-off.`;
-  }
-  if (lq.match(/overdue|late|past.?due|missed|breach/)) {
-    return `**3 cases are currently overdue:**\n\n- **KYC-30214** · Brevan Howard — 2 hrs overdue\n- **KYC-30188** · Marshall Wace — SLA closes today\n- **KYC-30201** · Brevan Howard — Jersey EDD pending\n\nAll 3 sit in the **London Alternatives DRG**. Marshall Wace is at highest risk of SLA breach.`;
-  }
-  if (lq.match(/recommend|action|next.?step|what should|to.?do|do next/)) {
-    return `**Top 3 recommended actions right now:**\n\n1. 🔴 **Sign off KYC-30214** — Brevan Howard exceptions resolved. Ready for sign-off.\n2. 🔴 **Escalate KYC-30188 FCA scope** — SLA breaches in <4 hrs, no client response.\n3. 🟡 **Run EDD on BH Partnership Holdings** — Jersey domicile triggers policy POL-EDD-23.\n\nThere are 4 further lower-urgency actions in the queue.`;
-  }
-  if (lq.match(/brevan|oc302636|kyc.?30214/)) {
-    return `**Brevan Howard Asset Management LLP (KYC-30214)**\n\n- **Status:** In Progress · High Priority · Elevated Risk\n- **Due:** Overdue — 2 hrs\n- **Open Exceptions:** 3 (PSC address drift, Jersey EDD, name continuity)\n- **Confidence:** 92%\n\n**Recommended:** Sign off — all exceptions addressed. PSC02 correction sent to client with 7-day SLA.`;
-  }
-  if (lq.match(/marshall.?wace|kyc.?30188|mwam/)) {
-    return `**Marshall Wace LLP (KYC-30188)**\n\n- **Status:** Pending Feedback · High Priority · Elevated Risk\n- **Due:** Overdue — SLA closes today\n- **Open Exceptions:** 2 (FCA permission drift, sanctions false positive)\n- **Confidence:** 88%\n\n**Watch out:** FCA shows a new "Managing an AIF" permission added 02/11/2026 — CRM not synced. Triggers AIFMD Article 23 disclosure obligations.`;
-  }
-  if (lq.match(/long.?focus|kyc.?30215/)) {
-    return `**Long Focus Capital Management, LLC (KYC-30215)**\n\n- **Status:** In Progress · High Priority · Elevated Risk\n- **Due:** Jul 02, 2026\n- **Open Exceptions:** 5 (US Reg # mismatch, LEI outstanding, address mismatch, CCO attestation, beneficial owner)\n- **Confidence:** 93%\n\nHighest exception count in the queue. Beneficial owner is unresolved — chain terminates at a Delaware holding company.`;
-  }
-  if (lq.match(/summar|overview|status|how many|count|total|queue/)) {
-    return `**Queue Summary — Today:**\n\n- **High priority:** 2 cases (both overdue)\n- **Medium priority:** 2 cases\n- **Low priority:** 4 cases\n- **Overdue:** 3 cases\n- **48-hr SLA at risk:** 5 cases\n- **Compliance alerts:** 2 unresolved\n- **AI recommended actions:** 7 pending\n\nCritical DRG: **London Alternatives** — 2 high-priority cases, both overdue.`;
-  }
-  if (lq.match(/sla|deadline|due.?date|time|when/)) {
-    return `**SLA Status:**\n\n- 🔴 KYC-30214 — due in **2 hrs**\n- 🔴 KYC-30188 — closes **today**\n- 🟡 KYC-30201 — due **tomorrow**\n- 🟡 KYC-30207 — due **Friday**\n- 🟢 KYC-30222 — due **next week**\n\nAvg response time is **3.2 days** — up 0.4d vs yesterday.`;
-  }
-  if (lq.match(/edd|jersey|enhanced.?due|bh.?partner/)) {
-    return `**Enhanced Due Diligence — BH Partnership Holdings Ltd**\n\nJersey reg. 106333 is a corporate designated member of Brevan Howard LLP. Jersey is listed under **EDD policy POL-EDD-23** due to bank-secrecy heritage.\n\nRequired: source-of-funds, source-of-wealth, natural-person UBO traversal. No EDD pack on file.\n\n**Recommended:** Run the EDD Agent bundle — ~20 min estimated completion.`;
-  }
-  if (lq.match(/sanction|screening|pep|watchlist/)) {
-    return `**Sanctions & Screening Status:**\n\n- ✅ 1 fuzzy match cleared — Sir Paul Marshall vs HMT "Paul Marshall" (DOB & nationality diverge)\n- ✅ 0 active hits across OFAC, EU CFSP, UN 1267, HMT\n- Last run: **Today, 6:00 AM**\n\n**Pending:** Add the cleared identity pair to the screening allowlist to suppress future alerts.`;
-  }
-  return `I can help you with your KYC case queue. Try asking:\n\n- "Which cases need attention?"\n- "What's overdue?"\n- "Summarise my queue"\n- "Tell me about Brevan Howard"\n- "What are the recommended actions?"\n- "What's the SLA status?"`;
-};
-
-// Simple markdown-to-JSX for bold and line breaks
-const renderMd = (text: string) =>
-  text.split("\n").map((line, li) => {
-    const parts = line.split(/\*\*(.*?)\*\*/g);
-    return (
-      <p key={li} className={cn("leading-snug text-[12px]", li > 0 && line === "" ? "mt-1" : li > 0 ? "mt-0.5" : "")}>
-        {parts.map((p, pi) =>
-          pi % 2 === 1 ? <strong key={pi} className="font-semibold">{p}</strong> : p
-        )}
-      </p>
-    );
-  });
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -246,35 +205,6 @@ const Dashboard = () => {
     };
   }, [entityByKyc]);
 
-  const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const [messages, setMessages] = useState<ChatMessage[]>([{
-    role: "assistant",
-    text: "You currently have **5 cases** within a 48-hour SLA across the **London Alternatives DRG**, and **2 unresolved compliance alerts** requiring action. How can I help?",
-    time: "8:42 AM",
-  }]);
-  const [inputValue, setInputValue] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const c = messagesContainerRef.current;
-    if (c) c.scrollTop = c.scrollHeight;
-  }, [messages, isTyping]);
-
-  const handleSend = (text: string) => {
-    const q = text.trim();
-    if (!q) return;
-    const userMsg: ChatMessage = { role: "user", text: q, time: now() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInputValue("");
-    setIsTyping(true);
-    setTimeout(() => {
-      const reply: ChatMessage = { role: "assistant", text: getMockResponse(q), time: now() };
-      setMessages((prev) => [...prev, reply]);
-      setIsTyping(false);
-    }, 800);
-  };
-
   const toggleKpi = (k: FilterKey) => setKpiFilter((prev) => (prev === k ? "all" : k));
 
   const totalCases = priorityCases.length;
@@ -322,8 +252,8 @@ const Dashboard = () => {
             label="SLA at Risk"
             value={String(slaAtRisk)}
             unit="cases"
-            trend={{ dir: "up", text: "Due within 48 hours" }}
-            accent="alert"
+            trend={{ dir: slaAtRisk === 0 ? "down" : "up", text: slaAtRisk === 0 ? "All SLAs on track" : "Due within 48 hours" }}
+            accent={slaAtRisk === 0 ? "success" : slaAtRisk < 3 ? "warning" : "alert"}
             soft
             icon={<AlertTriangle className="size-5" />}
           />
@@ -512,95 +442,8 @@ const Dashboard = () => {
 
       </div>
 
-      {/* Right column: AI + collab */}
+      {/* Right column: collab */}
       <aside className="col-span-12 xl:col-span-3 space-y-6">
-        <section className="rounded-xl border border-border bg-card flex flex-col" style={{ maxHeight: 480 }}>
-          <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b border-border shrink-0">
-            <span className="size-7 rounded-md bg-primary/10 text-primary grid place-items-center shrink-0">
-              <Sparkles className="size-3.5" />
-            </span>
-            <div>
-              <p className="text-[13px] font-semibold leading-tight">AI Assistant</p>
-              <p className="text-[10px] text-muted-foreground">KYC Agent Orchestrator</p>
-            </div>
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-success font-medium">
-              <span className="size-1.5 rounded-full bg-success animate-pulse" /> Live
-            </span>
-          </header>
-
-          {/* Message list */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
-            {messages.map((m, i) => (
-              <div key={i} className={cn("flex gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
-                {m.role === "assistant" && (
-                  <span className="size-6 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
-                    <Bot className="size-3" />
-                  </span>
-                )}
-                <div className={cn(
-                  "max-w-[85%] rounded-xl px-3 py-2 text-[12px]",
-                  m.role === "user"
-                    ? "bg-primary text-primary-foreground rounded-br-none"
-                    : "bg-secondary text-foreground rounded-bl-none"
-                )}>
-                  <div className="space-y-0.5">{renderMd(m.text)}</div>
-                  <p className={cn("text-[10px] mt-1", m.role === "user" ? "text-primary-foreground/70 text-right" : "text-muted-foreground")}>{m.time}</p>
-                </div>
-              </div>
-            ))}
-            {isTyping && (
-              <div className="flex gap-2 justify-start">
-                <span className="size-6 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
-                  <Bot className="size-3" />
-                </span>
-                <div className="bg-secondary rounded-xl rounded-bl-none px-3 py-2.5 flex items-center gap-1">
-                  <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
-                  <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
-                  <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Suggestion chips — always visible */}
-          <div className="px-4 pb-2 flex flex-wrap gap-1.5 shrink-0">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => handleSend(s)}
-                className="text-[10px] px-2.5 py-1 rounded-full border border-primary/30 bg-info-soft text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-
-          {/* Input */}
-          <div className="px-4 pb-4 pt-2 shrink-0 border-t border-border">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2">
-              <input
-                className="flex-1 bg-transparent text-[13px] placeholder:text-muted-foreground outline-none"
-                placeholder="Ask the AI about your queue…"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(inputValue); } }}
-              />
-              <button
-                onClick={() => handleSend(inputValue)}
-                disabled={!inputValue.trim() || isTyping}
-                className={cn(
-                  "size-7 rounded-md grid place-items-center transition-colors",
-                  inputValue.trim() && !isTyping
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-muted-foreground cursor-not-allowed"
-                )}
-              >
-                <Send className="size-3.5" />
-              </button>
-            </div>
-          </div>
-        </section>
-
         <section className="rounded-xl border border-border bg-card p-5">
           <header className="flex items-center justify-between mb-3">
             <h3 className="text-[15px] font-semibold">Collaboration &amp; Insights</h3>
