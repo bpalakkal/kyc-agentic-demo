@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import cytoscape from "cytoscape";
 // @ts-ignore — no types shipped with cytoscape-dagre
 import dagre from "cytoscape-dagre";
-import { X, ZoomIn, ZoomOut, Maximize2, RefreshCw, Expand } from "lucide-react";
+import { X, ZoomIn, ZoomOut, Maximize2, RefreshCw, Expand, GitMerge } from "lucide-react";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,8 @@ cytoscape.use(dagre);
 
 type CyNode = { id: string; label: string; _elementId?: string; [k: string]: unknown };
 type CyEdge = { id: string; source: string; target: string; label: string; [k: string]: unknown };
+
+const MAX_NODES = 100;
 
 function riskColor(node: CyNode): string {
   const risk = (node.clientRiskRating ?? node.riskRating ?? node.risk ?? "").toString().toLowerCase();
@@ -77,10 +79,7 @@ const CY_STYLE: cytoscape.Stylesheet[] = [
   },
   {
     selector: "node:selected",
-    style: {
-      "border-width": 4,
-      "border-color": "#fbbf24",
-    },
+    style: { "border-width": 4, "border-color": "#fbbf24" },
   },
   {
     selector: "edge",
@@ -102,10 +101,6 @@ const CY_STYLE: cytoscape.Stylesheet[] = [
     selector: "edge:selected",
     style: { "line-color": "#fbbf24", "target-arrow-color": "#fbbf24" },
   },
-  {
-    selector: "edge[?isNew]",
-    style: { "line-color": "#fbbf24", "target-arrow-color": "#fbbf24", "width": 2 },
-  },
 ];
 
 interface Props {
@@ -119,30 +114,82 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
   const cyRef = useRef<cytoscape.Core | null>(null);
   const expandedRef = useRef<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [expanding, setExpanding] = useState(false);
+  const [expandStatus, setExpandStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<CyNode | null>(null);
   const [nodeCount, setNodeCount] = useState(0);
   const [edgeCount, setEdgeCount] = useState(0);
+  const [atLimit, setAtLimit] = useState(false);
 
-  function safeElements(nodes: CyNode[], edges: CyEdge[]) {
-    const nodeIds = new Set(nodes.map(n => String(n.id)));
-    const safeEdges = edges.filter(e => nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)));
-    return { nodes, edges: safeEdges };
+  // ── helpers ────────────────────────────────────────────────────────────────
+
+  function safeEdges(nodes: CyNode[], edges: CyEdge[]) {
+    const ids = new Set(nodes.map(n => String(n.id)));
+    return edges.filter(e => ids.has(String(e.source)) && ids.has(String(e.target)));
   }
+
+  function syncCounts() {
+    const cy = cyRef.current;
+    if (!cy) return;
+    setNodeCount(cy.nodes().length);
+    setEdgeCount(cy.edges().length);
+    setAtLimit(cy.nodes().length >= MAX_NODES);
+  }
+
+  /** Fetch one node's neighbours from the expand endpoint and merge into cy.
+   *  Returns the count of brand-new nodes added. Does NOT run layout. */
+  async function fetchAndMerge(elementId: string): Promise<number> {
+    const cy = cyRef.current;
+    if (!cy || expandedRef.current.has(elementId)) return 0;
+    expandedRef.current.add(elementId);
+
+    const res = await fetch(`${AGENT_API_BASE}/api/neo4j/expand`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ elementId }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+
+    const nodes = (body.nodes ?? []) as CyNode[];
+    const edges = safeEdges(nodes, (body.edges ?? []) as CyEdge[]);
+
+    const existingNodeIds = new Set(cy.nodes().map(n => n.id()));
+    const existingEdgeIds = new Set(cy.edges().map(e => e.id()));
+
+    const newNodes = nodes.filter(n => !existingNodeIds.has(String(n.id)));
+    const newEdges = edges.filter(e => !existingEdgeIds.has(String(e.id)));
+
+    // Mark the expanded node
+    cy.getElementById(elementId.includes(":") ? String(nodes.find(n => n._elementId === elementId)?.id ?? "") : elementId)
+      .data("expanded", true);
+
+    // Also mark by iterating cy nodes with matching _elementId
+    cy.nodes().forEach(n => { if (n.data("_elementId") === elementId) n.data("expanded", true); });
+
+    if (newNodes.length > 0 || newEdges.length > 0) {
+      cy.add([
+        ...newNodes.map(n => ({ data: { ...n, color: riskColor(n), displayLabel: nodeLabel(n), isCentre: false, expanded: false } })),
+        ...newEdges.map(e => ({ data: { ...e } })),
+      ]);
+    }
+    return newNodes.length;
+  }
+
+  // ── load initial graph ──────────────────────────────────────────────────────
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
     setError(null);
     setSelected(null);
+    setAtLimit(false);
     expandedRef.current.clear();
     try {
       const res = await fetch(`${AGENT_API_BASE}/api/neo4j/entity/${encodeURIComponent(kycId)}/graph`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-      const { nodes, edges } = safeElements(body.nodes as CyNode[], body.edges as CyEdge[]);
-      setNodeCount(nodes.length);
-      setEdgeCount(edges.length);
+      const nodes = (body.nodes ?? []) as CyNode[];
+      const edges = safeEdges(nodes, (body.edges ?? []) as CyEdge[]);
       mountGraph(nodes, edges);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -158,9 +205,7 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
     const cy = cytoscape({
       container: containerRef.current,
       elements: [
-        ...nodes.map(n => ({
-          data: { ...n, color: riskColor(n), displayLabel: nodeLabel(n), isCentre: n.id === kycId, expanded: false },
-        })),
+        ...nodes.map(n => ({ data: { ...n, color: riskColor(n), displayLabel: nodeLabel(n), isCentre: n.id === kycId, expanded: false } })),
         ...edges.map(e => ({ data: { ...e } })),
       ],
       layout: DAGRE_LAYOUT,
@@ -170,64 +215,65 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
       boxSelectionEnabled: false,
     });
 
-    cy.on("tap", "node", (evt) => {
-      setSelected(evt.target.data() as CyNode);
-    });
-    cy.on("tap", (evt) => {
-      if (evt.target === cy) setSelected(null);
-    });
+    cy.on("tap", "node", (evt) => setSelected(evt.target.data() as CyNode));
+    cy.on("tap", (evt) => { if (evt.target === cy) setSelected(null); });
+    cy.on("layoutstop", syncCounts);
 
     cyRef.current = cy;
+    syncCounts();
   }
+
+  // ── expand single node ──────────────────────────────────────────────────────
 
   async function expandNode(node: CyNode) {
-    const elementId = node._elementId;
-    if (!elementId || !cyRef.current) return;
-    if (expandedRef.current.has(elementId)) return;
-    expandedRef.current.add(elementId);
-
-    setExpanding(true);
+    if (!node._elementId) return;
+    setExpandStatus("Expanding…");
     try {
-      const res = await fetch(`${AGENT_API_BASE}/api/neo4j/expand`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ elementId }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-
-      const cy = cyRef.current;
-      const { nodes, edges } = safeElements(body.nodes as CyNode[], body.edges as CyEdge[]);
-
-      // mark the clicked node as expanded
-      cy.getElementById(String(node.id)).data("expanded", true);
-
-      // add only genuinely new nodes/edges
-      const existingNodeIds = new Set(cy.nodes().map(n => n.id()));
-      const existingEdgeIds = new Set(cy.edges().map(e => e.id()));
-
-      const newElements: cytoscape.ElementDefinition[] = [
-        ...nodes
-          .filter(n => !existingNodeIds.has(String(n.id)))
-          .map(n => ({ data: { ...n, color: riskColor(n), displayLabel: nodeLabel(n), isCentre: false, expanded: false } })),
-        ...edges
-          .filter(e => !existingEdgeIds.has(String(e.id)))
-          .map(e => ({ data: { ...e, isNew: true } })),
-      ];
-
-      if (newElements.length > 0) {
-        cy.add(newElements);
-        cy.layout(DAGRE_LAYOUT).run();
-        setNodeCount(cy.nodes().length);
-        setEdgeCount(cy.edges().length);
-      }
+      await fetchAndMerge(node._elementId);
+      cyRef.current?.layout(DAGRE_LAYOUT).run();
+      syncCounts();
     } catch (e: unknown) {
-      expandedRef.current.delete(elementId);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setExpanding(false);
+      setExpandStatus(null);
     }
   }
+
+  // ── expand all (BFS) ────────────────────────────────────────────────────────
+
+  async function expandAll() {
+    const cy = cyRef.current;
+    if (!cy) return;
+    setExpandStatus("Expanding all…");
+    setError(null);
+    try {
+      let round = 0;
+      while (round < 10) {
+        round++;
+        if (cy.nodes().length >= MAX_NODES) { setAtLimit(true); break; }
+
+        const queue = cy.nodes()
+          .map(n => n.data("_elementId") as string | undefined)
+          .filter((eid): eid is string => !!eid && !expandedRef.current.has(eid));
+
+        if (queue.length === 0) break;
+
+        setExpandStatus(`Expanding… (${cy.nodes().length} nodes, round ${round})`);
+
+        const results = await Promise.all(queue.map(eid => fetchAndMerge(eid).catch(() => 0)));
+        const added = results.reduce((a, b) => a + b, 0);
+        if (added === 0) break;
+      }
+      cy.layout(DAGRE_LAYOUT).run();
+      syncCounts();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExpandStatus(null);
+    }
+  }
+
+  // ── lifecycle ───────────────────────────────────────────────────────────────
 
   useEffect(() => {
     loadGraph();
@@ -240,7 +286,8 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const isExpanded = selected?._elementId ? expandedRef.current.has(selected._elementId) : false;
+  const isSelectedExpanded = selected?._elementId ? expandedRef.current.has(selected._elementId) : false;
+  const isBusy = !!expandStatus || loading;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0f172a]">
@@ -252,13 +299,29 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
           {!loading && !error && (
             <span className="text-white/40 text-xs">{nodeCount} nodes · {edgeCount} edges</span>
           )}
-          {expanding && <span className="text-yellow-400/70 text-xs flex items-center gap-1"><RefreshCw className="size-3 animate-spin" /> Expanding…</span>}
+          {expandStatus && (
+            <span className="text-yellow-400/70 text-xs flex items-center gap-1.5">
+              <RefreshCw className="size-3 animate-spin" /> {expandStatus}
+            </span>
+          )}
+          {atLimit && (
+            <span className="text-orange-400/80 text-xs">(node limit reached: {MAX_NODES})</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={expandAll}
+            disabled={isBusy}
+            className="text-xs px-3 py-1.5 rounded border border-yellow-500/40 text-yellow-300 hover:bg-yellow-900/30 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition-colors"
+            title="Expand all relationships recursively"
+          >
+            <GitMerge className="size-3.5" /> Expand All
+          </button>
+          <div className="w-px h-6 bg-white/20" />
           <button onClick={() => cyRef.current?.fit(undefined, 40)} className="size-8 rounded border border-white/20 grid place-items-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" title="Fit to screen"><Maximize2 className="size-4" /></button>
           <button onClick={() => cyRef.current?.zoom((cyRef.current?.zoom() ?? 1) * 1.2)} className="size-8 rounded border border-white/20 grid place-items-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" title="Zoom in"><ZoomIn className="size-4" /></button>
           <button onClick={() => cyRef.current?.zoom((cyRef.current?.zoom() ?? 1) / 1.2)} className="size-8 rounded border border-white/20 grid place-items-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" title="Zoom out"><ZoomOut className="size-4" /></button>
-          <button onClick={loadGraph} className="size-8 rounded border border-white/20 grid place-items-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" title="Reset graph"><RefreshCw className="size-4" /></button>
+          <button onClick={loadGraph} disabled={isBusy} className="size-8 rounded border border-white/20 grid place-items-center text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-40 transition-colors" title="Reset graph"><RefreshCw className="size-4" /></button>
           <div className="w-px h-6 bg-white/20 mx-1" />
           <button onClick={onClose} className="size-8 rounded border border-white/20 grid place-items-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" title="Close (Esc)"><X className="size-4" /></button>
         </div>
@@ -267,7 +330,6 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
       {/* Graph canvas */}
       <div className="flex-1 relative overflow-hidden">
         <div ref={containerRef} className="absolute inset-0" />
-
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center text-white/60 text-sm gap-2">
             <RefreshCw className="size-4 animate-spin" /> Loading graph…
@@ -304,7 +366,7 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
           <p className="text-white font-medium text-sm mb-3">{nodeLabel(selected)}</p>
           <div className="space-y-1.5 mb-3">
             {Object.entries(selected)
-              .filter(([k]) => !["id", "label", "color", "isCentre", "name", "expanded", "displayLabel", "_elementId", "isNew"].includes(k))
+              .filter(([k]) => !["id", "label", "color", "isCentre", "name", "expanded", "displayLabel", "_elementId"].includes(k))
               .map(([k, v]) => (
                 <div key={k} className="flex items-baseline justify-between gap-2 text-[12px]">
                   <span className="text-white/50 capitalize shrink-0">{k.replace(/([A-Z])/g, " $1").trim()}</span>
@@ -320,16 +382,16 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
           {selected._elementId && (
             <button
               onClick={() => expandNode(selected)}
-              disabled={isExpanded || expanding}
+              disabled={isSelectedExpanded || isBusy}
               className={cn(
                 "w-full text-xs px-3 py-2 rounded-lg border flex items-center justify-center gap-2 transition-colors",
-                isExpanded
+                isSelectedExpanded || isBusy
                   ? "border-white/10 text-white/30 cursor-default"
                   : "border-yellow-500/40 text-yellow-300 hover:bg-yellow-900/30"
               )}
             >
               <Expand className="size-3" />
-              {isExpanded ? "Already expanded" : "Expand relationships"}
+              {isSelectedExpanded ? "Already expanded" : "Expand relationships"}
             </button>
           )}
         </div>

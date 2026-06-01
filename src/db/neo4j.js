@@ -115,7 +115,15 @@ export async function runGraphQuery(cypher, params = {}) {
         }
       }
     }
-    return { nodes: [...nodeMap.values()], edges: [...edgeMap.values()] };
+    // Deduplicate parallel edges — Neo4j allows multiple rels of the same type
+    // between the same pair of nodes; collapse them to one for the graph view.
+    const seenEdges = new Set();
+    const dedupedEdges = [];
+    for (const edge of edgeMap.values()) {
+      const key = `${edge.source}||${edge.label}||${edge.target}`;
+      if (!seenEdges.has(key)) { seenEdges.add(key); dedupedEdges.push(edge); }
+    }
+    return { nodes: [...nodeMap.values()], edges: dedupedEdges };
   } finally {
     await session.close();
   }
