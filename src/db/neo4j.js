@@ -90,6 +90,7 @@ export async function runGraphQuery(cypher, params = {}) {
     const elemIdToCyId = new Map(); // elementId → cyId
     const edgeMap  = new Map(); // elementId → edge data
 
+    // Pass 1 — collect ALL nodes across all records before touching edges
     for (const rec of result.records) {
       for (const key of rec.keys) {
         const val = rec.get(key);
@@ -100,6 +101,9 @@ export async function runGraphQuery(cypher, params = {}) {
           if (!nodeMap.has(cyId)) nodeMap.set(cyId, { id: cyId, label: val.labels[0] ?? 'Node', ...props });
         }
       }
+    }
+    // Pass 2 — collect edges now that every node elementId is registered
+    for (const rec of result.records) {
       for (const key of rec.keys) {
         const val = rec.get(key);
         if (isRel(val) && !edgeMap.has(val.elementId)) {

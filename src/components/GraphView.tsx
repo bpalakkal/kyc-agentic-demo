@@ -48,9 +48,11 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       const { nodes, edges } = body as { nodes: CyNode[]; edges: CyEdge[] };
+      const nodeIds = new Set(nodes.map(n => String(n.id)));
+      const safeEdges = edges.filter(e => nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)));
       setNodeCount(nodes.length);
-      setEdgeCount(edges.length);
-      mountGraph(nodes, edges);
+      setEdgeCount(safeEdges.length);
+      mountGraph(nodes, safeEdges);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
