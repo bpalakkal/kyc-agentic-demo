@@ -780,11 +780,13 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Select agents to run</p>
                   <p className="text-[11px] text-muted-foreground">Recommended pre-selected · pick any combination</p>
                 </div>
-                <div className="max-h-[320px] overflow-y-auto py-1">
+                <div className="max-h-[380px] overflow-y-auto py-1">
                   {AGENTS.map((a) => {
                     const Icon = a.icon;
                     const isSel = selected.has(a.id);
                     const isRec = bundle.agents.includes(a.id);
+                    const isLive = !!AGENT_API_CONFIGS[a.id];
+                    const canRunLive = isLive && !!entityContext?.name;
                     return (
                       <button
                         key={a.id}
@@ -797,16 +799,42 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                         )}>
                           {isSel && <CheckCircle2 className="size-3 text-primary-foreground" />}
                         </span>
-                        <span className="size-7 rounded-md bg-primary/10 text-primary grid place-items-center shrink-0">
+                        <span className={cn(
+                          "size-7 rounded-md grid place-items-center shrink-0",
+                          isLive ? "bg-success-soft text-success border border-success-soft-border" : "bg-primary/10 text-primary"
+                        )}>
                           <Icon className="size-3.5" />
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <p className="text-[12px] font-medium truncate">{a.name}</p>
                             {isRec && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Rec</span>}
+                            {isLive && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide flex items-center gap-0.5"><span className="size-1 rounded-full bg-success inline-block" />Live</span>}
                           </div>
                           <p className="text-[11px] text-muted-foreground leading-snug">{a.description}</p>
+                          {isLive && !entityContext?.name && (
+                            <p className="text-[10px] text-amber-500/80 mt-0.5">Open an entity in the review page to run live</p>
+                          )}
                         </div>
+                        {isLive && (
+                          <span
+                            role="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!canRunLive) return;
+                              runAgents([a.id], `${a.name} Lookup`);
+                              setOpen(false);
+                            }}
+                            className={cn(
+                              "text-[11px] font-medium shrink-0 mt-1 px-2 py-0.5 rounded border transition-colors",
+                              canRunLive
+                                ? "text-success border-success-soft-border hover:bg-success-soft cursor-pointer"
+                                : "text-muted-foreground border-border cursor-not-allowed opacity-40"
+                            )}
+                          >
+                            Run →
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -820,45 +848,6 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                   >
                     <Play className="size-3" /> Run Selected
                   </button>
-                </div>
-
-                {/* ── Live Data Source Agents ─────────────────────── */}
-                <div className="border-t border-border bg-secondary/30">
-                  <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-success inline-block" />
-                    Live Data Sources
-                  </p>
-                  {(
-                    [
-                      { id: "companies-house" as const, icon: Building2, label: "UK Companies House", desc: "Companies House incorporation & filing registry" },
-                      { id: "uk-parent-flow" as const, icon: Network, label: "UK Orchestration Flow", desc: "All UK agents end-to-end (Companies House, FCA, JFSC)" },
-                      { id: "jersey-fsc" as const, icon: Landmark, label: "Jersey FSC", desc: "Jersey Financial Services Commission registry" },
-                      { id: "fca" as const, icon: Scale, label: "FCA Data Sourcing", desc: "UK Financial Conduct Authority register" },
-                    ] as const
-                  ).map(({ id, icon: Icon, label, desc }) => (
-                    <button
-                      key={id}
-                      disabled={!entityContext?.name}
-                      onClick={() => { runAgents([id], `${label} Lookup`); setOpen(false); }}
-                      className="w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-secondary/60"
-                    >
-                      <span className="size-7 rounded-md bg-success-soft text-success border border-success-soft-border grid place-items-center shrink-0 mt-0.5">
-                        <Icon className="size-3.5" />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-[12px] font-medium">{label}</p>
-                          <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Live API</span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground leading-snug">
-                          {entityContext?.name
-                            ? <><span className="font-medium text-foreground">{entityContext.name}</span> · {desc}</>
-                            : "Open an entity in the review page first"}
-                        </p>
-                      </div>
-                      <span className="text-[11px] text-primary font-medium shrink-0 mt-1">Run →</span>
-                    </button>
-                  ))}
                 </div>
 
                 {/* ── Quality Assurance ─────────────────────────── */}
