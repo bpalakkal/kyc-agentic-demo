@@ -32,12 +32,23 @@ const TOOL_LABELS: Record<string, string> = {
 
 const renderMd = (text: string) =>
   text.split("\n").map((line, li) => {
-    const parts = line.split(/\*\*(.*?)\*\*/g);
+    const isBullet = line.startsWith("- ") || line.startsWith("• ");
+    const content  = isBullet ? line.slice(2) : line;
+    const parts    = content.split(/\*\*(.*?)\*\*/g);
+    const nodes    = parts.map((p, pi) =>
+      pi % 2 === 1 ? <strong key={pi} className="font-semibold">{p}</strong> : p
+    );
+    if (isBullet) {
+      return (
+        <p key={li} className="flex gap-1.5 items-start leading-snug text-[13px] mt-1">
+          <span className="shrink-0 mt-[5px] size-1 rounded-full bg-current opacity-40" />
+          <span>{nodes}</span>
+        </p>
+      );
+    }
     return (
-      <p key={li} className={cn("leading-snug text-[12px]", li > 0 && line === "" ? "mt-1" : li > 0 ? "mt-0.5" : "")}>
-        {parts.map((p, pi) =>
-          pi % 2 === 1 ? <strong key={pi} className="font-semibold">{p}</strong> : p
-        )}
+      <p key={li} className={cn("leading-snug text-[13px]", li > 0 && line === "" ? "mt-2" : li > 0 ? "mt-1" : "")}>
+        {nodes}
       </p>
     );
   });
@@ -147,29 +158,32 @@ const AiChatFloating = () => {
 
   return (
     <div
-      className="fixed z-50 bottom-4"
+      className="fixed z-50 bottom-6"
       style={{ right: rightPx, transition: "right 200ms ease" }}
     >
       {open ? (
         <div
-          className="w-[380px] rounded-xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden animate-fade-in"
-          style={{ maxHeight: 520 }}
+          className="w-[440px] rounded-2xl border border-border bg-card shadow-[0_8px_40px_-8px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden"
+          style={{ maxHeight: 560 }}
         >
           {/* Header */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-info-soft/60 to-card shrink-0">
-            <span className="size-7 rounded-md bg-primary/10 text-primary grid place-items-center shrink-0">
-              <Sparkles className="size-3.5" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold leading-tight">AI Assistant</p>
-              <p className="text-[10px] text-muted-foreground">KYC Agent Orchestrator</p>
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+            <div className="size-8 rounded-lg bg-primary/10 text-primary grid place-items-center shrink-0">
+              <Sparkles className="size-4" />
             </div>
-            <span className="flex items-center gap-1 text-[10px] text-success font-medium mr-1">
-              <span className="size-1.5 rounded-full bg-success animate-pulse" /> Live
-            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-[13px] font-semibold leading-tight">KYC Assistant</p>
+                <span className="flex items-center gap-1 text-[10px] text-success font-medium">
+                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
+                  Live
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">Powered by Claude · Real-time data</p>
+            </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-muted-foreground hover:text-foreground p-1"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
               aria-label="Close AI Assistant"
             >
               <X className="size-4" />
@@ -177,41 +191,50 @@ const AiChatFloating = () => {
           </div>
 
           {/* Message list */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
             {messages.map((m, i) => (
-              <div key={i} className={cn("flex gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
+              <div key={i} className={cn("flex gap-2.5", m.role === "user" ? "justify-end" : "justify-start items-start")}>
                 {m.role === "assistant" && (
-                  <span className="size-6 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
-                    <Bot className="size-3" />
-                  </span>
+                  <div className="size-7 rounded-lg bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
+                    <Bot className="size-3.5" />
+                  </div>
                 )}
                 <div className={cn(
-                  "max-w-[85%] rounded-xl px-3 py-2",
+                  "max-w-[82%] rounded-2xl px-3.5 py-2.5",
                   m.role === "user"
-                    ? "bg-primary text-primary-foreground rounded-br-none"
-                    : "bg-secondary text-foreground rounded-bl-none"
+                    ? "bg-primary text-primary-foreground rounded-tr-sm"
+                    : "bg-muted/70 text-foreground rounded-tl-sm"
                 )}>
-                  <div className="space-y-0.5">{renderMd(m.text)}</div>
-                  <p className={cn("text-[10px] mt-1", m.role === "user" ? "text-primary-foreground/70 text-right" : "text-muted-foreground")}>
+                  <div>{renderMd(m.text)}</div>
+                  <p className={cn("text-[10px] mt-1.5 leading-none", m.role === "user" ? "text-primary-foreground/60 text-right" : "text-muted-foreground")}>
                     {m.time}
                   </p>
                 </div>
               </div>
             ))}
+
+            {/* Typing / tool indicator */}
             {isTyping && messages[messages.length - 1]?.text === "" && (
-              <div className="flex gap-2 justify-start">
-                <span className="size-6 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
-                  <Bot className="size-3" />
-                </span>
-                <div className="bg-secondary rounded-xl rounded-bl-none px-3 py-2.5 flex items-center gap-1.5">
+              <div className="flex gap-2.5 items-start">
+                <div className="size-7 rounded-lg bg-primary/10 text-primary grid place-items-center shrink-0 mt-0.5">
+                  <Bot className="size-3.5" />
+                </div>
+                <div className="bg-muted/70 rounded-2xl rounded-tl-sm px-3.5 py-2.5">
                   {toolLabel ? (
-                    <span className="text-[11px] text-muted-foreground italic">{toolLabel}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="flex gap-0.5">
+                        <span className="size-1 rounded-full bg-primary/50 animate-bounce [animation-delay:0ms]" />
+                        <span className="size-1 rounded-full bg-primary/50 animate-bounce [animation-delay:100ms]" />
+                        <span className="size-1 rounded-full bg-primary/50 animate-bounce [animation-delay:200ms]" />
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{toolLabel}</span>
+                    </div>
                   ) : (
-                    <>
-                      <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
-                      <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
-                      <span className="size-1.5 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
-                    </>
+                    <div className="flex gap-1 items-center h-4">
+                      <span className="size-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:0ms]" />
+                      <span className="size-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:150ms]" />
+                      <span className="size-1.5 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:300ms]" />
+                    </div>
                   )}
                 </div>
               </div>
@@ -219,13 +242,13 @@ const AiChatFloating = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggestion chips */}
-          <div className="px-4 pb-2 flex flex-wrap gap-1.5 shrink-0">
+          {/* Suggestion chips — horizontal scroll */}
+          <div className="px-4 pb-2.5 flex gap-1.5 overflow-x-auto shrink-0 [&::-webkit-scrollbar]:hidden">
             {CHAT_SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 onClick={() => handleSend(s)}
-                className="text-[10px] px-2.5 py-1 rounded-full border border-primary/30 bg-info-soft text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                className="whitespace-nowrap text-[11px] px-3 py-1 rounded-full border border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors shrink-0"
               >
                 {s}
               </button>
@@ -233,11 +256,11 @@ const AiChatFloating = () => {
           </div>
 
           {/* Input */}
-          <div className="px-4 pb-4 pt-2 border-t border-border shrink-0">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2">
+          <div className="px-4 py-3 border-t border-border shrink-0">
+            <div className="flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 focus-within:border-primary/50 focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.08)] transition-all">
               <input
                 className="flex-1 bg-transparent text-[13px] placeholder:text-muted-foreground outline-none"
-                placeholder="Ask the AI about your queue…"
+                placeholder={entityContext?.name ? `Ask about ${entityContext.name}…` : "Ask anything about your queue…"}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
@@ -249,13 +272,13 @@ const AiChatFloating = () => {
                 onClick={() => handleSend(inputValue)}
                 disabled={!inputValue.trim() || isTyping}
                 className={cn(
-                  "size-7 rounded-md grid place-items-center transition-colors",
+                  "size-7 rounded-full grid place-items-center transition-all shrink-0",
                   inputValue.trim() && !isTyping
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                    : "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                 )}
               >
-                <Send className="size-3.5" />
+                <Send className="size-3" />
               </button>
             </div>
           </div>
