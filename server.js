@@ -403,8 +403,10 @@ const KYC_TOOLS = [
 async function executeTool(name, input) {
   try {
     if (name === "get_entity") {
-      const { getEntity } = await getSb();
-      return await getEntity(input.kyc_ref);
+      const { getEntities } = await getSb();
+      const all = await getEntities();
+      const entity = all.find(e => e.kyc_ref === input.kyc_ref);
+      return entity ?? { error: `No entity found with kyc_ref: ${input.kyc_ref}` };
     }
     if (name === "list_entities") {
       const { getEntities } = await getSb();
@@ -451,17 +453,18 @@ app.post("/api/chat", async (req, res) => {
 
   const send = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
-  const systemPrompt = `You are an AI assistant embedded in a KYC (Know Your Customer) compliance platform. You have real-time access to the entity work queue, compliance exceptions, and an ownership graph database.
-
-Key facts about the data model:
-- Entities have a kyc_ref (e.g. KYC-30214), risk_rating (High/Medium/Low), priority, status, jurisdiction, and due_date.
-- Exceptions are compliance issues linked to an entity — they have a type, status (open/resolved), and optional resolution.
-- The Neo4j graph contains Entity and Person nodes connected by relationships like IS_BENEFICIAL_OWNER_OF, IS_DIRECTOR_OF, IS_SHAREHOLDER_OF.
-- The KYC ref and Neo4j caseId are the same value.
+  const systemPrompt = `You are an AI analyst embedded in a KYC compliance platform with real-time access to entity data, exceptions, and an ownership graph.
 
 ${entityContext?.name ? `The analyst currently has **${entityContext.name}${entityContext.kyc ? ` (${entityContext.kyc})` : ""}** open.` : ""}
 
-Always use tools to retrieve live data before answering factual questions. Be concise and precise. Highlight risk signals, overdue items, and actionable next steps.`;
+Always use tools to retrieve live data before answering. Then respond with analysis — never dump raw fields or lists.
+
+**Response format rules:**
+- Entity summaries: exactly 2 short paragraphs. First: status snapshot — bold the **risk rating**, **jurisdiction**, **status**, and **due date**. Second: compliance posture — open exceptions, what they mean, and the single most important next action.
+- Graph summaries: exactly 2 short paragraphs. First: ownership structure in plain English — who owns what, key percentages if available. Second: risk signals — circular ownership, multiple directorships, offshore entities, or anything that warrants scrutiny. If the graph is clean, say so in one sentence.
+- Work queue / list answers: a 2–3 sentence summary of patterns (e.g. "7 of 15 high-risk cases are overdue, concentrated in Jersey and BVI jurisdictions"), then a short bulleted list of the top items with **name** and one key fact each.
+- Always bold the most critical fact in every response.
+- Never output raw JSON, field dumps, or exhaustive lists.`;
 
   // Convert chat history to Anthropic message format
   const anthropicMessages = messages.map(m => ({ role: m.role, content: m.text }));
