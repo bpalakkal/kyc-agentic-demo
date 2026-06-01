@@ -23,7 +23,7 @@ import AppLayout from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import WorkQueue from "./pages/WorkQueue";
 import ExceptionReview from "./pages/ExceptionReview";
-import { Reports } from "./pages/Placeholders";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const ScrollToTop = () => {
