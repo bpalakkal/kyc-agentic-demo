@@ -232,6 +232,35 @@ app.get("/api/agent-run/:runId", async (req, res) => {
   res.status(status).json(data);
 });
 
+// Artifacts list for a completed run.
+app.get("/api/agent-artifacts/:runId", async (req, res) => {
+  const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}/artifacts`;
+  const { status, data } = await proxyFetch(url);
+  res.status(status).json(data);
+});
+
+// Binary artifact download — streams file content back to the browser.
+// ?path= must be the relative downloadUrl returned by the artifacts endpoint.
+app.get("/api/artifact-download", async (req, res) => {
+  const artifactPath = req.query.path;
+  if (!artifactPath || typeof artifactPath !== "string") {
+    return res.status(400).json({ error: "path query param is required" });
+  }
+  const url = `${AWS_AGENT_BASE}${artifactPath}`;
+  try {
+    const upstream = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    res.status(upstream.status);
+    const ct = upstream.headers.get("content-type");
+    if (ct) res.setHeader("content-type", ct);
+    const cd = upstream.headers.get("content-disposition");
+    if (cd) res.setHeader("content-disposition", cd);
+    const buffer = await upstream.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 // ─── Supabase API endpoints ───────────────────────────────────────────────────
 
 // GET /api/entities — work queue list
