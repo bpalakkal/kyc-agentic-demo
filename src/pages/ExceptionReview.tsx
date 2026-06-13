@@ -7,7 +7,7 @@
  * Centre panel   Active exception: flag text, narrative, evidence, resolutions
  * Right panel    Attributes / Document Locker / Collaboration (collapsible)
  * Top bar        QA Review · Escalate · Outreach · Submit actions
- * Bottom-right   Agent Console Dock (from AgentSystem)
+ * Bottom-right   Agent Console Dock (from AgentSystem
  *
  * Data sources (current state — demo)
  * ─────────────────────────────────────
@@ -1159,12 +1159,12 @@ const ExceptionReview = () => {
         onClose={() => setGraphOpen(false)}
       />
     )}
-    <div className="px-6 py-6 max-w-[1480px] mx-auto">
+    <div className="px-6 py-2 max-w-[1480px] mx-auto">
       {/* Top header */}
       <div className="rounded-xl border border-border bg-card p-4 mb-4">
         <div className="flex items-start justify-between gap-6">
-          <div className="flex items-start gap-8 flex-1 flex-wrap">
-            <div>
+          <div className="flex items-start gap-4 gap-y-2 flex-1 flex-wrap min-w-[380px]">
+            <div className="w-full">
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">DRG</p>
               <Popover>
                 <PopoverTrigger asChild>
