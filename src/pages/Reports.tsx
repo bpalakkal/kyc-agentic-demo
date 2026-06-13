@@ -179,12 +179,12 @@ const ChartTooltip = ({ active, payload, label }: any) => {
 const Card = ({
   title, subtitle, children, className,
 }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) => (
-  <div className={cn("rounded-xl border border-border bg-card overflow-hidden", className)}>
-    <div className="px-5 py-3.5 border-b border-border">
-      <p className="text-[13px] font-semibold">{title}</p>
+  <div className={cn("rounded-xl border border-border bg-card overflow-hidden shadow-sm", className)}>
+    <div className="px-4 py-2.5 border-b border-border">
+      <p className="text-[13px] font-bold">{title}</p>
       {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
     </div>
-    <div className="p-5">{children}</div>
+    <div className="p-4">{children}</div>
   </div>
 );
 
@@ -300,7 +300,7 @@ const SlaQueue = () => (
     ].map(s => (
       <div key={s.label} className="rounded-xl border border-border bg-card px-4 py-3.5">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{s.label}</p>
-        <p className="text-2xl font-semibold tabular-nums mt-1.5">{s.value}</p>
+        <p className="text-2xl font-bold tabular-nums mt-1.5">{s.value}</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">{s.note}</p>
       </div>
     ))}
@@ -324,7 +324,7 @@ const Exceptions = () => (
           : "border-border",
         )}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{s.label}</p>
-          <p className={cn("text-2xl font-semibold tabular-nums mt-1.5",
+          <p className={cn("text-2xl font-bold tabular-nums mt-1.5",
             s.accent === "success" ? "text-success" : s.accent === "warning" ? "text-warning" : ""
           )}>{s.value}</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">{s.note}</p>
@@ -446,7 +446,7 @@ const ReportLibrary = () => (
       const items = REPORT_CATALOG.filter(r => r.category === cat);
       return (
         <section key={cat} className="rounded-xl border border-border bg-card overflow-hidden">
-          <header className="flex items-center gap-3 px-5 py-3 border-b border-border bg-secondary/40">
+          <header className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-secondary/40">
             <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium", CAT_TONE[cat])}>{cat}</span>
             <span className="text-xs text-muted-foreground">{items.length} reports</span>
           </header>
@@ -488,7 +488,7 @@ const Reports = () => {
       {/* Header */}
       <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">Reports</h1>
+          <h1 className="text-[18px] font-bold tracking-tight">Reports</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Compliance analytics and report exports · Last 30 days
           </p>
@@ -501,24 +501,22 @@ const Reports = () => {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {KPIS.map(k => (
-          <div key={k.label} className="rounded-xl border border-border bg-card p-4 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{k.label}</p>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-semibold tabular-nums">{k.value}</span>
-                {k.unit && <span className="text-sm text-muted-foreground">{k.unit}</span>}
-              </div>
-              <p className={cn("mt-1.5 text-xs flex items-center gap-1 font-medium", k.trend.good ? "text-success" : "text-alert")}>
-                {k.trend.dir === "up" ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-                {k.trend.text}
-              </p>
+          <div key={k.label} className={cn(
+            "rounded-xl border border-border bg-card p-4 shadow-sm",
+            k.accent === "success" ? "border-t-[3px] border-t-success"
+            : k.accent === "warning" ? "border-t-[3px] border-t-warning"
+            : k.accent === "alert"   ? "border-t-[3px] border-t-alert"
+            : "border-t-[3px] border-t-primary",
+          )}>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{k.label}</p>
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="text-2xl font-bold tabular-nums">{k.value}</span>
+              {k.unit && <span className="text-sm text-muted-foreground">{k.unit}</span>}
             </div>
-            <div className={cn(
-              "size-9 rounded-lg grid place-items-center shrink-0",
-              k.accent === "success" ? "bg-success-soft text-success" : "bg-warning-soft text-warning",
-            )}>
-              {k.icon}
-            </div>
+            <p className={cn("mt-1.5 text-xs flex items-center gap-1 font-medium", k.trend.good ? "text-success" : "text-alert")}>
+              {k.trend.dir === "up" ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+              {k.trend.text}
+            </p>
           </div>
         ))}
       </div>
