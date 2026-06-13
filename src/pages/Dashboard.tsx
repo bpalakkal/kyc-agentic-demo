@@ -84,20 +84,10 @@ const ACCENT_TEXT: Record<AccentVariant, string> = {
   warning: "text-warning",
   success: "text-success",
 };
-const ACCENT_ICON: Record<AccentVariant, string> = {
-  alert:   "bg-alert/10 text-alert",
-  warning: "bg-warning/10 text-warning",
-  success: "bg-success/10 text-success",
-};
-const ACCENT_CARD: Record<AccentVariant, string> = {
-  alert:   "border-alert-soft-border bg-gradient-to-br from-alert-soft to-card",
-  warning: "border-warning-soft-border bg-gradient-to-br from-warning-soft to-card",
-  success: "border-success-soft-border bg-gradient-to-br from-success-soft to-card",
-};
 
-const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, active, topBorderClass }: {
+const Stat = ({ label, value, unit, trend, accent, icon, onClick, active, topBorderClass }: {
   label: string; value: string; unit?: string; trend?: { dir: "up" | "down"; text: string };
-  accent?: AccentVariant; icon?: React.ReactNode; soft?: boolean; onClick?: () => void; active?: boolean;
+  accent?: AccentVariant; icon?: React.ReactNode; onClick?: () => void; active?: boolean;
   topBorderClass?: string;
 }) => {
   const body = (
@@ -118,14 +108,14 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
       {icon && (
         <div className={cn(
           "size-10 rounded-lg grid place-items-center shrink-0",
-          soft && accent ? ACCENT_ICON[accent] : cn("bg-secondary text-muted-foreground", onClick && "transition-colors group-hover:bg-primary/10 group-hover:text-primary"),
+          cn("bg-secondary text-muted-foreground", onClick && "transition-colors group-hover:bg-primary/10 group-hover:text-primary"),
           active && onClick && "bg-primary/10 text-primary"
         )}>{icon}</div>
       )}
     </>
   );
 
-  const cardBg = topBorderClass ? `border-border ${topBorderClass}` : soft && accent ? ACCENT_CARD[accent] : "border-border";
+  const cardBg = topBorderClass ? `border-border ${topBorderClass}` : "border-border";
 
   if (onClick) {
     return (
@@ -266,7 +256,7 @@ const Dashboard = () => {
                 <span className="text-2xl font-bold tracking-tight tabular-nums">48</span>
                 <span className="text-lg text-muted-foreground">%</span>
               </div>
-              <p className="mt-2 text-xs text-[hsl(30_70%_40%)] flex items-center gap-1 font-medium">
+              <p className="mt-2 text-xs text-warning flex items-center gap-1 font-medium">
                 <ArrowDownRight className="size-3" /> 3% vs yesterday
               </p>
             </div>
