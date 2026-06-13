@@ -295,7 +295,7 @@ const WorkQueue = () => {
   return (
     <div className="px-6 py-6">
       <div className="mb-5">
-        <h1 className="text-[22px] font-semibold tracking-tight">Alex's Work Queue</h1>
+        <h1 className="text-[18px] font-bold tracking-tight">Alex's Work Queue</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Select entities to begin a review session. Locked rows are read-only.</p>
       </div>
 
@@ -354,7 +354,7 @@ const WorkQueue = () => {
 
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
         {/* Header row */}
-        <div className={`grid ${COLS} gap-2 px-4 py-3 bg-secondary/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground`}>
+        <div className={`grid ${COLS} gap-2 px-4 py-3 bg-muted/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground`}>
           <span />
           <span>Entity Name ⇅</span>
           <span>Due Date ↑</span>
@@ -391,7 +391,12 @@ const WorkQueue = () => {
             <div key={g.id} className="border-b border-border last:border-0">
               <button
                 onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !open }))}
-                className="w-full grid grid-cols-[40px_40px_1fr] items-center gap-2 px-4 py-3 text-left hover:bg-secondary/40 transition-colors"
+                className={cn(
+                  "w-full grid grid-cols-[40px_40px_1fr] items-center gap-2 px-4 py-3 text-left hover:bg-secondary/40 transition-colors",
+                  g.priorityTone === "high"   && "border-l-2 border-l-alert",
+                  g.priorityTone === "medium" && "border-l-2 border-l-warning",
+                  g.priorityTone === "low"    && "border-l-2 border-l-muted-foreground/30"
+                )}
               >
                 <span className="size-4 rounded border border-border" />
                 <span className="text-muted-foreground">
