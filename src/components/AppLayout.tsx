@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
 import { Bell, User, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip, useAgents, AGENT_API_BASE } from "@/components/AgentSystem";
-import kpmgLogo from "@/assets/kpmg-logo-white.svg";
 
 const tabs = [
   { to: "/", label: "Dashboard", end: true },
@@ -307,10 +306,13 @@ const AppLayout = () => {
       <div className="h-full bg-background flex flex-col min-w-0 overflow-x-hidden">
         <header className="bg-nav text-nav-foreground">
           <div className="px-6 h-14 flex items-center gap-8">
-            <div className="flex items-center gap-3">
-              <img src={kpmgLogo} alt="KPMG" className="h-5 w-auto" />
-              <span className="font-semibold text-[15px]">KYC Platform</span>
-            </div>
+            <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+              <div className="w-[3px] h-[22px] rounded-full bg-gradient-to-b from-blue-500 to-indigo-500 shrink-0" />
+              <div>
+                <div className="text-[14px] font-bold text-nav-foreground tracking-tight leading-tight">KYC Sentinel</div>
+                <div className="text-[9px] text-nav-muted uppercase tracking-widest leading-tight">Powered by Forge</div>
+              </div>
+            </Link>
 
             <nav className="flex-1 flex items-center justify-center gap-8">
               {tabs.map((t) =>
