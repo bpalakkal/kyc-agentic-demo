@@ -95,16 +95,17 @@ const ACCENT_CARD: Record<AccentVariant, string> = {
   success: "border-success-soft-border bg-gradient-to-br from-success-soft to-card",
 };
 
-const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, active }: {
+const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, active, topBorderClass }: {
   label: string; value: string; unit?: string; trend?: { dir: "up" | "down"; text: string };
   accent?: AccentVariant; icon?: React.ReactNode; soft?: boolean; onClick?: () => void; active?: boolean;
+  topBorderClass?: string;
 }) => {
   const body = (
     <>
       <div className="min-w-0">
         <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">{label}</p>
         <div className="mt-2 flex items-baseline gap-2">
-          <span className={cn("text-3xl font-semibold tracking-tight tabular-nums", accent && ACCENT_TEXT[accent])}>{value}</span>
+          <span className={cn("text-2xl font-bold tracking-tight tabular-nums", accent && ACCENT_TEXT[accent])}>{value}</span>
           {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
         </div>
         {trend && (
@@ -124,7 +125,7 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
     </>
   );
 
-  const cardBg = soft && accent ? ACCENT_CARD[accent] : "border-border";
+  const cardBg = topBorderClass ? `border-border ${topBorderClass}` : soft && accent ? ACCENT_CARD[accent] : "border-border";
 
   if (onClick) {
     return (
@@ -132,7 +133,7 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
         type="button"
         onClick={onClick}
         className={cn(
-          "group rounded-xl border bg-card p-5 flex items-start justify-between gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40",
+          "group rounded-xl border bg-card p-4 flex items-start justify-between gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 text-left w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 shadow-sm",
           cardBg,
           active && "ring-2 ring-primary/60 shadow-md -translate-y-0.5"
         )}>
@@ -141,7 +142,7 @@ const Stat = ({ label, value, unit, trend, accent, icon, soft = false, onClick, 
     );
   }
   return (
-    <div className={cn("rounded-xl border bg-card p-5 flex items-start justify-between gap-4", cardBg)}>
+    <div className={cn("rounded-xl border bg-card p-4 flex items-start justify-between gap-4 shadow-sm", cardBg)}>
       {body}
     </div>
   );
@@ -233,7 +234,7 @@ const Dashboard = () => {
         {/* Page heading */}
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-[22px] font-semibold tracking-tight">Alex's Dashboard</h1>
+            <h1 className="text-[18px] font-bold tracking-tight">Alex's Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Real-time view of cases, SLAs and AI-recommended actions across your cases.</p>
           </div>
           <p className="text-xs text-muted-foreground">Last refreshed: Today, 8:42 AM</p>
@@ -247,6 +248,7 @@ const Dashboard = () => {
             unit="open cases"
             trend={{ dir: "up", text: "+3 since last week" }}
             icon={<FileText className="size-5" />}
+            topBorderClass="border-t-[3px] border-t-primary"
           />
           <Stat
             label="SLA at Risk"
@@ -254,22 +256,22 @@ const Dashboard = () => {
             unit="cases"
             trend={{ dir: slaAtRisk === 0 ? "down" : "up", text: slaAtRisk === 0 ? "All SLAs on track" : "Due within 48 hours" }}
             accent={slaAtRisk === 0 ? "success" : slaAtRisk < 3 ? "warning" : "alert"}
-            soft
+            topBorderClass={slaAtRisk === 0 ? "border-t-[3px] border-t-success" : slaAtRisk < 3 ? "border-t-[3px] border-t-warning" : "border-t-[3px] border-t-alert"}
             icon={<AlertTriangle className="size-5" />}
           />
-          <div className="rounded-xl border border-border bg-card p-5 flex items-start justify-between">
+          <div className="rounded-xl border border-border border-t-[3px] border-t-success bg-card p-4 flex items-start justify-between shadow-sm">
             <div>
               <p className="text-[11px] font-medium tracking-wide uppercase text-muted-foreground">Cases Complete</p>
               <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-3xl font-semibold tracking-tight tabular-nums">48</span>
-                <span className="text-xl text-muted-foreground">%</span>
+                <span className="text-2xl font-bold tracking-tight tabular-nums">48</span>
+                <span className="text-lg text-muted-foreground">%</span>
               </div>
               <p className="mt-2 text-xs text-[hsl(30_70%_40%)] flex items-center gap-1 font-medium">
                 <ArrowDownRight className="size-3" /> 3% vs yesterday
               </p>
             </div>
-            <div className="relative size-14">
-              <svg viewBox="0 0 36 36" className="size-14 -rotate-90">
+            <div className="relative size-12">
+              <svg viewBox="0 0 36 36" className="size-12 -rotate-90">
                 <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--secondary))" strokeWidth="3.6" />
                 <circle cx="18" cy="18" r="15.9" fill="none" stroke="hsl(var(--primary))" strokeWidth="3.6"
                   strokeDasharray="48 100" strokeLinecap="round" />
@@ -280,30 +282,25 @@ const Dashboard = () => {
         </div>
 
         {/* Second stat row — clickable priority shortcuts */}
-        <div className="rounded-xl border border-border bg-card divide-y md:divide-y-0 md:divide-x divide-border grid grid-cols-2 md:grid-cols-4 overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {([
-            { label: "High Priority", value: highPriorityCount, icon: <AlertTriangle className="size-4" />, accent: true,  action: () => toggleKpi("high"),  active: kpiFilter === "high" },
-            { label: "Due Today",     value: dueTodayCount,     icon: <Clock className="size-4" />,          accent: false, action: () => toggleKpi("today"), active: kpiFilter === "today" },
-            { label: "Compliance Alerts", value: 2,             icon: <AlertTriangle className="size-4" />, accent: true,  action: goQueue,                   active: false },
-            { label: "AI Actions for Today", value: aiActionsLive.filter(a => a.dot === "alert").length, icon: <Sparkles className="size-4" />, accent: false, action: () => setActionsFilter((p) => p === "today" ? "all" : "today"), active: actionsFilter === "today" },
+            { label: "High Priority",        value: highPriorityCount,                                    borderClass: "border-t-[3px] border-t-alert",      textClass: "text-alert",    action: () => toggleKpi("high"),                                               active: kpiFilter === "high" },
+            { label: "Due Today",            value: dueTodayCount,                                        borderClass: "border-t-[3px] border-t-warning",    textClass: "text-warning",  action: () => toggleKpi("today"),                                              active: kpiFilter === "today" },
+            { label: "Compliance Alerts",    value: 2,                                                    borderClass: "border-t-[3px] border-t-alert",      textClass: "text-alert",    action: goQueue,                                                               active: false },
+            { label: "AI Actions for Today", value: aiActionsLive.filter(a => a.dot === "alert").length, borderClass: "border-t-[3px] border-t-indigo-500", textClass: "text-indigo-500 dark:text-indigo-400", action: () => setActionsFilter((p) => p === "today" ? "all" : "today"), active: actionsFilter === "today" },
           ] as const).map((s) => (
             <button
               key={s.label}
               type="button"
               onClick={s.action}
               className={cn(
-                "text-left px-4 py-3 hover:bg-secondary/40 transition-colors focus:outline-none focus:bg-secondary/60 flex items-center gap-3",
-                s.active && "bg-info-soft"
+                "rounded-xl border border-border bg-card p-4 text-left flex flex-col gap-1 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/40",
+                s.borderClass,
+                s.active && "ring-2 ring-primary/40 -translate-y-0.5 shadow-md"
               )}
             >
-              <span className={cn(
-                "size-8 rounded-lg grid place-items-center shrink-0",
-                s.accent ? "bg-alert/10 text-alert" : "bg-secondary text-muted-foreground"
-              )}>{s.icon}</span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-medium tracking-wide uppercase text-muted-foreground">{s.label}</p>
-                <p className={cn("text-lg font-semibold tabular-nums leading-tight", s.accent && "text-alert")}>{s.value}</p>
-              </div>
+              <p className="text-[10px] font-medium tracking-wide uppercase text-muted-foreground">{s.label}</p>
+              <p className={cn("text-2xl font-bold tabular-nums leading-tight", s.textClass)}>{s.value}</p>
             </button>
           ))}
         </div>
@@ -312,7 +309,7 @@ const Dashboard = () => {
         {/* Priority Cases + Recommended Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Priority Cases — 3 by default, expand to scroll */}
-          <section className="rounded-xl border border-border bg-card p-5">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <header className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-semibold">All Cases</h2>
@@ -389,7 +386,7 @@ const Dashboard = () => {
           </section>
 
           {/* Recommended Actions — 3 by default, expand to scroll */}
-          <section className="rounded-xl border border-border bg-card p-5">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <header className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-semibold flex items-center gap-2">
@@ -444,7 +441,7 @@ const Dashboard = () => {
 
       {/* Right column: collab */}
       <aside className="col-span-12 xl:col-span-3 space-y-6">
-        <section className="rounded-xl border border-border bg-card p-5">
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <header className="flex items-center justify-between mb-3">
             <h3 className="text-[15px] font-semibold">Collaboration &amp; Insights</h3>
             <button className="text-muted-foreground hover:text-foreground"><Maximize2 className="size-4" /></button>
