@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Bell, User, BotMessageSquare, Bot, Send, X, Sparkles } from "lucide-react";
+import { Bell, User, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip, useAgents, AGENT_API_BASE } from "@/components/AgentSystem";
 import kpmgLogo from "@/assets/kpmg-logo-white.svg";
@@ -300,6 +301,7 @@ const AiChatFloating = () => {
 
 const AppLayout = () => {
   const location = useLocation();
+  const { resolvedTheme, setTheme } = useTheme();
   return (
     <AgentProvider>
       <div className="h-full bg-background flex flex-col min-w-0 overflow-x-hidden">
@@ -342,6 +344,13 @@ const AppLayout = () => {
             </nav>
 
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                className="text-nav-muted hover:text-nav-foreground transition-colors"
+                aria-label="Toggle theme"
+              >
+                {resolvedTheme === "dark" ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
+              </button>
               <button className="text-nav-muted hover:text-nav-foreground transition-colors" aria-label="Notifications">
                 <Bell className="size-[18px]" />
               </button>
