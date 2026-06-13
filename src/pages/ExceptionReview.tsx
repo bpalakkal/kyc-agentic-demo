@@ -1422,7 +1422,7 @@ const ExceptionReview = () => {
             </button>
           </aside>
         ) : (
-        <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <header className="flex items-center justify-between mb-3 pb-3 border-b border-border">
             <div className="flex items-center gap-3 flex-wrap">
               <Settings2 className="size-3.5 text-muted-foreground" />
@@ -1680,7 +1680,7 @@ const ExceptionReview = () => {
 
         {/* Right: Attributes / Document Locker — collapsible */}
         {rightPaneOpen ? (
-          <aside className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <aside className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4 border-b border-border">
               <div className="flex items-center gap-4">
                 <button
