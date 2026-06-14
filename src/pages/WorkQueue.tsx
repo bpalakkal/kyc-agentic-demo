@@ -18,6 +18,7 @@ import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2 } f
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── API types ────────────────────────────────────────────────────────────────
 
@@ -230,6 +231,11 @@ const EntityRow = ({
 // ─── Page component ───────────────────────────────────────────────────────────
 
 const WorkQueue = () => {
+  const { user } = useAuth();
+  const firstName =
+    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0]
+    ?? user?.email?.split("@")[0]
+    ?? "My";
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -295,7 +301,7 @@ const WorkQueue = () => {
   return (
     <div className="px-6 py-6">
       <div className="mb-5">
-        <h1 className="text-[18px] font-bold tracking-tight">Alex's Work Queue</h1>
+        <h1 className="text-[18px] font-bold tracking-tight">{firstName}'s Work Queue</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Select entities to begin a review session. Locked rows are read-only.</p>
       </div>
 

@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ApiEntity = {
   kyc_ref: string;
@@ -148,6 +149,11 @@ const filterLabel: Record<FilterKey, string> = {
 };
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const firstName =
+    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0]
+    ?? user?.email?.split("@")[0]
+    ?? "My";
   const navigate = useNavigate();
   const goQueue = () => navigate("/work-queue");
   const [priorityExpanded, setPriorityExpanded] = useState(false);
@@ -224,7 +230,7 @@ const Dashboard = () => {
         {/* Page heading */}
         <div className="flex items-end justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-[18px] font-bold tracking-tight">Alex's Dashboard</h1>
+            <h1 className="text-[18px] font-bold tracking-tight">{firstName}'s Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Real-time view of cases, SLAs and AI-recommended actions across your cases.</p>
           </div>
           <p className="text-xs text-muted-foreground">Last refreshed: Today, 8:42 AM</p>
