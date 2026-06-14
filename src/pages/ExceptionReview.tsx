@@ -1726,10 +1726,11 @@ const ExceptionReview = () => {
       </>
       )}
       {attrViewMode === "attributes" && (
-        <div className="py-4 text-sm text-muted-foreground text-center">
-          Attribute view — coming in next task
-        </div>
-      )}
+  <AttributeFormView
+    selectedEntities={selectedEntities}
+    exceptions={effectiveExceptions}
+  />
+)}
 
         {/* Right: Attributes / Document Locker — collapsible */}
         {rightPaneOpen ? (
@@ -2592,7 +2593,73 @@ TRACE_DOCS["Designated Members"] = [
   ...(TRACE_DOCS["Persons of Significant Control"] ?? []).slice(0, 1),
 ];
 
+type AuditEntry = {
+  type: "agent" | "analyst_action" | "override";
+  actor: string;
+  role?: string;
+  action: string;
+  valueBefore?: string;
+  valueAfter?: string;
+  confidence?: number;   // 0–100 for agents; 100 for overrides (rendered as "1.0")
+  isManual?: boolean;    // true → render confidence as "1.0" in green
+  timestamp: string;
+  source?: string;
+};
 
+const ATTR_AUDIT_LOG: Record<string, AuditEntry[]> = {
+  "LEI Number": [
+    {
+      type: "agent", actor: "Document Agent", action: "Retrieved from GLEIF registry",
+      valueAfter: "549300TRJQK6NRSF5M51", confidence: 87,
+      timestamp: "2024-10-28 · 14:32 UTC", source: "GLEIF Registry",
+    },
+    {
+      type: "analyst_action", actor: "James Holloway", role: "Analyst",
+      action: "Re-ran agent — value inconsistent with CRM record",
+      timestamp: "2024-11-01 · 09:17 UTC",
+    },
+    {
+      type: "agent", actor: "Document Agent", action: "Re-processed GLEIF + CRM cross-reference",
+      valueBefore: "549300TRJQK6NRSF5M51", valueAfter: "549300TRJQK6NRSF5M52", confidence: 71,
+      timestamp: "2024-11-01 · 09:18 UTC", source: "GLEIF + CRM",
+    },
+  ],
+  "Incorporation Date": [
+    {
+      type: "agent", actor: "Document Agent", action: "Retrieved from Companies House filing",
+      valueAfter: "2002-11-19", confidence: 87,
+      timestamp: "2024-10-28 · 14:32 UTC", source: "Companies House",
+    },
+    {
+      type: "analyst_action", actor: "James Holloway", role: "Analyst",
+      action: "Re-ran agent — date inconsistent with articles of association",
+      timestamp: "2024-11-01 · 09:17 UTC",
+    },
+    {
+      type: "agent", actor: "Document Agent", action: "Re-processed Companies House + MoA",
+      valueBefore: "2002-11-19", valueAfter: "2002-11-12", confidence: 71,
+      timestamp: "2024-11-01 · 09:18 UTC", source: "Companies House + MoA",
+    },
+    {
+      type: "override", actor: "Sarah Chen", role: "Senior Analyst",
+      action: "Manual override — confirmed via incorporation certificate #IC-2002-441",
+      valueBefore: "2002-11-12", valueAfter: "2002-11-14",
+      confidence: 100, isManual: true,
+      timestamp: "2024-11-02 · 11:45 UTC",
+    },
+  ],
+  "Persons of Significant Control": [
+    {
+      type: "agent", actor: "Document Agent", action: "Retrieved from Companies House PSC register",
+      valueAfter: "Alan Howard · 75–100% voting rights", confidence: 88,
+      timestamp: "2024-11-01 · 10:05 UTC", source: "Companies House",
+    },
+    {
+      type: "agent", actor: "Audit Agent", action: "Cross-referenced against OFAC + Refinitiv",
+      confidence: 82, timestamp: "2024-11-01 · 10:06 UTC", source: "OFAC / Refinitiv",
+    },
+  ],
+};
 
 
 
@@ -3396,6 +3463,204 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
         />
       )}
 
+    </div>
+  );
+};
+
+// ── Attribute Form View ──────────────────────────────────────────────────────
+
+const AttributeFormView = ({
+  selectedEntities,
+  exceptions: excs,
+}: {
+  selectedEntities: { name: string; kyc: string; drg?: string }[];
+  exceptions: Exc[];
+}) => {
+  const [openTraceFor, setOpenTraceFor] = useState<{ label: string; entity: string } | null>(null);
+  const [openOverrideFor, setOpenOverrideFor] = useState<{ label: string; entity: string } | null>(null);
+  const [overrideDraft, setOverrideDraft] = useState("");
+  const [overrideNote, setOverrideNote] = useState("");
+  const [savedOverrides, setSavedOverrides] = useState<Record<string, { value: string; actor: string; timestamp: string }>>({});
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+  const [traceStepsOpen, setTraceStepsOpen] = useState(false);
+  const [traceDocsOpen, setTraceDocsOpen] = useState(false);
+  const [traceTab, setTraceTab] = useState<"reasoning" | "audit">("reasoning");
+
+  const { runAgents } = useAgents();
+
+  // Reset disclosure state when selected trace changes
+  useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); setTraceTab("reasoning"); }, [openTraceFor]);
+  // Close override form when trace changes
+  useEffect(() => { setOpenOverrideFor(null); setOverrideDraft(""); setOverrideNote(""); }, [openTraceFor]);
+
+  // Resolve trace for the currently open field (same logic as AttributeTree)
+  const trace = useMemo(() => {
+    if (!openTraceFor) return null;
+    const curated = ATTRIBUTE_TRACES[openTraceFor.label];
+    if (curated) return curated;
+    const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(x => x.label === openTraceFor.label);
+    if (!pa) return null;
+    const agent = SOURCE_AGENT[pa.source];
+    const status: "verified" | "flagged" = pa.status === "ok" ? "verified" : "flagged";
+    return {
+      value: pa.value,
+      status,
+      confidence: pa.status === "ok" ? 96 : pa.status === "warn" ? 82 : 64,
+      agents: [
+        { id: "document" as AgentId, name: agent.name, action: "Resolved attribute value", thought: `Returned "${pa.value}" from ${agent.system} for ${openTraceFor.entity}.`, source: agent.system },
+        { id: "audit" as AgentId, name: "Audit Agent", action: "Stamped provenance entry", thought: "Wrote retrieval snapshot and source citation to the immutable audit log.", source: `Audit Log · ${openTraceFor.entity}` },
+      ],
+      conclusion: pa.status === "ok"
+        ? "Attribute resolved cleanly against record-of-truth; no divergence detected."
+        : pa.status === "warn"
+        ? "Attribute resolved but a deviation was detected against linked sources — analyst review queued."
+        : "Attribute violates policy threshold or required check — routed to exception queue for analyst action.",
+    } as AttrTrace;
+  }, [openTraceFor]);
+
+  const traceDocs = useMemo(() => {
+    if (!openTraceFor) return [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[];
+    const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(x => x.label === openTraceFor.label);
+    if (pa?.docs?.length) return pa.docs.map(d => ({ entity: openTraceFor.entity, attr: pa, doc: d }));
+    return (TRACE_DOCS[openTraceFor.label] ?? []).filter(d => d.entity === openTraceFor.entity);
+  }, [openTraceFor]);
+
+  // Categorize attributes for a given entity (no pending filter — show all in form view)
+  const categorize = (entity: string, attrs: string[]) => {
+    const profile = ENTITY_PROFILES[entity];
+    const isFlagged = (label: string) => {
+      const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
+      const pa = profile?.attrs.find(x => x.label === label);
+      const excFlagged = excs.some(
+        exc => exc.entity === entity && exc.status === "Pending" &&
+          (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
+      );
+      return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
+    };
+    const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
+      "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
+      "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
+    };
+    for (const label of attrs) buckets[categoryOf(label)].push({ label, flagged: !!isFlagged(label) });
+    return ATTR_CATEGORY_ORDER
+      .map(c => ({ category: c, items: buckets[c] }))
+      .filter(g => g.items.length > 0);
+  };
+
+  const isCatOpen = (key: string, idx: number) => {
+    if (key in openCats) return openCats[key];
+    return idx < 2; // first two sections open by default
+  };
+
+  // Build entitiesForTree (same shape as AttributeTree uses)
+  const entitiesForTree = selectedEntities.map(e => {
+    const profile = ENTITY_PROFILES[e.name];
+    const profileLabels = profile?.attrs.map(a => a.label) ?? [];
+    const excTitleLabels = profileLabels.length === 0
+      ? excs.filter(exc => exc.kyc === e.kyc && !exc.id.startsWith("stub-") && !exc.attrLabel).map(exc => exc.title)
+      : [];
+    const dbAttrLabels = excs.filter(exc => exc.kyc === e.kyc && exc.attrLabel).map(exc => exc.attrLabel!);
+    return {
+      entity: e.name,
+      kyc: e.kyc,
+      attrs: Array.from(new Set([...profileLabels, ...excTitleLabels, ...dbAttrLabels])),
+    };
+  });
+
+  // Status strip computation
+  const allProfiles = entitiesForTree.map(e => ENTITY_PROFILES[e.entity]).filter(Boolean);
+  const idComplete = allProfiles.length > 0 && allProfiles.every(p => p!.attrs.every(a => a.status !== "alert"));
+  const vComplete = !excs.some(e => e.status === "Pending");
+  const pendingCount = excs.filter(e => e.status === "Pending").length;
+
+  const handleSaveOverride = (draftKey: string) => {
+    const now = new Date().toISOString().replace("T", " · ").slice(0, 19) + " UTC";
+    setSavedOverrides(prev => ({ ...prev, [draftKey]: { value: overrideDraft, actor: "You", timestamp: now } }));
+    setOpenOverrideFor(null);
+    setOverrideDraft("");
+    setOverrideNote("");
+  };
+
+  return (
+    <div className="space-y-0">
+      {/* Status strip */}
+      <div className="flex items-center gap-2 px-1 pb-3 flex-wrap">
+        <span className={cn(
+          "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold",
+          idComplete ? "bg-success-soft text-success border border-success-soft-border" : "bg-alert-soft text-alert border border-alert-soft-border"
+        )}>
+          {idComplete ? <CheckCircle2 className="size-3.5" /> : <X className="size-3.5" />}
+          {idComplete ? "ID Complete" : "ID Incomplete"}
+        </span>
+        <span className={cn(
+          "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold",
+          vComplete
+            ? "bg-success-soft text-success border border-success-soft-border"
+            : "bg-warning-soft text-warning border border-warning-soft-border"
+        )}>
+          {vComplete ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+          {vComplete ? "Verification Complete" : "Verification Pending"}
+        </span>
+        {pendingCount > 0 && (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-alert-soft text-alert border border-alert-soft-border">
+            <X className="size-3.5" /> {pendingCount} Exception{pendingCount > 1 ? "s" : ""}
+          </span>
+        )}
+        {entitiesForTree.length > 0 && (
+          <span className="ml-auto text-[11px] text-muted-foreground font-medium truncate">
+            {entitiesForTree.map(e => e.entity).join(" · ")}
+          </span>
+        )}
+      </div>
+
+      {/* Sections */}
+      {entitiesForTree.map(({ entity, attrs }) => {
+        const groups = categorize(entity, attrs);
+        return (
+          <div key={entity}>
+            {entitiesForTree.length > 1 && (
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1 py-2">{entity}</p>
+            )}
+            {groups.map(({ category, items }, idx) => {
+              const catKey = `${entity}::${category}`;
+              const open = isCatOpen(catKey, idx);
+              const pendingInCat = items.filter(i => i.flagged).length;
+              return (
+                <div key={category} className="rounded-xl border border-border bg-card mb-3 overflow-hidden">
+                  {/* Section header */}
+                  <button
+                    onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
+                    className="w-full flex items-center gap-2 px-4 py-3 bg-secondary/40 hover:bg-secondary/60 transition-colors text-left"
+                  >
+                    <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground flex-1">{category}</span>
+                    <span className="text-[10px] text-muted-foreground">{items.length} attribute{items.length !== 1 ? "s" : ""}</span>
+                    {pendingInCat > 0 && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{pendingInCat}</span>
+                    )}
+                  </button>
+
+                  {/* Section body — placeholder for field rows (added in Task 3) */}
+                  {open && (
+                    <div className="divide-y divide-border/60">
+                      {items.map(({ label, flagged }) => (
+                        <div key={label} className="px-4 py-2 text-[11px] text-muted-foreground flex items-center gap-2">
+                          <div className={cn("size-1.5 rounded-full shrink-0", flagged ? "bg-alert" : "bg-success")} />
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      {entitiesForTree.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-10">No entities selected.</p>
+      )}
     </div>
   );
 };
