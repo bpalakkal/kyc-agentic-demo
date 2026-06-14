@@ -3605,14 +3605,18 @@ const AttributeFormView = ({
                  :                       <span className="text-muted-foreground/50">V–</span>;
 
     return (
-      <>
+      <>{/* sibling slot for InlineTraceDrawer (Task 4) and override form (Task 5) */}
         <div className={cn(
           "flex items-center gap-3 px-4 py-2.5 transition-colors",
-          isOpen ? "bg-info-soft/40 border-l-2 border-primary" : "",
-          isOverridden ? "bg-success-soft/20 border-l-2 border-success" : "",
-          isAlert && !isOpen ? "bg-alert-soft/20 border-l-2 border-alert" : "",
-          isWarn  && !isOpen ? "bg-warning-soft/20 border-l-2 border-warning" : "",
-          !isOpen && !isOverridden && !isAlert && !isWarn ? "hover:bg-secondary/30" : "",
+          isOpen
+            ? "bg-info-soft/40 border-l-2 border-primary"
+            : isOverridden
+            ? "bg-success-soft/20 border-l-2 border-success"
+            : isAlert
+            ? "bg-alert-soft/20 border-l-2 border-alert"
+            : isWarn
+            ? "bg-warning-soft/20 border-l-2 border-warning"
+            : "hover:bg-secondary/30"
         )}>
           {/* Status dot */}
           <div className={cn(
