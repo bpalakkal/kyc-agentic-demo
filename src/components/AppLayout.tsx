@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
-import { Bell, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon, LogOut } from "lucide-react";
+import { Bell, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon, LogOut, Pencil } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip, useAgents, AGENT_API_BASE } from "@/components/AgentSystem";
@@ -320,6 +324,20 @@ const AppLayout = () => {
     .slice(0, 2)
     .map((w: string) => w[0].toUpperCase())
     .join("") || (user?.email?.[0]?.toUpperCase() ?? "?");
+
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
+
+  async function saveName(e: React.FormEvent) {
+    e.preventDefault();
+    if (!nameInput.trim()) return;
+    setNameSaving(true);
+    await supabase.auth.updateUser({ data: { full_name: nameInput.trim() } });
+    setNameSaving(false);
+    setNameDialogOpen(false);
+  }
+
   return (
     <AgentProvider>
       <div className="h-full bg-background flex flex-col min-w-0 overflow-x-hidden">
@@ -394,6 +412,13 @@ const AppLayout = () => {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    onClick={() => { setNameInput(fullName); setNameDialogOpen(true); }}
+                    className="cursor-pointer gap-2"
+                  >
+                    <Pencil className="size-3.5" />
+                    Edit name
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
                     onClick={signOut}
                     className="text-destructive focus:text-destructive cursor-pointer gap-2"
                   >
@@ -402,6 +427,28 @@ const AppLayout = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <Dialog open={nameDialogOpen} onOpenChange={setNameDialogOpen}>
+                <DialogContent className="sm:max-w-xs">
+                  <DialogHeader>
+                    <DialogTitle>Edit display name</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={saveName} className="space-y-4 pt-1">
+                    <Input
+                      placeholder="Jane Smith"
+                      value={nameInput}
+                      onChange={e => setNameInput(e.target.value)}
+                      autoFocus
+                    />
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setNameDialogOpen(false)}>Cancel</Button>
+                      <Button type="submit" disabled={nameSaving || !nameInput.trim()}>
+                        {nameSaving ? "Saving…" : "Save"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </header>
