@@ -36,7 +36,7 @@ import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
@@ -46,6 +46,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
 import { GraphView } from "@/components/GraphView";
+import { Input }    from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 
 
@@ -1030,7 +1032,8 @@ const ExceptionReview = () => {
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"attrs" | "locker" | "collab">("attrs");
+  const [rightTab, setRightTab] = useState<"locker" | "collab">("locker");
+  const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes">("exception");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
   const [reachOutOpen, setReachOutOpen] = useState(false);
@@ -1160,6 +1163,49 @@ const ExceptionReview = () => {
       />
     )}
     <div className="px-6 py-2 max-w-[1480px] mx-auto">
+      {/* ── Exception / Attributes view toggle ──────────────────────────── */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="inline-flex text-[11px] font-semibold rounded-md border border-border overflow-hidden">
+          <button
+            onClick={() => setAttrViewMode("exception")}
+            className={cn(
+              "px-3 py-1.5 transition-colors",
+              attrViewMode === "exception"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary/60"
+            )}
+          >
+            Exception
+          </button>
+          <button
+            onClick={() => setAttrViewMode("attributes")}
+            className={cn(
+              "px-3 py-1.5 border-l border-border transition-colors",
+              attrViewMode === "attributes"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary/60"
+            )}
+          >
+            Attributes
+          </button>
+        </div>
+        {attrViewMode === "attributes" && (
+          <div className="flex items-center gap-2">
+            <button className="text-[11px] px-3 py-1.5 rounded-md border border-warning/60 bg-warning-soft text-warning font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity">
+              <Zap className="size-3" /> Manual Override
+            </button>
+            <button
+              onClick={() => runAgents(["document", "audit"], "Re-run all attributes")}
+              className="text-[11px] px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
+            >
+              <RotateCw className="size-3" /> Re-run Agents
+            </button>
+          </div>
+        )}
+      </div>
+
+      {attrViewMode === "exception" && (
+      <>
       {/* Top header */}
       <div className="rounded-xl border border-border bg-card p-4 mb-4">
         <div className="flex items-start justify-between gap-6">
@@ -1677,23 +1723,19 @@ const ExceptionReview = () => {
           </div>
         </section>
         )}
+      </>
+      )}
+      {attrViewMode === "attributes" && (
+        <div className="py-4 text-sm text-muted-foreground text-center">
+          Attribute view — coming in next task
+        </div>
+      )}
 
         {/* Right: Attributes / Document Locker — collapsible */}
         {rightPaneOpen ? (
           <aside className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4 border-b border-border">
               <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setRightTab("attrs")}
-                  className={cn(
-                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
-                    rightTab === "attrs"
-                      ? "font-medium border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Settings2 className="size-3.5" /> Attributes
-                </button>
                 <button
                   onClick={() => setRightTab("locker")}
                   className={cn(
@@ -1730,7 +1772,6 @@ const ExceptionReview = () => {
               </div>
             </div>
 
-            {rightTab === "attrs" && <AttributeTree selectedEntities={selectedEntities} exceptions={effectiveExceptions} />}
             {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
             {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
           </aside>
@@ -1744,14 +1785,6 @@ const ExceptionReview = () => {
               <ChevronDown className="size-3.5 rotate-90" />
             </button>
             <div className="flex-1 flex flex-col items-center justify-evenly w-full pt-3">
-              <button
-                onClick={() => { setRightPaneOpen(true); setRightTab("attrs"); }}
-                className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
-                title="Attributes"
-              >
-                <Settings2 className="size-3" /> Attributes
-              </button>
-              <div className="w-5 h-px bg-border/60" />
               <div className="relative">
                 <button
                   onClick={() => { setRightPaneOpen(true); setRightTab("locker"); }}
