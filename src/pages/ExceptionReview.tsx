@@ -3582,6 +3582,90 @@ const AttributeFormView = ({
     setOverrideNote("");
   };
 
+  const SimpleFieldRow = ({ label, entity }: { label: string; entity: string }) => {
+    const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
+    const overrideKey = `${entity}::${label}`;
+    const override = savedOverrides[overrideKey];
+    const currentValue = override?.value ?? pa?.value ?? "";
+    const isOverridden = !!override;
+    const isAlert = !isOverridden && pa?.status === "alert";
+    const isWarn  = !isOverridden && pa?.status === "warn";
+    const isOpen  = openTraceFor?.label === label && openTraceFor?.entity === entity;
+    const isOverrideOpen = openOverrideFor?.label === label && openOverrideFor?.entity === entity;
+    const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
+
+    // ID / V badge values
+    const idOk  = !!pa;
+    const vStatus: "ok" | "warn" | "alert" | "none" = isOverridden ? "ok" : (pa?.status ?? "none");
+
+    const idLabel = idOk ? <span className="text-success font-bold">ID✓</span> : <span className="text-muted-foreground/50">ID–</span>;
+    const vLabel = vStatus === "ok"    ? <span className="text-success font-bold">V✓</span>
+                 : vStatus === "warn"  ? <span className="text-warning font-bold">V⚠</span>
+                 : vStatus === "alert" ? <span className="text-alert font-bold">V✕</span>
+                 :                       <span className="text-muted-foreground/50">V–</span>;
+
+    return (
+      <>
+        <div className={cn(
+          "flex items-center gap-3 px-4 py-2.5 transition-colors",
+          isOpen ? "bg-info-soft/40 border-l-2 border-primary" : "",
+          isOverridden ? "bg-success-soft/20 border-l-2 border-success" : "",
+          isAlert && !isOpen ? "bg-alert-soft/20 border-l-2 border-alert" : "",
+          isWarn  && !isOpen ? "bg-warning-soft/20 border-l-2 border-warning" : "",
+          !isOpen && !isOverridden && !isAlert && !isWarn ? "hover:bg-secondary/30" : "",
+        )}>
+          {/* Status dot */}
+          <div className={cn(
+            "size-1.5 rounded-full shrink-0",
+            isOverridden ? "bg-success" : pa ? DOT_STYLE[pa.status] : "bg-muted-foreground/30"
+          )} />
+
+          {/* Label */}
+          <span className="text-[11px] font-medium text-muted-foreground w-[150px] shrink-0 truncate">{label}</span>
+
+          {/* Value */}
+          <span className={cn(
+            "flex-1 text-[11px] truncate",
+            isAlert ? "text-alert font-semibold" : isWarn ? "text-warning" : "text-foreground"
+          )}>
+            {currentValue || <span className="text-muted-foreground/40 italic">—</span>}
+            {isOverridden && (
+              <span className="ml-2 text-[9px] font-semibold text-success border border-success/40 bg-success-soft rounded px-1.5 py-0.5">✎ Overridden</span>
+            )}
+          </span>
+
+          {/* ID / V inline text badges */}
+          <span className="text-[9px] shrink-0 whitespace-nowrap">
+            {idLabel}<span className="text-muted-foreground/30 mx-0.5">/</span>{vLabel}
+          </span>
+
+          {/* Source badge */}
+          {pa && (
+            <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold shrink-0", SOURCE_STYLE[pa.source])}>
+              {pa.source}
+            </span>
+          )}
+
+          {/* 🤖 Trace button */}
+          <button
+            disabled={!hasTrace}
+            onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
+            className={cn(
+              "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
+              isOpen
+                ? "bg-primary text-primary-foreground border-primary"
+                : hasTrace
+                ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
+                : "border-border/30 text-muted-foreground/30 cursor-not-allowed bg-transparent"
+            )}
+          >
+            <Bot className="size-3" />{isOpen ? "▲" : "Trace"}
+          </button>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="space-y-0">
       {/* Status strip */}
@@ -3641,14 +3725,10 @@ const AttributeFormView = ({
                     )}
                   </button>
 
-                  {/* Section body — placeholder for field rows (added in Task 3) */}
                   {open && (
                     <div className="divide-y divide-border/60">
-                      {items.map(({ label, flagged }) => (
-                        <div key={label} className="px-4 py-2 text-[11px] text-muted-foreground flex items-center gap-2">
-                          <div className={cn("size-1.5 rounded-full shrink-0", flagged ? "bg-alert" : "bg-success")} />
-                          {label}
-                        </div>
+                      {items.map(({ label }) => (
+                        <SimpleFieldRow key={label} label={label} entity={entity} />
                       ))}
                     </div>
                   )}
