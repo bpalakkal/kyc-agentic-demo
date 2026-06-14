@@ -32,7 +32,7 @@ export default function Login() {
       email: email.trim(),
       password,
     });
-    if (err) setError(err.message === "Invalid login credentials" ? "Incorrect email or password." : err.message);
+    if (err) setError("Sign-in failed. Check your credentials and try again.");
     setLoading(false);
   }
 
@@ -57,7 +57,7 @@ export default function Login() {
       password,
       options: { data: { full_name: name.trim() } },
     });
-    if (err) setError(err.message);
+    if (err) setError("Account creation failed. Please try again or contact your administrator.");
     setLoading(false);
   }
 
