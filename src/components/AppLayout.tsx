@@ -1,6 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
-import { Bell, User, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon } from "lucide-react";
+import { Bell, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon, LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip, useAgents, AGENT_API_BASE } from "@/components/AgentSystem";
@@ -301,6 +311,15 @@ const AiChatFloating = () => {
 const AppLayout = () => {
   const location = useLocation();
   const { resolvedTheme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
+
+  const fullName: string = user?.user_metadata?.full_name ?? "";
+  const initials = fullName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0].toUpperCase())
+    .join("") || (user?.email?.[0]?.toUpperCase() ?? "?");
   return (
     <AgentProvider>
       <div className="h-full bg-background flex flex-col min-w-0 overflow-x-hidden">
@@ -356,9 +375,33 @@ const AppLayout = () => {
               <button className="text-nav-muted hover:text-nav-foreground transition-colors" aria-label="Notifications">
                 <Bell className="size-[18px]" />
               </button>
-              <button className="size-8 rounded-full border border-white/15 flex items-center justify-center text-nav-muted hover:text-nav-foreground transition-colors" aria-label="Account">
-                <User className="size-[16px]" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-full" aria-label="Account menu">
+                    <Avatar className="size-8 border border-white/15 cursor-pointer hover:opacity-80 transition-opacity">
+                      <AvatarFallback className="bg-primary/20 text-primary text-[11px] font-semibold">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col gap-0.5">
+                      {fullName && <span className="text-[13px] font-medium">{fullName}</span>}
+                      <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={signOut}
+                    className="text-destructive focus:text-destructive cursor-pointer gap-2"
+                  >
+                    <LogOut className="size-3.5" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
