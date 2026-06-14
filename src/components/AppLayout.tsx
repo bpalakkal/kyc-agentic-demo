@@ -309,7 +309,7 @@ const AppLayout = () => {
             <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
               <div className="w-[3px] h-[22px] rounded-full bg-gradient-to-b from-blue-500 to-indigo-500 shrink-0" />
               <div>
-                <div className="text-[14px] font-bold text-nav-foreground tracking-tight leading-tight">KYC Sentinel</div>
+                <div className="text-[17px] font-bold text-nav-foreground tracking-tight leading-tight">KYC Sentinel</div>
                 <div className="text-[9px] text-nav-muted uppercase tracking-widest leading-tight">Powered by Forge</div>
               </div>
             </Link>
