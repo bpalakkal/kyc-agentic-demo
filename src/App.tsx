@@ -1,26 +1,13 @@
-/**
- * App — root router
- *
- * The basename "/kyc-agentic2" matches the GitHub Pages repository sub-path.
- * TODO: In production (custom domain or root-path deployment), remove basename
- * and update vite.config.ts `base` to "/".
- *
- * Route structure
- * ───────────────
- * /                   → Dashboard     (KPI summary, AI assistant, activity feed)
- * /work-queue         → WorkQueue     (entity selection table, grouped by DRG)
- * /work-queue/review  → ExceptionReview (exception detail + agent console)
- * /reports            → Reports       (placeholder — not yet implemented)
- */
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/AppLayout";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import WorkQueue from "./pages/WorkQueue";
 import ExceptionReview from "./pages/ExceptionReview";
@@ -35,6 +22,37 @@ const ScrollToTop = () => {
 
 const queryClient = new QueryClient();
 
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route
+          path="/login"
+          element={user ? <Navigate to="/" replace /> : <Login />}
+        />
+        <Route element={user ? <AppLayout /> : <Navigate to="/login" replace />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/work-queue" element={<WorkQueue />} />
+          <Route path="/work-queue/review" element={<ExceptionReview />} />
+          <Route path="/reports" element={<Reports />} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+}
+
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" storageKey="kyc-theme">
     <QueryClientProvider client={queryClient}>
@@ -42,16 +60,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter basename="/kyc-agentic2">
-          <ScrollToTop />
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/work-queue" element={<WorkQueue />} />
-              <Route path="/work-queue/review" element={<ExceptionReview />} />
-              <Route path="/reports" element={<Reports />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
