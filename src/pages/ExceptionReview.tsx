@@ -1726,9 +1726,10 @@ const ExceptionReview = () => {
       </>
       )}
       {attrViewMode === "attributes" && (
-        <div className="py-4 text-sm text-muted-foreground text-center">
-          Attribute view — coming in next task
-        </div>
+        <AttributeFormView
+          selectedEntities={selectedEntities}
+          exceptions={effectiveExceptions}
+        />
       )}
 
         {/* Right: Attributes / Document Locker — collapsible */}
@@ -3396,6 +3397,696 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
         />
       )}
 
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AttributeFormView — full-page attribute editing surface (Tasks 2–6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type AttrFormProps = {
+  selectedEntities: { name: string; kyc: string; drg?: string }[];
+  exceptions: Exc[];
+};
+
+const NESTED_LABELS = new Set([
+  "Persons of Significant Control",
+  "Persons with Significant Control",
+  "Designated Members",
+  "Controllers",
+  "Board Directors",
+  "Corporate Officer",
+  "Beneficial Owner (25%+)",
+  "Key Controller",
+  "Trustee",
+  "Authorized Signatory",
+]);
+
+const AttributeFormView = ({ selectedEntities, exceptions: excs }: AttrFormProps) => {
+  // ── State ─────────────────────────────────────────────────────────────────
+  const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
+  const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [overrideKey, setOverrideKey] = useState<string | null>(null); // "entity::label"
+  const [overrideValue, setOverrideValue] = useState("");
+  const [traceOpen, setTraceOpen] = useState<{ label: string; entity: string } | null>(null);
+  const [traceTab, setTraceTab] = useState<"reasoning" | "audit">("reasoning");
+  const [traceStepsOpen, setTraceStepsOpen] = useState(false);
+  const [traceDocsOpen, setTraceDocsOpen] = useState(false);
+
+  const isDirty = Object.keys(draftValues).length > 0;
+
+  // Reset draft state when entity selection changes
+  useEffect(() => {
+    setDraftValues({});
+    setOverrideKey(null);
+    setTraceOpen(null);
+  }, [selectedEntities]);
+
+  // Reset trace sub-state when trace target changes
+  useEffect(() => {
+    setTraceStepsOpen(false);
+    setTraceDocsOpen(false);
+    setTraceTab("reasoning");
+  }, [traceOpen]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const isFlagged = (entity: string, label: string) => {
+    const pa = ENTITY_PROFILES[entity]?.attrs.find((x) => x.label === label);
+    const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
+    const excFlagged = excs.some(
+      (exc) => exc.entity === entity && exc.status === "Pending" &&
+        (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
+    );
+    return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
+  };
+
+  const entitiesForForm = selectedEntities.map((e) => {
+    const profile = ENTITY_PROFILES[e.name];
+    const profileLabels = profile?.attrs.map((a) => a.label) ?? [];
+    const dbAttrLabels = excs
+      .filter((exc) => exc.kyc === e.kyc && exc.attrLabel)
+      .map((exc) => exc.attrLabel!);
+    return {
+      entity: e.name,
+      kyc: e.kyc,
+      attrs: Array.from(new Set([...profileLabels, ...dbAttrLabels])),
+    };
+  });
+
+  const categorize = (entity: string, attrs: string[]) => {
+    const filtered = showOnlyPending ? attrs.filter((l) => isFlagged(entity, l)) : attrs;
+    const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
+      "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
+      "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
+    };
+    for (const label of filtered) {
+      buckets[categoryOf(label)].push({ label, flagged: isFlagged(entity, label) });
+    }
+    return ATTR_CATEGORY_ORDER
+      .map((c) => ({ category: c, items: buckets[c] }))
+      .filter((g) => g.items.length > 0);
+  };
+
+  const isCatOpen = (entity: string, cat: AttrCategory, idx: number) => {
+    const key = `${entity}::${cat}`;
+    if (key in openCats) return openCats[key];
+    return idx === 0;
+  };
+
+  // Resolve trace for trace drawer
+  const resolvedTrace = useMemo(() => {
+    if (!traceOpen) return null;
+    const { label, entity } = traceOpen;
+    const curated = ATTRIBUTE_TRACES[label];
+    if (curated) return curated;
+    const pa = ENTITY_PROFILES[entity]?.attrs.find((x) => x.label === label);
+    if (!pa) return null;
+    const agent = SOURCE_AGENT[pa.source];
+    const status: "verified" | "flagged" = pa.status === "ok" ? "verified" : "flagged";
+    return {
+      value: pa.value,
+      status,
+      confidence: pa.status === "ok" ? 96 : pa.status === "warn" ? 82 : 64,
+      agents: [
+        { id: "document" as AgentId, name: agent.name, action: "Resolved attribute value", thought: `Returned "${pa.value}" from ${agent.system} for ${entity}.`, source: agent.system },
+        { id: "audit" as AgentId, name: "Audit Agent", action: "Stamped provenance entry", thought: "Wrote retrieval snapshot and source citation to the immutable audit log.", source: `Audit Log · ${entity}` },
+      ],
+      conclusion:
+        pa.status === "ok"
+          ? "Attribute resolved cleanly against record-of-truth; no divergence detected."
+          : pa.status === "warn"
+          ? "Attribute resolved but a deviation was detected against linked sources — analyst review queued."
+          : "Attribute violates policy threshold or required check — routed to exception queue for analyst action.",
+    } as AttrTrace;
+  }, [traceOpen]);
+
+  const resolvedTraceDocs = useMemo(() => {
+    if (!traceOpen) return [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[];
+    const { label, entity } = traceOpen;
+    const pa = ENTITY_PROFILES[entity]?.attrs.find((x) => x.label === label);
+    if (pa?.docs?.length) return pa.docs.map((d) => ({ entity, attr: pa, doc: d }));
+    return (TRACE_DOCS[label] ?? []).filter((d) => d.entity === entity);
+  }, [traceOpen]);
+
+  // ── Status strip ──────────────────────────────────────────────────────────
+  const allAttrs = entitiesForForm.flatMap(({ entity, attrs }) =>
+    attrs.map((label) => {
+      const pa = ENTITY_PROFILES[entity]?.attrs.find((a) => a.label === label);
+      return pa?.status ?? "ok";
+    })
+  );
+  const total = allAttrs.length;
+  const alertCount = allAttrs.filter((s) => s === "alert").length;
+  const warnCount = allAttrs.filter((s) => s === "warn").length;
+  const okCount = total - alertCount - warnCount;
+  const pct = total ? Math.round((okCount / total) * 100) : 0;
+
+  // ── Save / discard ────────────────────────────────────────────────────────
+  const handleSave = () => {
+    setDraftValues({});
+    setOverrideKey(null);
+  };
+
+  const handleDiscard = () => {
+    setDraftValues({});
+    setOverrideKey(null);
+  };
+
+  // ── Field key helpers ─────────────────────────────────────────────────────
+  const draftKey = (entity: string, label: string) => `${entity}::${label}`;
+
+  // ── Field row renderer (Tasks 3 & 6) ─────────────────────────────────────
+  const renderFieldRow = (entity: string, label: string, flagged: boolean) => {
+    const pa = ENTITY_PROFILES[entity]?.attrs.find((a) => a.label === label);
+    const key = draftKey(entity, label);
+    const currentValue = draftValues[key] ?? pa?.value ?? "";
+    const isOverride = overrideKey === key;
+    const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
+    const isTraceOpen = traceOpen?.label === label && traceOpen?.entity === entity;
+    const isNested = NESTED_LABELS.has(label);
+
+    if (isNested) {
+      return (
+        <NestedObjectBlock
+          key={key}
+          label={label}
+          entity={entity}
+          pa={pa}
+          flagged={flagged}
+          hasTrace={hasTrace}
+          isTraceOpen={isTraceOpen}
+          onTrace={() => setTraceOpen(isTraceOpen ? null : { label, entity })}
+        />
+      );
+    }
+
+    return (
+      <div
+        key={key}
+        className={cn(
+          "rounded-lg border p-2.5 space-y-1.5 transition-colors",
+          flagged ? "border-alert/40 bg-alert-soft/10" : "border-border bg-card/50"
+        )}
+      >
+        {/* Label row */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className={cn("size-2 rounded-full shrink-0", DOT_STYLE[pa?.status ?? "ok"])} />
+          <span className="text-[11px] font-medium flex-1 min-w-0 truncate">{label}</span>
+          {pa && (
+            <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium shrink-0", SOURCE_STYLE[pa.source])}>
+              {pa.source}
+            </span>
+          )}
+          {pa && (
+            <span className={cn(
+              "text-[9px] px-1.5 py-0.5 rounded border font-medium shrink-0",
+              pa.status === "ok" ? "bg-success-soft text-success border-success-soft-border"
+                : pa.status === "warn" ? "bg-warning-soft text-warning border-warning-soft-border"
+                : "bg-alert-soft text-alert border-alert-soft-border"
+            )}>
+              {COMPLETENESS_LABEL[pa.status]}
+            </span>
+          )}
+          <button
+            onClick={() => setTraceOpen(isTraceOpen ? null : { label, entity })}
+            disabled={!hasTrace}
+            className={cn(
+              "size-5 rounded grid place-items-center transition-colors shrink-0",
+              isTraceOpen ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-primary hover:bg-info-soft",
+              !hasTrace && "opacity-30 cursor-not-allowed"
+            )}
+            title="Agent trace"
+          >
+            <Bot className="size-3" />
+          </button>
+          {flagged && (
+            <button
+              onClick={() => {
+                if (isOverride) {
+                  setOverrideKey(null);
+                } else {
+                  setOverrideKey(key);
+                  setOverrideValue(currentValue);
+                }
+              }}
+              className={cn(
+                "size-5 rounded grid place-items-center transition-colors shrink-0",
+                isOverride ? "bg-warning text-warning-foreground" : "text-warning hover:bg-warning-soft"
+              )}
+              title="Manual override"
+            >
+              <Zap className="size-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Override edit mode (Task 5) */}
+        {isOverride ? (
+          <div className="space-y-1.5">
+            <div className="rounded-md border border-warning/50 bg-warning-soft/20 p-1">
+              {overrideValue.length > 80 ? (
+                <Textarea
+                  value={overrideValue}
+                  onChange={(e) => setOverrideValue(e.target.value)}
+                  className="min-h-[60px] max-h-[120px] resize-y text-[12px] border-0 bg-transparent p-0 focus-visible:ring-0"
+                  autoFocus
+                />
+              ) : (
+                <Input
+                  value={overrideValue}
+                  onChange={(e) => setOverrideValue(e.target.value)}
+                  className="h-7 text-[12px] border-0 bg-transparent px-0 focus-visible:ring-0"
+                  autoFocus
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setDraftValues((d) => ({ ...d, [key]: overrideValue }));
+                  setOverrideKey(null);
+                }}
+                className="text-[10px] px-2 py-1 rounded bg-warning text-warning-foreground font-semibold hover:opacity-90 transition-opacity flex items-center gap-1"
+              >
+                <Zap className="size-2.5" /> Apply override
+              </button>
+              <button
+                onClick={() => setOverrideKey(null)}
+                className="text-[10px] px-2 py-1 rounded border border-border text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <span className="ml-auto text-[9px] text-muted-foreground">Confidence locked to 100% on override</span>
+            </div>
+          </div>
+        ) : (
+          /* Read-only field value display */
+          <div className={cn(
+            "text-[12px] leading-snug px-1",
+            draftValues[key] ? "text-warning font-medium" : "text-foreground"
+          )}>
+            {draftValues[key] ? (
+              <span className="flex items-center gap-1.5">
+                <Zap className="size-3 text-warning shrink-0" />
+                {draftValues[key]}
+                <button
+                  onClick={() => setDraftValues((d) => { const n = { ...d }; delete n[key]; return n; })}
+                  className="ml-auto text-[9px] text-muted-foreground hover:text-alert transition-colors"
+                >
+                  undo
+                </button>
+              </span>
+            ) : (
+              currentValue || <span className="text-muted-foreground italic">—</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Inline Trace Drawer (Task 4) ──────────────────────────────────────────
+  const renderTraceDrawer = () => {
+    if (!traceOpen || !resolvedTrace) return null;
+    const { label, entity } = traceOpen;
+    const confidenceColor =
+      resolvedTrace.confidence >= 90 ? "text-success"
+      : resolvedTrace.confidence >= 75 ? "text-warning"
+      : "text-alert";
+
+    // Generate a synthetic audit log
+    const auditEntries = [
+      { ts: "2026-04-19 09:42:11", actor: "CRM Sync Agent", action: "Attribute resolved", note: `Value "${resolvedTrace.value}" retrieved from ${resolvedTrace.agents[0]?.source ?? "source"}.` },
+      { ts: "2026-04-19 09:42:13", actor: "Audit Agent", action: "Provenance stamped", note: "Immutable audit log entry written with source citation." },
+      ...(resolvedTrace.status === "flagged"
+        ? [{ ts: "2026-04-19 09:42:15", actor: "Risk Scoring Agent", action: "Exception raised", note: "Attribute value diverges from policy threshold — exception created." }]
+        : []),
+    ];
+
+    return (
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        {/* Drawer header */}
+        <div className="px-3 py-2.5 border-b border-border flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground mb-0.5 flex items-center gap-1">
+              <Sparkles className="size-2.5 text-primary" /> Agent Trace
+            </p>
+            <p className="text-[12px] font-semibold leading-tight truncate">{label}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{entity}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={cn(
+              "text-[11px] font-bold tabular-nums",
+              confidenceColor
+            )}>{resolvedTrace.confidence}%</span>
+            <span className={cn(
+              "text-[9px] px-1.5 py-0.5 rounded-full border font-medium",
+              resolvedTrace.status === "verified"
+                ? "bg-success-soft text-success border-success-soft-border"
+                : "bg-alert-soft text-alert border-alert-soft-border"
+            )}>
+              {resolvedTrace.status === "verified" ? "Verified" : "Flagged"}
+            </span>
+            <button
+              onClick={() => setTraceOpen(null)}
+              className="size-5 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-border text-[11px]">
+          <button
+            onClick={() => setTraceTab("reasoning")}
+            className={cn(
+              "px-3 py-1.5 transition-colors",
+              traceTab === "reasoning" ? "font-medium border-b-2 border-primary -mb-px" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span className="flex items-center gap-1"><Sparkles className="size-3" /> Reasoning</span>
+          </button>
+          <button
+            onClick={() => setTraceTab("audit")}
+            className={cn(
+              "px-3 py-1.5 transition-colors",
+              traceTab === "audit" ? "font-medium border-b-2 border-primary -mb-px" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <span className="flex items-center gap-1"><Clock className="size-3" /> Audit Trail</span>
+          </button>
+        </div>
+
+        <div className="p-3 space-y-2.5 max-h-[320px] overflow-y-auto">
+          {traceTab === "reasoning" ? (
+            <>
+              {/* Conclusion */}
+              <div className="rounded-lg border border-border bg-secondary/40 p-2.5">
+                <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
+                  <ShieldCheck className="size-2.5 text-success" /> Conclusion
+                </p>
+                <p className="text-[11px] leading-snug">{resolvedTrace.conclusion}</p>
+              </div>
+
+              {/* Reasoning steps toggle */}
+              <button
+                onClick={() => setTraceStepsOpen((v) => !v)}
+                className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-2.5 py-1.5 hover:bg-secondary/40 transition-colors"
+              >
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="size-2.5 text-primary" /> Reasoning steps ({resolvedTrace.agents.length})
+                </span>
+                <ChevronDown className={cn("size-3 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
+              </button>
+              {traceStepsOpen && (
+                <ol className="space-y-2 px-1">
+                  {resolvedTrace.agents.map((a, i) => (
+                    <li key={a.id} className="relative pl-6">
+                      <span className="absolute left-0 top-0.5 size-4 rounded-full bg-primary/10 text-primary grid place-items-center text-[9px] font-medium">{i + 1}</span>
+                      {i < resolvedTrace.agents.length - 1 && <span className="absolute left-[7px] top-5 bottom-[-8px] w-px bg-border" />}
+                      <p className="text-[11px] font-medium mb-0.5">{a.name} → {a.action}</p>
+                      <p className="text-[10px] text-muted-foreground italic">"{a.thought}"</p>
+                      <p className="text-[9px] text-primary mt-0.5 flex items-center gap-0.5">
+                        <Database className="size-2" /> {a.source}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+
+              {/* Source documents toggle */}
+              {resolvedTraceDocs.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setTraceDocsOpen((v) => !v)}
+                    className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-2.5 py-1.5 hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      <Paperclip className="size-2.5 text-primary" /> Source documents ({resolvedTraceDocs.length})
+                    </span>
+                    <ChevronDown className={cn("size-3 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
+                  </button>
+                  {traceDocsOpen && (
+                    <div className="space-y-1">
+                      {resolvedTraceDocs.map(({ doc, attr: docAttr, entity: docEntity }) => {
+                        const meta = DOC_KIND_META[doc.kind];
+                        return (
+                          <div
+                            key={`${docEntity}-${doc.id}`}
+                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-border bg-card"
+                          >
+                            <FileText className="size-3 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-medium truncate">{doc.title}</p>
+                              <p className="text-[9px] text-muted-foreground truncate">{docEntity} · {doc.source}</p>
+                            </div>
+                            <span className={cn("text-[8px] px-1 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
+                              {meta.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            /* Audit trail tab */
+            <div className="space-y-1.5">
+              {auditEntries.map((entry, i) => (
+                <div key={i} className="flex gap-2 text-[11px]">
+                  <div className="pt-0.5 shrink-0">
+                    <span className="size-1.5 rounded-full bg-primary/60 block mt-1.5" />
+                  </div>
+                  <div className="min-w-0 flex-1 border-b border-border/60 pb-1.5 last:border-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium">{entry.actor}</span>
+                      <span className="text-muted-foreground">→</span>
+                      <span className="text-muted-foreground">{entry.action}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{entry.note}</p>
+                    <p className="text-[9px] text-muted-foreground/60 mt-0.5 flex items-center gap-1">
+                      <Clock className="size-2.5" /> {entry.ts}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Main render ───────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-3 pt-2">
+      {/* ── Status strip ──────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-card p-3">
+        <div className="flex items-center justify-between gap-3 mb-1.5">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Attribute Completeness</p>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold">{pct}% complete</span>
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-muted-foreground">Pending only</span>
+              <button
+                onClick={() => setShowOnlyPending((v) => !v)}
+                className={cn("relative h-5 w-9 rounded-full transition-colors", showOnlyPending ? "bg-primary" : "bg-muted")}
+                aria-pressed={showOnlyPending}
+              >
+                <span className={cn("absolute top-0.5 size-4 rounded-full bg-background shadow transition-all", showOnlyPending ? "left-[18px]" : "left-0.5")} />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="h-1.5 rounded-full bg-border overflow-hidden flex">
+          <div className="h-full bg-success transition-all" style={{ width: `${total ? (okCount / total) * 100 : 0}%` }} />
+          <div className="h-full bg-warning transition-all" style={{ width: `${total ? (warnCount / total) * 100 : 0}%` }} />
+          <div className="h-full bg-alert transition-all" style={{ width: `${total ? (alertCount / total) * 100 : 0}%` }} />
+        </div>
+        <div className="flex items-center gap-4 mt-2 text-[11px]">
+          <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-success" /><span className="text-success font-medium">{okCount}</span><span className="text-muted-foreground">Complete</span></span>
+          <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-warning" /><span className="text-warning font-medium">{warnCount}</span><span className="text-muted-foreground">Review</span></span>
+          <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full bg-alert" /><span className="text-alert font-medium">{alertCount}</span><span className="text-muted-foreground">Incomplete</span></span>
+        </div>
+      </div>
+
+      {/* ── Inline Trace Drawer ────────────────────────────────────────────── */}
+      {traceOpen && renderTraceDrawer()}
+
+      {/* ── Entity sections ────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        {entitiesForForm.map(({ entity, attrs }) => {
+          const groups = categorize(entity, attrs);
+          const multiEntity = entitiesForForm.length > 1;
+          return (
+            <div key={entity} className="space-y-2">
+              {multiEntity && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="size-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-[11px] font-semibold">{entity}</span>
+                </div>
+              )}
+              {groups.length === 0 && (
+                <p className="text-[12px] text-muted-foreground italic py-4 text-center">
+                  {showOnlyPending ? "No pending attributes." : "No attributes to display."}
+                </p>
+              )}
+              {groups.map(({ category, items }, idx) => {
+                const open = isCatOpen(entity, category, idx);
+                const pending = items.filter((i) => i.flagged).length;
+                const catKey = `${entity}::${category}`;
+                return (
+                  <div key={catKey} className="rounded-xl border border-border overflow-hidden">
+                    {/* Category header */}
+                    <button
+                      onClick={() => setOpenCats((s) => ({ ...s, [catKey]: !open }))}
+                      className="w-full flex items-center justify-between px-3 py-2 bg-secondary/30 hover:bg-secondary/60 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{category}</span>
+                        <span className="text-[10px] text-muted-foreground">· {items.length}</span>
+                      </span>
+                      {pending > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-medium">
+                          {pending} pending
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Category content */}
+                    {open && (
+                      <div className="p-2.5 space-y-1.5">
+                        {items.map(({ label, flagged }) => renderFieldRow(entity, label, flagged))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        {entitiesForForm.length === 0 && (
+          <p className="text-[12px] text-muted-foreground text-center py-8">No entities selected.</p>
+        )}
+      </div>
+
+      {/* ── Sticky save / discard footer ────────────────────────────────────── */}
+      {isDirty && (
+        <div className="sticky bottom-0 bg-card/95 backdrop-blur border-t border-border pt-2.5 pb-1 flex items-center justify-between gap-2">
+          <span className="text-[11px] text-muted-foreground">
+            {Object.keys(draftValues).length} override{Object.keys(draftValues).length !== 1 ? "s" : ""} pending
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDiscard}
+              className="text-[11px] px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:bg-secondary transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              onClick={handleSave}
+              className="text-[11px] px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+            >
+              <ShieldCheck className="size-3" /> Save overrides
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Task 6: NestedObjectBlock — multi-record attributes (PSC, UBO, officers) ──
+
+type NestedObjectBlockProps = {
+  label: string;
+  entity: string;
+  pa: EntityAttr | undefined;
+  flagged: boolean;
+  hasTrace: boolean;
+  isTraceOpen: boolean;
+  onTrace: () => void;
+};
+
+const NestedObjectBlock = ({ label, entity, pa, flagged, hasTrace, isTraceOpen, onTrace }: NestedObjectBlockProps) => {
+  const [expanded, setExpanded] = useState(false);
+  // Parse multi-record value: lines split by " · " or newlines
+  const rawValue = pa?.value ?? "";
+  const records = rawValue
+    .split(/\n|(?<=\))\s*,\s*(?=[A-Z])/)
+    .map((r) => r.trim())
+    .filter(Boolean);
+  const multiRecord = records.length > 1;
+
+  return (
+    <div className={cn(
+      "rounded-lg border p-2.5 space-y-1.5 transition-colors",
+      flagged ? "border-alert/40 bg-alert-soft/10" : "border-border bg-card/50"
+    )}>
+      {/* Label row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className={cn("size-2 rounded-full shrink-0", DOT_STYLE[pa?.status ?? "ok"])} />
+        <span className="text-[11px] font-medium flex-1 min-w-0 truncate">{label}</span>
+        {pa && (
+          <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium shrink-0", SOURCE_STYLE[pa.source])}>
+            {pa.source}
+          </span>
+        )}
+        {pa && (
+          <span className={cn(
+            "text-[9px] px-1.5 py-0.5 rounded border font-medium shrink-0",
+            pa.status === "ok" ? "bg-success-soft text-success border-success-soft-border"
+              : pa.status === "warn" ? "bg-warning-soft text-warning border-warning-soft-border"
+              : "bg-alert-soft text-alert border-alert-soft-border"
+          )}>
+            {COMPLETENESS_LABEL[pa.status]}
+          </span>
+        )}
+        <button
+          onClick={onTrace}
+          disabled={!hasTrace}
+          className={cn(
+            "size-5 rounded grid place-items-center transition-colors shrink-0",
+            isTraceOpen ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-primary hover:bg-info-soft",
+            !hasTrace && "opacity-30 cursor-not-allowed"
+          )}
+          title="Agent trace"
+        >
+          <Bot className="size-3" />
+        </button>
+        {multiRecord && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-[9px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:bg-secondary transition-colors flex items-center gap-0.5 shrink-0"
+          >
+            {records.length} records
+            <ChevronDown className={cn("size-2.5 transition-transform", expanded && "rotate-180")} />
+          </button>
+        )}
+      </div>
+
+      {/* Record display */}
+      {multiRecord && expanded ? (
+        <div className="space-y-1">
+          {records.map((record, i) => (
+            <div key={i} className="flex items-start gap-1.5 px-1 py-1 rounded bg-secondary/30 text-[11px]">
+              <span className="text-muted-foreground shrink-0 tabular-nums w-4">{i + 1}.</span>
+              <span className="flex-1">{record}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[12px] leading-snug px-1 text-foreground">
+          {rawValue || <span className="text-muted-foreground italic">—</span>}
+        </div>
+      )}
     </div>
   );
 };
