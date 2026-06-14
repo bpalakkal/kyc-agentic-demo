@@ -3574,7 +3574,8 @@ const AttributeFormView = ({
   const pendingCount = excs.filter(e => e.status === "Pending").length;
 
   const handleSaveOverride = (draftKey: string) => {
-    const now = new Date().toISOString().replace("T", " · ").slice(0, 19) + " UTC";
+    const d = new Date();
+    const now = `${d.toISOString().slice(0, 10)} · ${d.toISOString().slice(11, 16)} UTC`;
     setSavedOverrides(prev => ({ ...prev, [draftKey]: { value: overrideDraft, actor: "You", timestamp: now } }));
     setOpenOverrideFor(null);
     setOverrideDraft("");
