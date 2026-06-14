@@ -3185,7 +3185,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
   const drgEntries = Object.entries(drgGroups);
 
   // Helper: per entity, return ordered [category, labels[]] for those categories that have at least one (visible) attribute
-  const categorize = (entity: string, attrs: string[]) => {
+  const categorize = (entity: string, attrs: string[], overrideShowPending?: boolean) => {
     const profile = ENTITY_PROFILES[entity];
     const isFlagged = (label: string) => {
       const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
@@ -3196,7 +3196,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
       );
       return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
     };
-    const filtered = showOnlyPending ? attrs.filter(isFlagged) : attrs;
+    const filtered = (overrideShowPending ?? showOnlyPending) ? attrs.filter(isFlagged) : attrs;
     const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
       "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
       "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
@@ -3405,10 +3405,9 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
           setSelected={setSelected}
           isDirty={isDirty}
           onSave={() => { setDraftValues({}); setPanelMode("view"); toast.success("Changes saved"); }}
-          onDiscard={() => setDraftValues({})}
+          onDiscard={() => { setDraftValues({}); setPanelMode("view"); }}
           renderAttrPopoverContent={renderAttrPopoverContent}
-          categorize={categorize}
-          excs={excs}
+          categorize={(entity, attrs) => categorize(entity, attrs, false)}
         />
       )}
 
@@ -3443,7 +3442,6 @@ const AttributeEditForm = ({
   onDiscard,
   renderAttrPopoverContent,
   categorize,
-  excs,
 }: {
   entitiesForTree: { entity: string; kyc: string; drg: string; attrs: string[] }[];
   draftValues: Record<string, string>;
@@ -3455,7 +3453,6 @@ const AttributeEditForm = ({
   onDiscard: () => void;
   renderAttrPopoverContent: (label: string, entity: string) => React.ReactNode;
   categorize: (entity: string, attrs: string[]) => { category: string; items: { label: string; flagged: boolean }[] }[];
-  excs: Exc[];
 }) => {
   const multiEntity = entitiesForTree.length > 1;
 
@@ -3542,7 +3539,7 @@ const AttributeEditForm = ({
                               </div>
 
                               {/* Input or Textarea */}
-                              {currentValue.length > 80 ? (
+                              {draftVal.length > 80 ? (
                                 <Textarea
                                   className="min-h-[60px] max-h-[120px] resize-y text-[12px]"
                                   value={draftVal}
