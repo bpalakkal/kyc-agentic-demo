@@ -36,7 +36,7 @@ import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
@@ -46,6 +46,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
 import { GraphView } from "@/components/GraphView";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { toast } from "sonner";
 
 
 
@@ -2949,6 +2954,18 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
   // Reset disclosures when switching attribute
   useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); }, [selected]);
 
+  const [panelMode, setPanelMode] = useState<"view" | "edit">("view");
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const isDirty = Object.keys(draftValues).length > 0;
+
+  useEffect(() => {
+    if (panelMode === "view") { setDraftValues({}); setSelected(null); }
+  }, [panelMode]);
+
+  useEffect(() => {
+    setDraftValues({}); setPanelMode("view"); setSelected(null);
+  }, [selectedEntities]);
+
 
   const { runAgents } = useAgents();
 
@@ -2988,6 +3005,122 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
   }, [selected]);
 
 
+  const renderAttrPopoverContent = (label: string, _entity: string): React.ReactNode => {
+    if (!trace) return null;
+    return (
+      <div className="p-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
+              <Sparkles className="size-3 text-primary" /> Agent Trace
+            </p>
+            <p className="text-[13px] font-semibold leading-tight">{label}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{trace.value}</p>
+          </div>
+          <span className={cn(
+            "px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0 mt-0.5",
+            trace.status === "verified"
+              ? "bg-success-soft text-success border-success-soft-border"
+              : "bg-alert-soft text-alert border-alert-soft-border"
+          )}>
+            {trace.status === "verified" ? "Verified" : "Flagged"} · {trace.confidence}%
+          </span>
+        </div>
+
+        {/* Conclusion */}
+        <div className="rounded-lg border border-border bg-secondary/40 p-3">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
+            <ShieldCheck className="size-3 text-success" /> Conclusion
+          </p>
+          <p className="text-[12px] leading-snug">{trace.conclusion}</p>
+        </div>
+
+        {/* Reasoning steps */}
+        <button
+          onClick={() => setTraceStepsOpen((v) => !v)}
+          className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
+        >
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+            <Sparkles className="size-3 text-primary" /> Reasoning steps ({trace.agents.length})
+          </span>
+          <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
+        </button>
+        {traceStepsOpen && (
+          <ol className="space-y-2.5 px-1">
+            {trace.agents.map((a, i) => (
+              <li key={a.id} className="relative pl-7">
+                <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-medium">{i + 1}</span>
+                {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                  <p className="text-[12px] font-medium">{a.name}</p>
+                  <ChevronRight className="size-3 text-muted-foreground" />
+                  <p className="text-[12px] text-muted-foreground">{a.action}</p>
+                </div>
+                <p className="text-[12px] text-muted-foreground leading-snug italic">"{a.thought}"</p>
+                <p className="text-[10px] text-primary mt-1 flex items-center gap-1">
+                  <Database className="size-2.5" /> {a.source}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {/* Source documents */}
+        {traceDocs.length > 0 && (
+          <>
+            <button
+              onClick={() => setTraceDocsOpen((v) => !v)}
+              className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
+            >
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <Paperclip className="size-3 text-primary" /> Source documents ({traceDocs.length})
+              </span>
+              <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
+            </button>
+            {traceDocsOpen && (
+              <div className="space-y-1.5">
+                {traceDocs.map(({ doc, attr: docAttr, entity: docEntity }) => {
+                  const meta = DOC_KIND_META[doc.kind];
+                  return (
+                    <button
+                      key={`${docEntity}-${doc.id}`}
+                      onClick={() => setViewDoc({ doc, attr: docAttr, entity: docEntity })}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-primary hover:bg-info-soft/40 text-left transition-colors group"
+                    >
+                      <FileText className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-medium truncate">{doc.title}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{docEntity} · {doc.source}</p>
+                      </div>
+                      <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
+                        {meta.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center justify-between pt-1 border-t border-border">
+          <div className="flex items-center gap-2">
+            <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsUp className="size-3.5" /></button>
+            <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsDown className="size-3.5" /></button>
+          </div>
+          <button
+            onClick={() => runAgents(trace.agents.map((a) => a.id), `Re-verify: ${label}`)}
+            className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5"
+          >
+            <Play className="size-3" /> Re-run
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const attrNode = (label: string, entity: string, flagged: boolean) => {
     const isSel = selected?.label === label && selected?.entity === entity;
     return (
@@ -3006,116 +3139,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
         </PopoverTrigger>
         {trace && (
           <PopoverContent side="left" align="start" sideOffset={8} className="w-[360px] p-0 max-h-[72vh] overflow-y-auto">
-            <div className="p-4 space-y-3">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
-                    <Sparkles className="size-3 text-primary" /> Agent Trace
-                  </p>
-                  <p className="text-[13px] font-semibold leading-tight">{label}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{trace.value}</p>
-                </div>
-                <span className={cn(
-                  "px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0 mt-0.5",
-                  trace.status === "verified"
-                    ? "bg-success-soft text-success border-success-soft-border"
-                    : "bg-alert-soft text-alert border-alert-soft-border"
-                )}>
-                  {trace.status === "verified" ? "Verified" : "Flagged"} · {trace.confidence}%
-                </span>
-              </div>
-
-              {/* Conclusion */}
-              <div className="rounded-lg border border-border bg-secondary/40 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
-                  <ShieldCheck className="size-3 text-success" /> Conclusion
-                </p>
-                <p className="text-[12px] leading-snug">{trace.conclusion}</p>
-              </div>
-
-              {/* Reasoning steps */}
-              <button
-                onClick={() => setTraceStepsOpen((v) => !v)}
-                className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
-              >
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                  <Sparkles className="size-3 text-primary" /> Reasoning steps ({trace.agents.length})
-                </span>
-                <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
-              </button>
-              {traceStepsOpen && (
-                <ol className="space-y-2.5 px-1">
-                  {trace.agents.map((a, i) => (
-                    <li key={a.id} className="relative pl-7">
-                      <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-medium">{i + 1}</span>
-                      {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
-                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                        <p className="text-[12px] font-medium">{a.name}</p>
-                        <ChevronRight className="size-3 text-muted-foreground" />
-                        <p className="text-[12px] text-muted-foreground">{a.action}</p>
-                      </div>
-                      <p className="text-[12px] text-muted-foreground leading-snug italic">"{a.thought}"</p>
-                      <p className="text-[10px] text-primary mt-1 flex items-center gap-1">
-                        <Database className="size-2.5" /> {a.source}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-              )}
-
-              {/* Source documents */}
-              {traceDocs.length > 0 && (
-                <>
-                  <button
-                    onClick={() => setTraceDocsOpen((v) => !v)}
-                    className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
-                  >
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                      <Paperclip className="size-3 text-primary" /> Source documents ({traceDocs.length})
-                    </span>
-                    <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
-                  </button>
-                  {traceDocsOpen && (
-                    <div className="space-y-1.5">
-                      {traceDocs.map(({ doc, attr: docAttr, entity: docEntity }) => {
-                        const meta = DOC_KIND_META[doc.kind];
-                        return (
-                          <button
-                            key={`${docEntity}-${doc.id}`}
-                            onClick={() => setViewDoc({ doc, attr: docAttr, entity: docEntity })}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-border hover:border-primary hover:bg-info-soft/40 text-left transition-colors group"
-                          >
-                            <FileText className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[12px] font-medium truncate">{doc.title}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">{docEntity} · {doc.source}</p>
-                            </div>
-                            <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium uppercase tracking-wide shrink-0", meta.tone)}>
-                              {meta.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-between pt-1 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsUp className="size-3.5" /></button>
-                  <button className="size-7 rounded-full border border-border grid place-items-center text-muted-foreground hover:text-foreground"><ThumbsDown className="size-3.5" /></button>
-                </div>
-                <button
-                  onClick={() => runAgents(trace.agents.map((a) => a.id), `Re-verify: ${label}`)}
-                  className="text-[11px] px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-info-soft flex items-center gap-1.5"
-                >
-                  <Play className="size-3" /> Re-run
-                </button>
-              </div>
-            </div>
+            {renderAttrPopoverContent(label, entity)}
           </PopoverContent>
         )}
       </Popover>
@@ -3206,27 +3230,52 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
 
   // ── Shared controls ───────────────────────────────────────────────────────────
   const controls = (
-    <div className="flex items-center justify-between text-[11px]">
-      <div className="inline-flex rounded-md border border-border overflow-hidden font-medium">
-        <button
-          onClick={() => setViewMode("cards")}
-          className={cn("px-2.5 py-1 transition-colors", viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/60")}
-        >Cards</button>
-        <button
-          onClick={() => setViewMode("tree")}
-          className={cn("px-2.5 py-1 border-l border-border transition-colors", viewMode === "tree" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/60")}
-        >Tree</button>
-      </div>
+    <div className="space-y-2 text-[11px]">
+      {/* Row 1: primary View / Edit toggle */}
       <div className="flex items-center gap-2">
-        <span className="text-muted-foreground">Show only pending</span>
-        <button
-          onClick={() => setShowOnlyPending((v) => !v)}
-          className={cn("relative h-5 w-9 rounded-full transition-colors", showOnlyPending ? "bg-primary" : "bg-muted")}
-          aria-pressed={showOnlyPending}
-        >
-          <span className={cn("absolute top-0.5 size-4 rounded-full bg-background shadow transition-all", showOnlyPending ? "left-[18px]" : "left-0.5")} />
-        </button>
+        <div className="inline-flex rounded-md border border-border overflow-hidden font-medium">
+          <button
+            onClick={() => setPanelMode("view")}
+            className={cn("px-2.5 py-1 transition-colors",
+              panelMode === "view"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary/60")}
+          >View</button>
+          <button
+            onClick={() => setPanelMode("edit")}
+            className={cn("px-2.5 py-1 border-l border-border transition-colors flex items-center gap-1",
+              panelMode === "edit"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary/60")}
+          ><Pencil className="size-3" />Edit</button>
+        </div>
       </div>
+
+      {/* Row 2: Cards/Tree + pending toggle — view mode only */}
+      {panelMode === "view" && (
+        <div className="flex items-center justify-between">
+          <div className="inline-flex rounded-md border border-border overflow-hidden font-medium">
+            <button
+              onClick={() => setViewMode("cards")}
+              className={cn("px-2.5 py-1 transition-colors", viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/60")}
+            >Cards</button>
+            <button
+              onClick={() => setViewMode("tree")}
+              className={cn("px-2.5 py-1 border-l border-border transition-colors", viewMode === "tree" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/60")}
+            >Tree</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Show only pending</span>
+            <button
+              onClick={() => setShowOnlyPending((v) => !v)}
+              className={cn("relative h-5 w-9 rounded-full transition-colors", showOnlyPending ? "bg-primary" : "bg-muted")}
+              aria-pressed={showOnlyPending}
+            >
+              <span className={cn("absolute top-0.5 size-4 rounded-full bg-background shadow transition-all", showOnlyPending ? "left-[18px]" : "left-0.5")} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -3235,7 +3284,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
       {controls}
 
       {/* ── Cards view ────────────────────────────────────────────────────── */}
-      {viewMode === "cards" && (
+      {panelMode === "view" && viewMode === "cards" && (
         <div className="space-y-3">
           {categoryCards.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-6">No attributes to display.</p>
@@ -3274,7 +3323,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
       )}
 
       {/* ── Tree view ─────────────────────────────────────────────────────── */}
-      {viewMode === "tree" && (
+      {panelMode === "view" && viewMode === "tree" && (
         <div className="space-y-6">
       {drgEntries.map(([drgName, group]) => (
         <div key={drgName}>
@@ -3347,6 +3396,22 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
         </div>
       )}
 
+      {panelMode === "edit" && (
+        <AttributeEditForm
+          entitiesForTree={entitiesForTree}
+          draftValues={draftValues}
+          setDraftValues={setDraftValues}
+          selected={selected}
+          setSelected={setSelected}
+          isDirty={isDirty}
+          onSave={() => { setDraftValues({}); setPanelMode("view"); toast.success("Changes saved"); }}
+          onDiscard={() => setDraftValues({})}
+          renderAttrPopoverContent={renderAttrPopoverContent}
+          categorize={categorize}
+          excs={excs}
+        />
+      )}
+
       {openEntity && (
         <EntityDetailPanel
           profile={ENTITY_PROFILES[openEntity]}
@@ -3363,6 +3428,173 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
         />
       )}
 
+    </div>
+  );
+};
+
+const AttributeEditForm = ({
+  entitiesForTree,
+  draftValues,
+  setDraftValues,
+  selected,
+  setSelected,
+  isDirty,
+  onSave,
+  onDiscard,
+  renderAttrPopoverContent,
+  categorize,
+  excs,
+}: {
+  entitiesForTree: { entity: string; kyc: string; drg: string; attrs: string[] }[];
+  draftValues: Record<string, string>;
+  setDraftValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  selected: { label: string; entity: string } | null;
+  setSelected: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
+  isDirty: boolean;
+  onSave: () => void;
+  onDiscard: () => void;
+  renderAttrPopoverContent: (label: string, entity: string) => React.ReactNode;
+  categorize: (entity: string, attrs: string[]) => { category: string; items: { label: string; flagged: boolean }[] }[];
+  excs: Exc[];
+}) => {
+  const multiEntity = entitiesForTree.length > 1;
+
+  return (
+    <div className="relative">
+      <div className="space-y-4 pb-16">
+        {entitiesForTree.map(({ entity, attrs }) => {
+          const groups = categorize(entity, attrs);
+          return (
+            <div key={entity}>
+              {multiEntity && (
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 truncate">{entity}</p>
+              )}
+              {groups.map(({ category, items }) => {
+                const pendingCount = items.filter(i => i.flagged).length;
+                return (
+                  <Collapsible key={category} defaultOpen className="mb-3">
+                    <CollapsibleTrigger className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-secondary/40 text-left group">
+                      <div className="flex items-center gap-1.5">
+                        <ChevronDown className="size-3 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90" />
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{category}</span>
+                        <span className="text-[10px] text-muted-foreground">· {items.length}</span>
+                      </div>
+                      {pendingCount > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-medium">{pendingCount}</span>
+                      )}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="mt-1 space-y-2 pl-2">
+                        {items.map(({ label, flagged }) => {
+                          const draftKey = `${entity}::${label}`;
+                          const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
+                          const currentValue = pa?.value ?? "";
+                          const draftVal = draftValues[draftKey] ?? currentValue;
+                          const isAlert = pa?.status === "alert";
+                          const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
+                          const isSel = selected?.label === label && selected?.entity === entity;
+
+                          return (
+                            <div
+                              key={label}
+                              className={cn(
+                                "rounded-lg border p-2.5",
+                                isAlert ? "border-alert/50 bg-alert-soft/10" : "border-border bg-card"
+                              )}
+                            >
+                              {/* Label row */}
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  {pa && (
+                                    <span className={cn("size-2 rounded-full shrink-0", DOT_STYLE[pa.status])} />
+                                  )}
+                                  {isAlert && <AlertTriangle className="size-3 text-alert shrink-0" />}
+                                  <Label className="text-[11px] font-medium truncate cursor-default">{label}</Label>
+                                  {pa && (
+                                    <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-medium shrink-0", SOURCE_STYLE[pa.source])}>
+                                      {pa.source}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Bot icon — opens agent trace popover */}
+                                <Popover open={isSel} onOpenChange={(open) => { if (!open) setSelected(null); }}>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      disabled={!hasTrace}
+                                      onClick={() => setSelected(isSel ? null : { label, entity })}
+                                      className={cn(
+                                        "size-6 rounded border grid place-items-center shrink-0 transition-colors",
+                                        hasTrace
+                                          ? "border-border text-muted-foreground hover:border-primary hover:text-primary"
+                                          : "border-border/40 text-muted-foreground/30 cursor-not-allowed"
+                                      )}
+                                      title="View agent trace"
+                                    >
+                                      <Bot className="size-3.5" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  {hasTrace && isSel && (
+                                    <PopoverContent side="left" align="start" sideOffset={8} className="w-[360px] p-0 max-h-[72vh] overflow-y-auto">
+                                      {renderAttrPopoverContent(label, entity)}
+                                    </PopoverContent>
+                                  )}
+                                </Popover>
+                              </div>
+
+                              {/* Input or Textarea */}
+                              {currentValue.length > 80 ? (
+                                <Textarea
+                                  className="min-h-[60px] max-h-[120px] resize-y text-[12px]"
+                                  value={draftVal}
+                                  onChange={e => setDraftValues(prev => ({ ...prev, [draftKey]: e.target.value }))}
+                                  placeholder={`Enter ${label}`}
+                                />
+                              ) : (
+                                <Input
+                                  className="h-8 text-[12px]"
+                                  value={draftVal}
+                                  onChange={e => setDraftValues(prev => ({ ...prev, [draftKey]: e.target.value }))}
+                                  placeholder={`Enter ${label}`}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        {entitiesForTree.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center py-6">No entities selected.</p>
+        )}
+      </div>
+
+      {/* Sticky footer */}
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border pt-2 pb-1 flex items-center gap-2">
+        <button
+          onClick={onSave}
+          className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-[12px] font-medium hover:bg-primary/90 transition-colors"
+        >
+          Save changes
+        </button>
+        <button
+          onClick={onDiscard}
+          disabled={!isDirty}
+          className={cn(
+            "px-3 py-1.5 rounded-md border text-[12px] font-medium transition-colors",
+            isDirty
+              ? "border-border text-foreground hover:bg-secondary/60"
+              : "border-border/40 text-muted-foreground/40 cursor-not-allowed"
+          )}
+        >
+          Discard
+        </button>
+      </div>
     </div>
   );
 };
