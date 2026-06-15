@@ -1,0 +1,202 @@
+<h2>How should the page title area look?</h2>
+<p class="subtitle">B's bold hero band vs. C's slim inline header — or something in between. Pick the one that feels cleanest.</p>
+
+<div class="cards" style="grid-template-columns: repeat(3, 1fr); gap: 20px;">
+
+  <!-- Option 1: Hero band (B-style) -->
+  <div class="card" data-choice="hero-band" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f1f5f9;padding:0;overflow:hidden;height:260px;">
+      <!-- Nav -->
+      <div style="background:#1e293b;padding:0 14px;height:36px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:3px;height:18px;background:linear-gradient(to bottom,#3b82f6,#6366f1);border-radius:2px;"></div>
+          <div>
+            <div style="color:#fff;font-size:10px;font-weight:700;line-height:1.1;letter-spacing:-0.01em;">KYC Sentinel</div>
+            <div style="color:rgba(255,255,255,0.38);font-size:7px;letter-spacing:0.05em;">POWERED BY FORGE</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <span style="color:rgba(255,255,255,0.4);font-size:9px;">Dashboard</span>
+          <span style="color:#fff;font-size:9px;border-bottom:1.5px solid #3b82f6;padding-bottom:4px;margin-bottom:-4px;">Work Queue</span>
+          <span style="color:rgba(255,255,255,0.4);font-size:9px;">Reports</span>
+        </div>
+      </div>
+      <!-- Hero title band -->
+      <div style="background:linear-gradient(to right,#1e3a8a,#312e81);padding:14px 14px 12px;">
+        <div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-0.02em;line-height:1;">Alex's Dashboard</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.5);margin-top:3px;">Friday, Jun 13 · 47 cases need attention</div>
+      </div>
+      <!-- KPI strip -->
+      <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;">
+        <div style="background:#fff;border-left:3px solid #3b82f6;border-radius:0 7px 7px 0;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,0.07);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;">Queue</div>
+          <div style="font-size:20px;font-weight:800;color:#0f172a;line-height:1.1;font-variant-numeric:tabular-nums;">247</div>
+        </div>
+        <div style="background:#fff;border-left:3px solid #ef4444;border-radius:0 7px 7px 0;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,0.07);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;">SLA Risk</div>
+          <div style="font-size:20px;font-weight:800;color:#ef4444;line-height:1.1;font-variant-numeric:tabular-nums;">18</div>
+        </div>
+        <div style="background:#fff;border-left:3px solid #10b981;border-radius:0 7px 7px 0;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,0.07);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;">Complete</div>
+          <div style="font-size:20px;font-weight:800;color:#10b981;line-height:1.1;font-variant-numeric:tabular-nums;">68%</div>
+        </div>
+      </div>
+      <!-- Card preview -->
+      <div style="padding:0 14px;display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:9px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:8px;font-weight:700;color:#0f172a;margin-bottom:5px;">Priority Cases</div>
+          <div style="font-size:8px;color:#64748b;line-height:1.7;">Acme Corp · High<br/>Global Ventures · Med</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e0e7ff;border-radius:7px;padding:9px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:8px;font-weight:700;color:#4f46e5;margin-bottom:5px;">✦ AI Actions</div>
+          <div style="font-size:8px;color:#64748b;line-height:1.7;">Review Acme UBO<br/>Request docs</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>1 — Hero Band</h3>
+      <p>Bold gradient title strip between the nav and content. Strongly editorial. Creates a clear "you are here" anchor on every page.</p>
+    </div>
+  </div>
+
+  <!-- Option 2: Slim inline header (C-style) -->
+  <div class="card" data-choice="slim-bar" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:0;overflow:hidden;height:260px;">
+      <!-- Nav -->
+      <div style="background:#1e293b;padding:0 14px;height:36px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:3px;height:18px;background:linear-gradient(to bottom,#3b82f6,#6366f1);border-radius:2px;"></div>
+          <div>
+            <div style="color:#fff;font-size:10px;font-weight:700;line-height:1.1;letter-spacing:-0.01em;">KYC Sentinel</div>
+            <div style="color:rgba(255,255,255,0.38);font-size:7px;letter-spacing:0.05em;">POWERED BY FORGE</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <span style="color:rgba(255,255,255,0.4);font-size:9px;">Dashboard</span>
+          <span style="color:#fff;font-size:9px;border-bottom:1.5px solid #3b82f6;padding-bottom:4px;margin-bottom:-4px;">Work Queue</span>
+          <span style="color:rgba(255,255,255,0.4);font-size:9px;">Reports</span>
+        </div>
+      </div>
+      <!-- Slim white bar with page title inline -->
+      <div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:7px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:13px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">Alex's Dashboard</span>
+          <span style="font-size:9px;color:#94a3b8;">47 cases need attention</span>
+        </div>
+        <div style="display:flex;gap:5px;">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;font-size:8px;padding:2px 7px;border-radius:4px;">High Priority ×</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;font-size:8px;padding:2px 7px;border-radius:4px;">+ Filter</div>
+        </div>
+      </div>
+      <!-- KPI strip — 4 column compact -->
+      <div style="padding:10px 14px;display:grid;grid-template-columns:repeat(4,1fr);gap:7px;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Queue</div>
+          <div style="font-size:18px;font-weight:700;color:#0f172a;line-height:1;font-variant-numeric:tabular-nums;">247</div>
+          <div style="font-size:7px;color:#64748b;margin-top:2px;">↑ 12 cases</div>
+        </div>
+        <div style="background:#fff;border:1px solid #fecaca;border-radius:7px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">SLA Risk</div>
+          <div style="font-size:18px;font-weight:700;color:#ef4444;line-height:1;font-variant-numeric:tabular-nums;">18</div>
+          <div style="font-size:7px;color:#ef4444;margin-top:2px;">3 critical</div>
+        </div>
+        <div style="background:#fff;border:1px solid #bbf7d0;border-radius:7px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">Complete</div>
+          <div style="font-size:18px;font-weight:700;color:#16a34a;line-height:1;font-variant-numeric:tabular-nums;">68%</div>
+          <div style="font-size:7px;color:#16a34a;margin-top:2px;">↑ 4% vs last mo</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e0e7ff;border-radius:7px;padding:8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:3px;">AI Actions</div>
+          <div style="font-size:18px;font-weight:700;color:#4f46e5;line-height:1;font-variant-numeric:tabular-nums;">9</div>
+          <div style="font-size:7px;color:#6366f1;margin-top:2px;">✦ 3 urgent</div>
+        </div>
+      </div>
+      <!-- Cards -->
+      <div style="padding:0 14px;display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:9px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:8px;font-weight:600;color:#0f172a;margin-bottom:5px;">Priority Cases <span style="background:#fee2e2;color:#ef4444;font-size:7px;padding:1px 5px;border-radius:8px;margin-left:3px;">5 High</span></div>
+          <div style="font-size:8px;color:#64748b;line-height:1.7;">Acme Corp · High<br/>Global Ventures · Med</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e0e7ff;background:linear-gradient(135deg,#f5f3ff 0%,#fff 100%);border-radius:7px;padding:9px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+          <div style="font-size:8px;font-weight:600;color:#4f46e5;margin-bottom:5px;">✦ AI Recommendations</div>
+          <div style="font-size:8px;color:#64748b;line-height:1.7;">Review Acme UBO chain<br/>Request docs · Escalate</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>2 — Slim Inline Bar</h3>
+      <p>Page title lives in a compact white strip with filters alongside it. Clean, space-efficient. More content visible above the fold.</p>
+    </div>
+  </div>
+
+  <!-- Option 3: Content-first (no band) -->
+  <div class="card" data-choice="content-first" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:0;overflow:hidden;height:260px;">
+      <!-- Nav -->
+      <div style="background:#1e293b;padding:0 14px;height:36px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:3px;height:18px;background:linear-gradient(to bottom,#3b82f6,#6366f1);border-radius:2px;"></div>
+          <div>
+            <div style="color:#fff;font-size:10px;font-weight:700;line-height:1.1;letter-spacing:-0.01em;">KYC Sentinel</div>
+            <div style="color:rgba(255,255,255,0.38);font-size:7px;letter-spacing:0.05em;">POWERED BY FORGE</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;">
+          <span style="color:rgba(255,255,255,0.4);font-size:9px;">Dashboard</span>
+          <span style="color:#fff;font-size:9px;border-bottom:1.5px solid #3b82f6;padding-bottom:4px;margin-bottom:-4px;">Work Queue</span>
+          <span style="color:rgba(255,255,255,0.4);font-size:9px;">Reports</span>
+        </div>
+      </div>
+      <!-- Content starts immediately with page title inside content area -->
+      <div style="padding:12px 14px 6px;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <span style="font-size:14px;font-weight:700;color:#0f172a;letter-spacing:-0.01em;">Alex's Dashboard</span>
+            <span style="font-size:9px;color:#94a3b8;margin-left:8px;">Friday, Jun 13</span>
+          </div>
+          <div style="display:flex;gap:5px;">
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;color:#2563eb;font-size:8px;padding:2px 7px;border-radius:4px;">High ×</div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;font-size:8px;padding:2px 7px;border-radius:4px;">+ Filter</div>
+          </div>
+        </div>
+        <!-- KPI strip — tighter 4 col -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-top:2px solid #3b82f6;border-radius:7px;padding:7px 8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Queue</div>
+            <div style="font-size:17px;font-weight:700;color:#0f172a;line-height:1;font-variant-numeric:tabular-nums;">247</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-top:2px solid #ef4444;border-radius:7px;padding:7px 8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">SLA Risk</div>
+            <div style="font-size:17px;font-weight:700;color:#ef4444;line-height:1;font-variant-numeric:tabular-nums;">18</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-top:2px solid #10b981;border-radius:7px;padding:7px 8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">Complete</div>
+            <div style="font-size:17px;font-weight:700;color:#10b981;line-height:1;font-variant-numeric:tabular-nums;">68%</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-top:2px solid #6366f1;border-radius:7px;padding:7px 8px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:7px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:2px;">AI Actions</div>
+            <div style="font-size:17px;font-weight:700;color:#6366f1;line-height:1;font-variant-numeric:tabular-nums;">9</div>
+          </div>
+        </div>
+        <!-- Cards -->
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:6px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:9px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:8px;font-weight:600;color:#0f172a;margin-bottom:5px;">Priority Cases <span style="background:#fee2e2;color:#ef4444;font-size:7px;padding:1px 5px;border-radius:8px;margin-left:3px;">5 High</span></div>
+            <div style="font-size:8px;color:#64748b;line-height:1.7;">Acme Corp · High<br/>Global Ventures · Med</div>
+          </div>
+          <div style="background:#f5f3ff;border:1px solid #e0e7ff;border-radius:7px;padding:9px;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:8px;font-weight:600;color:#4f46e5;margin-bottom:5px;">✦ AI Actions</div>
+            <div style="font-size:8px;color:#64748b;line-height:1.7;">Review Acme UBO<br/>Request docs</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>3 — Content First</h3>
+      <p>No extra header band — title floats inline with page content. Maximally space-efficient. Cards get a colored top-border accent instead of left-border.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;font-size:12px;">Note: all three share the same dark nav with KYC Sentinel / Powered by Forge branding and the vertical blue accent bar.</p>
