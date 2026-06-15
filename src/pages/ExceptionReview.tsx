@@ -2661,7 +2661,72 @@ const ATTR_AUDIT_LOG: Record<string, AuditEntry[]> = {
   ],
 };
 
+type NestedSubField = {
+  label: string;
+  value: string;
+  source: EntityAttr["source"];
+  status: EntityAttr["status"];
+};
+type NestedEntry = { name: string; tag: string; fields: NestedSubField[] };
 
+const NESTED_ATTR_PROFILES: Record<string, NestedEntry[]> = {
+  "Persons of Significant Control": [
+    {
+      name: "Alan Howard", tag: "Founder · 75–100%",
+      fields: [
+        { label: "Name", value: "Alan Howard", source: "CRM", status: "ok" },
+        { label: "Date of Birth", value: "1964-09-15", source: "CRM", status: "ok" },
+        { label: "Country", value: "United Kingdom", source: "Forge", status: "ok" },
+      ],
+    },
+    {
+      name: "Nagi Kawkabani", tag: "CEO · 28%",
+      fields: [
+        { label: "Name", value: "Nagi Kawkabani", source: "CRM", status: "ok" },
+        { label: "Date of Birth", value: "Unconfirmed", source: "3rd", status: "warn" },
+        { label: "Country", value: "Switzerland", source: "3rd", status: "ok" },
+      ],
+    },
+  ],
+  "Persons with Significant Control": [
+    {
+      name: "Alan Howard", tag: "Founder · 75–100%",
+      fields: [
+        { label: "Name", value: "Alan Howard", source: "CRM", status: "ok" },
+        { label: "Date of Birth", value: "1964-09-15", source: "CRM", status: "ok" },
+        { label: "Country", value: "United Kingdom", source: "Forge", status: "ok" },
+      ],
+    },
+  ],
+  "Beneficial Owner (25%+)": [
+    {
+      name: "BH Capital Ltd (Cayman)", tag: "UBO · 61%",
+      fields: [
+        { label: "Entity Name", value: "BH Capital Ltd", source: "3rd", status: "ok" },
+        { label: "Jurisdiction", value: "Cayman Islands", source: "Forge", status: "alert" },
+        { label: "Ownership %", value: "61.4%", source: "CRM", status: "ok" },
+      ],
+    },
+  ],
+  "Directors": [
+    {
+      name: "Aron Landy", tag: "CEO",
+      fields: [
+        { label: "Name", value: "Aron Landy", source: "CRM", status: "ok" },
+        { label: "Date of Birth", value: "1970-04-22", source: "CRM", status: "ok" },
+        { label: "Nationality", value: "British", source: "3rd", status: "ok" },
+      ],
+    },
+    {
+      name: "Carsten Kengeter", tag: "Non-exec Director",
+      fields: [
+        { label: "Name", value: "Carsten Kengeter", source: "CRM", status: "ok" },
+        { label: "Date of Birth", value: "1967-01-09", source: "CRM", status: "ok" },
+        { label: "Nationality", value: "German", source: "3rd", status: "warn" },
+      ],
+    },
+  ],
+};
 
 
 
@@ -3643,32 +3708,58 @@ const AttributeFormView = ({
 
                   {open && (
                     <div className="divide-y divide-border/60">
-                      {items.map(({ label }) => (
-                        <SimpleFieldRow
-                          key={label}
-                          label={label}
-                          entity={entity}
-                          savedOverrides={savedOverrides}
-                          openTraceFor={openTraceFor}
-                          setOpenTraceFor={setOpenTraceFor}
-                          openOverrideFor={openOverrideFor}
-                          setOpenOverrideFor={setOpenOverrideFor}
-                          trace={trace}
-                          traceDocs={traceDocs}
-                          traceTab={traceTab}
-                          setTraceTab={setTraceTab}
-                          traceStepsOpen={traceStepsOpen}
-                          setTraceStepsOpen={setTraceStepsOpen}
-                          traceDocsOpen={traceDocsOpen}
-                          setTraceDocsOpen={setTraceDocsOpen}
-                          runAgents={runAgents}
-                          overrideDraft={overrideDraft}
-                          setOverrideDraft={setOverrideDraft}
-                          overrideNote={overrideNote}
-                          setOverrideNote={setOverrideNote}
-                          handleSaveOverride={handleSaveOverride}
-                        />
-                      ))}
+                      {items.map(({ label }) =>
+                        NESTED_ATTR_PROFILES[label] ? (
+                          <div key={label} className="p-3">
+                            <NestedObjectBlock
+                              label={label}
+                              entity={entity}
+                              openTraceFor={openTraceFor}
+                              setOpenTraceFor={setOpenTraceFor}
+                              savedOverrides={savedOverrides}
+                              trace={trace}
+                              traceDocs={traceDocs}
+                              traceTab={traceTab}
+                              setTraceTab={setTraceTab}
+                              traceStepsOpen={traceStepsOpen}
+                              setTraceStepsOpen={setTraceStepsOpen}
+                              traceDocsOpen={traceDocsOpen}
+                              setTraceDocsOpen={setTraceDocsOpen}
+                              runAgents={runAgents}
+                              openOverrideFor={openOverrideFor}
+                              setOpenOverrideFor={setOpenOverrideFor}
+                              overrideDraft={overrideDraft}
+                              setOverrideDraft={setOverrideDraft}
+                              setOverrideNote={setOverrideNote}
+                            />
+                          </div>
+                        ) : (
+                          <SimpleFieldRow
+                            key={label}
+                            label={label}
+                            entity={entity}
+                            savedOverrides={savedOverrides}
+                            openTraceFor={openTraceFor}
+                            setOpenTraceFor={setOpenTraceFor}
+                            openOverrideFor={openOverrideFor}
+                            setOpenOverrideFor={setOpenOverrideFor}
+                            overrideDraft={overrideDraft}
+                            setOverrideDraft={setOverrideDraft}
+                            overrideNote={overrideNote}
+                            setOverrideNote={setOverrideNote}
+                            handleSaveOverride={handleSaveOverride}
+                            trace={trace}
+                            traceDocs={traceDocs}
+                            traceTab={traceTab}
+                            setTraceTab={setTraceTab}
+                            traceStepsOpen={traceStepsOpen}
+                            setTraceStepsOpen={setTraceStepsOpen}
+                            traceDocsOpen={traceDocsOpen}
+                            setTraceDocsOpen={setTraceDocsOpen}
+                            runAgents={runAgents}
+                          />
+                        )
+                      )}
                     </div>
                   )}
                 </div>
@@ -4135,6 +4226,157 @@ const InlineTraceDrawer = ({
           ✕ Close
         </button>
       </div>
+    </div>
+  );
+};
+
+type NestedObjectBlockProps = {
+  label: string;
+  entity: string;
+  openTraceFor: { label: string; entity: string } | null;
+  setOpenTraceFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
+  // all InlineTraceDrawer props (passed through for the group-level drawer)
+  savedOverrides: Record<string, { value: string; actor: string; timestamp: string }>;
+  trace: AttrTrace | null;
+  traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
+  traceTab: "reasoning" | "audit";
+  setTraceTab: React.Dispatch<React.SetStateAction<"reasoning" | "audit">>;
+  traceStepsOpen: boolean;
+  setTraceStepsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  traceDocsOpen: boolean;
+  setTraceDocsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  runAgents: (agents: AgentId[], reason: string) => void;
+  openOverrideFor: { label: string; entity: string } | null;
+  setOpenOverrideFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
+  overrideDraft: string;
+  setOverrideDraft: React.Dispatch<React.SetStateAction<string>>;
+  setOverrideNote: React.Dispatch<React.SetStateAction<string>>;
+};
+
+const NestedObjectBlock = ({
+  label, entity,
+  openTraceFor, setOpenTraceFor,
+  savedOverrides, trace, traceDocs,
+  traceTab, setTraceTab,
+  traceStepsOpen, setTraceStepsOpen,
+  traceDocsOpen, setTraceDocsOpen,
+  runAgents, openOverrideFor, setOpenOverrideFor,
+  overrideDraft, setOverrideDraft, setOverrideNote,
+}: NestedObjectBlockProps) => {
+  const entries = NESTED_ATTR_PROFILES[label];
+  if (!entries) return null;
+
+  const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
+  const groupStatus: EntityAttr["status"] = entries.flatMap(e => e.fields).some(f => f.status === "alert")
+    ? "alert" : entries.flatMap(e => e.fields).some(f => f.status === "warn") ? "warn" : "ok";
+  const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
+  const isGroupOpen = openTraceFor?.label === label && openTraceFor?.entity === entity;
+
+  return (
+    <div className="border border-border rounded-lg overflow-hidden">
+      {/* Object-level header */}
+      <div className={cn(
+        "flex items-center gap-2 px-4 py-2.5 border-b border-border",
+        groupStatus === "alert" ? "bg-alert-soft/20" : groupStatus === "warn" ? "bg-warning-soft/20" : "bg-secondary/30"
+      )}>
+        <div className={cn("size-1.5 rounded-full shrink-0", DOT_STYLE[groupStatus])} />
+        <span className="text-[11px] font-semibold text-foreground flex-1">{label}</span>
+        {/* Group-level ID/V summary badge */}
+        <span className="text-[9px] font-bold">
+          <span className="text-success">ID✓</span>
+          <span className="text-muted-foreground/30 mx-0.5">/</span>
+          <span className={groupStatus === "ok" ? "text-success" : groupStatus === "warn" ? "text-warning" : "text-alert"}>
+            {groupStatus === "ok" ? "V✓" : groupStatus === "warn" ? "V⚠" : "V✕"}
+          </span>
+        </span>
+        {pa && <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold", SOURCE_STYLE[pa.source])}>{pa.source}</span>}
+        <button
+          disabled={!hasTrace}
+          onClick={() => setOpenTraceFor(isGroupOpen ? null : { label, entity })}
+          className={cn(
+            "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors",
+            isGroupOpen ? "bg-primary text-primary-foreground border-primary"
+              : hasTrace ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
+              : "border-border/30 text-muted-foreground/30 cursor-not-allowed"
+          )}
+        >
+          <Bot className="size-3" />{isGroupOpen ? "▲" : "Trace"}
+        </button>
+      </div>
+
+      {/* Group-level trace drawer */}
+      {isGroupOpen && (
+        <InlineTraceDrawer
+          label={label}
+          entity={entity}
+          savedOverrides={savedOverrides}
+          trace={trace}
+          traceDocs={traceDocs}
+          traceTab={traceTab}
+          setTraceTab={setTraceTab}
+          traceStepsOpen={traceStepsOpen}
+          setTraceStepsOpen={setTraceStepsOpen}
+          traceDocsOpen={traceDocsOpen}
+          setTraceDocsOpen={setTraceDocsOpen}
+          runAgents={runAgents}
+          setOpenTraceFor={setOpenTraceFor}
+          openOverrideFor={openOverrideFor}
+          setOpenOverrideFor={setOpenOverrideFor}
+          overrideDraft={overrideDraft}
+          setOverrideDraft={setOverrideDraft}
+          setOverrideNote={setOverrideNote}
+        />
+      )}
+
+      {/* Entries */}
+      {entries.map((entry, ei) => (
+        <div key={ei} className="border-b border-border/50 last:border-b-0">
+          {/* Entry header */}
+          <div className="flex items-center gap-2 px-4 py-1.5 bg-secondary/20">
+            <div className={cn(
+              "size-1.5 rounded-full shrink-0",
+              entry.fields.some(f => f.status === "alert") ? "bg-alert"
+                : entry.fields.some(f => f.status === "warn") ? "bg-warning"
+                : "bg-success"
+            )} />
+            <span className="text-[10px] font-semibold text-foreground">{entry.name}</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-semibold">{entry.tag}</span>
+          </div>
+          {/* Sub-fields */}
+          {entry.fields.map(field => {
+            const vOk = field.status === "ok";
+            const vWarn = field.status === "warn";
+            return (
+              <div key={field.label} className={cn(
+                "flex items-center gap-3 pl-8 pr-4 py-2 border-t border-border/30 hover:bg-secondary/20 transition-colors",
+                field.status === "alert" ? "bg-alert-soft/10" : ""
+              )}>
+                <div className={cn("size-1.5 rounded-full shrink-0", DOT_STYLE[field.status])} />
+                <span className="text-[10px] font-medium text-muted-foreground w-[120px] shrink-0">{field.label}</span>
+                <span className={cn(
+                  "flex-1 text-[10px]",
+                  field.status === "alert" ? "text-alert font-semibold" : field.status === "warn" ? "text-warning" : "text-foreground"
+                )}>{field.value}</span>
+                <span className="text-[8px] font-bold whitespace-nowrap">
+                  <span className="text-success">ID✓</span>
+                  <span className="text-muted-foreground/30 mx-0.5">/</span>
+                  <span className={vOk ? "text-success" : vWarn ? "text-warning" : "text-alert"}>
+                    {vOk ? "V✓" : vWarn ? "V⚠" : "V✕"}
+                  </span>
+                </span>
+                <span className={cn("text-[8px] px-1 py-0.5 rounded border font-semibold", SOURCE_STYLE[field.source])}>{field.source}</span>
+                <button
+                  disabled
+                  className="flex items-center gap-1 text-[8px] font-semibold px-1.5 py-0.5 rounded border border-border/30 text-muted-foreground/30 cursor-not-allowed"
+                  title="Trace available on the object level above"
+                >
+                  <Bot className="size-2.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 };
