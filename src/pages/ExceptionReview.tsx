@@ -1723,14 +1723,6 @@ const ExceptionReview = () => {
           </div>
         </section>
         )}
-      </>
-      )}
-      {attrViewMode === "attributes" && (
-  <AttributeFormView
-    selectedEntities={selectedEntities}
-    exceptions={effectiveExceptions}
-  />
-)}
 
         {/* Right: Attributes / Document Locker — collapsible */}
         {rightPaneOpen ? (
@@ -1820,6 +1812,14 @@ const ExceptionReview = () => {
         )}
 
       </div>
+      </>
+      )}
+      {attrViewMode === "attributes" && (
+        <AttributeFormView
+          selectedEntities={selectedEntities}
+          exceptions={effectiveExceptions}
+        />
+      )}
 
 
       {openAgent && <AgentReviewModal onClose={() => setOpenAgent(false)} />}
