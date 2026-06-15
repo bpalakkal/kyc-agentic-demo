@@ -3664,7 +3664,9 @@ const AttributeFormView = ({
                           runAgents={runAgents}
                           overrideDraft={overrideDraft}
                           setOverrideDraft={setOverrideDraft}
+                          overrideNote={overrideNote}
                           setOverrideNote={setOverrideNote}
+                          handleSaveOverride={handleSaveOverride}
                         />
                       ))}
                     </div>
@@ -3705,7 +3707,9 @@ type SimpleFieldRowProps = {
   runAgents: (agentIds: AgentId[], label?: string) => void;
   overrideDraft: string;
   setOverrideDraft: Dispatch<SetStateAction<string>>;
+  overrideNote: string;
   setOverrideNote: Dispatch<SetStateAction<string>>;
+  handleSaveOverride: (draftKey: string) => void;
 };
 
 const SimpleFieldRow = ({
@@ -3713,7 +3717,7 @@ const SimpleFieldRow = ({
   savedOverrides, openTraceFor, setOpenTraceFor, openOverrideFor, setOpenOverrideFor,
   trace, traceDocs, traceTab, setTraceTab,
   traceStepsOpen, setTraceStepsOpen, traceDocsOpen, setTraceDocsOpen,
-  runAgents, overrideDraft, setOverrideDraft, setOverrideNote,
+  runAgents, overrideDraft, setOverrideDraft, overrideNote, setOverrideNote, handleSaveOverride,
 }: SimpleFieldRowProps) => {
   const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
   const overrideKey = `${entity}::${label}`;
@@ -3819,6 +3823,57 @@ const SimpleFieldRow = ({
           setOverrideDraft={setOverrideDraft}
           setOverrideNote={setOverrideNote}
         />
+      )}
+      {isOverrideOpen && (
+        <div className="px-4 py-3 border-l-2 border-warning bg-warning-soft/20 border-b border-border/60">
+          <p className="text-[10px] font-semibold text-warning mb-2 flex items-center gap-1.5">
+            <Zap className="size-3" /> Override value — <span className="font-normal text-muted-foreground">{label}</span>
+          </p>
+          {overrideDraft.length > 80 ? (
+            <Textarea
+              className="text-[12px] min-h-[60px] max-h-[120px] resize-y mb-2"
+              value={overrideDraft}
+              onChange={e => setOverrideDraft(e.target.value)}
+              placeholder={`Enter corrected value for ${label}`}
+              autoFocus
+            />
+          ) : (
+            <Input
+              className="h-8 text-[12px] mb-2"
+              value={overrideDraft}
+              onChange={e => setOverrideDraft(e.target.value)}
+              placeholder={`Enter corrected value for ${label}`}
+              autoFocus
+            />
+          )}
+          <Textarea
+            className="text-[11px] min-h-[48px] resize-none mb-3"
+            value={overrideNote}
+            onChange={e => setOverrideNote(e.target.value)}
+            placeholder="Reason for override (optional)"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              disabled={!overrideDraft.trim()}
+              onClick={() => handleSaveOverride(`${entity}::${label}`)}
+              className={cn(
+                "text-[11px] font-semibold px-3 py-1.5 rounded-md transition-colors",
+                overrideDraft.trim()
+                  ? "bg-success text-white hover:bg-success/90"
+                  : "bg-muted text-muted-foreground cursor-not-allowed"
+              )}
+            >
+              Save override
+            </button>
+            <button
+              onClick={() => { setOpenOverrideFor(null); setOverrideDraft(""); setOverrideNote(""); }}
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+            <span className="ml-auto text-[9px] text-muted-foreground">Confidence will be set to 1.0</span>
+          </div>
+        </div>
       )}
     </>
   );
