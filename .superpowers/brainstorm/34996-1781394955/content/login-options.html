@@ -1,0 +1,88 @@
+<h2>Login Page Style</h2>
+<p class="subtitle">Which layout fits KYC Sentinel best?</p>
+
+<div class="cards">
+
+  <!-- Option A: Centered card -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;padding:24px;min-height:260px;display:flex;align-items:center;justify-content:center;font-family:system-ui">
+        <div style="background:#1e293b;border-radius:12px;border:1px solid #334155;padding:28px 32px;width:300px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+            <div style="width:3px;height:22px;border-radius:4px;background:linear-gradient(to bottom,#3b82f6,#6366f1)"></div>
+            <div>
+              <div style="color:#fff;font-weight:700;font-size:13px;line-height:1.2">KYC Sentinel</div>
+              <div style="color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:0.1em">Powered by Forge</div>
+            </div>
+          </div>
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:16px">Sign in to your account</div>
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 10px;color:#64748b;font-size:12px;margin-bottom:8px">email@kpmg.com</div>
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 10px;color:#64748b;font-size:12px;margin-bottom:16px">••••••••</div>
+          <div style="background:#3b82f6;border-radius:6px;padding:8px;text-align:center;color:#fff;font-size:12px;font-weight:600">Sign In</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Centered Card</h3>
+      <p>Login card centered on a dark full-screen background. Clean, focused, matches the dark nav aesthetic.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Split panel -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0f172a;padding:0;min-height:260px;display:flex;font-family:system-ui;overflow:hidden;border-radius:4px">
+        <!-- Left brand panel -->
+        <div style="width:45%;background:linear-gradient(135deg,#1e3a8a,#312e81);display:flex;flex-direction:column;justify-content:center;padding:24px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+            <div style="width:3px;height:20px;border-radius:4px;background:linear-gradient(to bottom,#60a5fa,#a5b4fc)"></div>
+            <div>
+              <div style="color:#fff;font-weight:700;font-size:13px">KYC Sentinel</div>
+              <div style="color:#a5b4fc;font-size:9px;text-transform:uppercase;letter-spacing:0.1em">Powered by Forge</div>
+            </div>
+          </div>
+          <div style="color:#bfdbfe;font-size:11px;line-height:1.5">Intelligent KYC compliance, powered by AI</div>
+        </div>
+        <!-- Right form panel -->
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px">
+          <div style="width:100%">
+            <div style="color:#e2e8f0;font-size:13px;font-weight:600;margin-bottom:14px">Welcome back</div>
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:7px 10px;color:#64748b;font-size:11px;margin-bottom:8px">email@kpmg.com</div>
+            <div style="background:#1e293b;border:1px solid #334155;border-radius:6px;padding:7px 10px;color:#64748b;font-size:11px;margin-bottom:12px">••••••••</div>
+            <div style="background:#3b82f6;border-radius:6px;padding:7px;text-align:center;color:#fff;font-size:11px;font-weight:600">Sign In</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Split Panel</h3>
+      <p>Left brand panel (blue gradient) + right login form. More visual presence, good for a first impression.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Minimal top-branded -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#f8fafc;padding:24px;min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:system-ui">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="width:3px;height:22px;border-radius:4px;background:linear-gradient(to bottom,#3b82f6,#6366f1)"></div>
+          <div>
+            <div style="color:#0f172a;font-weight:700;font-size:14px">KYC Sentinel</div>
+            <div style="color:#94a3b8;font-size:9px;text-transform:uppercase;letter-spacing:0.1em">Powered by Forge</div>
+          </div>
+        </div>
+        <div style="color:#64748b;font-size:11px;margin-bottom:20px">Sign in to continue</div>
+        <div style="width:260px">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;color:#94a3b8;font-size:12px;margin-bottom:8px">email@kpmg.com</div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;color:#94a3b8;font-size:12px;margin-bottom:14px">••••••••</div>
+          <div style="background:#3b82f6;border-radius:6px;padding:8px;text-align:center;color:#fff;font-size:12px;font-weight:600">Sign In</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Light Minimal</h3>
+      <p>Clean white/light background with logo above the form. Adapts naturally to light/dark mode toggle.</p>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inline Trace Drawer — Refined</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #f1f5f9; padding: 24px; min-height: 100vh; }
+
+h1 { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.sub { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+
+.shell { max-width: 720px; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.10); border: 1px solid #e2e8f0; }
+
+/* topbar */
+.topbar { background:#1e293b; padding:5px 10px; display:flex; align-items:center; gap:5px; }
+.dd { width:7px; height:7px; border-radius:50%; }
+.dd.r{background:#ef4444;}.dd.y{background:#f59e0b;}.dd.g{background:#10b981;}
+.topbar span { font-size:10px; color:#64748b; margin-left:6px; }
+
+/* page header */
+.pg-hdr { background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; }
+.tabs { display:flex; border:1px solid #e2e8f0; border-radius:6px; overflow:hidden; }
+.tab { padding:4px 14px; font-size:11px; font-weight:600; background:#fff; color:#64748b; border:none; cursor:pointer; }
+.tab.active { background:#6366f1; color:#fff; }
+.hdr-actions { display:flex; gap:6px; }
+.hbtn { padding:4px 11px; font-size:10px; border-radius:5px; border:1px solid; font-weight:600; cursor:pointer; }
+.hbtn.override { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+.hbtn.rerun { background:#6366f1; color:#fff; border-color:#6366f1; }
+
+/* status strip */
+.strip { padding:6px 14px; border-bottom:1px solid #e2e8f0; display:flex; gap:8px; align-items:center; background:#fff; }
+.pill { display:flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:10px; font-weight:700; }
+.pill.ok { background:#d1fae5; color:#065f46; }
+.pill.warn { background:#fef3c7; color:#92400e; }
+.pill.err { background:#fee2e2; color:#991b1b; }
+
+/* section */
+.sec { border-bottom:1px solid #f1f5f9; }
+.sec-hdr { display:flex; align-items:center; gap:8px; padding:8px 14px; cursor:pointer; background:#f8fafc; }
+.sec-hdr:hover { background:#f1f5f9; }
+.chev { font-size:9px; color:#94a3b8; transition:transform .2s; }
+.sec-title { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:#64748b; flex:1; }
+.pending-pill { font-size:8px; padding:1px 5px; border-radius:10px; background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; font-weight:700; }
+.sec-body { background:#fff; }
+
+/* field row */
+.frow { display:flex; align-items:center; gap:7px; padding:6px 14px; border-bottom:1px solid #f8fafc; transition:background .1s; }
+.frow:hover { background:#f8fafc; }
+.frow.open { background:#eef2ff; border-left:3px solid #6366f1; }
+.frow.alert-row { background:#fff8f8; border-left:3px solid #ef4444; }
+.frow.warn-row  { background:#fffbeb; border-left:3px solid #f59e0b; }
+.sdot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.sdot.ok{background:#10b981;}.sdot.warn{background:#f59e0b;}.sdot.err{background:#ef4444;}
+.flabel { font-size:11px; font-weight:500; color:#475569; width:150px; flex-shrink:0; }
+.fval { flex:1; font-size:11px; color:#0f172a; }
+.fval.alert { color:#991b1b; font-weight:600; }
+.fval.warn  { color:#92400e; }
+.idv-txt { font-size:9px; font-weight:700; flex-shrink:0; white-space:nowrap; }
+.idv-txt .ok  { color:#10b981; }
+.idv-txt .no  { color:#cbd5e1; }
+.idv-txt .warn{ color:#f59e0b; }
+.idv-txt .sep { color:#e2e8f0; margin:0 1px; }
+.src { font-size:9px; padding:1px 5px; border-radius:3px; border:1px solid; font-weight:600; flex-shrink:0; }
+.src.crm{color:#3b82f6;border-color:#bfdbfe;background:#eff6ff;}
+.src.third{color:#8b5cf6;border-color:#ddd6fe;background:#f5f3ff;}
+.src.forge{color:#10b981;border-color:#a7f3d0;background:#ecfdf5;}
+.bot-btn { display:flex; align-items:center; gap:3px; font-size:9px; padding:2px 7px; border-radius:4px; border:1px solid; font-weight:600; cursor:pointer; flex-shrink:0; }
+.bot-btn.inactive { color:#94a3b8; border-color:#e2e8f0; background:#fff; }
+.bot-btn.active { color:#fff; border-color:#6366f1; background:#6366f1; }
+
+/* ── Inline trace drawer ── */
+.drawer {
+  border-left: 3px solid #6366f1;
+  border-bottom: 1px solid #c7d2fe;
+  background: linear-gradient(135deg, #f0f4ff 0%, #fafafe 100%);
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Drawer header row: field context + confidence score */
+.drawer-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px 6px;
+  border-bottom: 1px solid #e0e7ff;
+}
+.drawer-field-ctx {}
+.drawer-field-name { font-size: 11px; font-weight: 700; color: #312e81; }
+.drawer-field-val  { font-size: 10px; color: #6366f1; margin-top: 1px; }
+.confidence-block { text-align: right; }
+.conf-label { font-size: 8px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; margin-bottom: 2px; }
+.conf-score { font-size: 20px; font-weight: 800; color: #6366f1; line-height: 1; }
+.conf-score.low { color: #ef4444; }
+.conf-score.mid { color: #f59e0b; }
+.conf-score.override { color: #10b981; }
+.conf-score sup { font-size: 11px; font-weight: 600; }
+.conf-bar-wrap { width: 60px; height: 4px; background: #e0e7ff; border-radius: 2px; margin-top: 3px; margin-left: auto; }
+.conf-bar { height: 100%; border-radius: 2px; background: #6366f1; }
+.conf-bar.low { background: #ef4444; }
+.conf-bar.mid { background: #f59e0b; }
+.conf-bar.override { background: #10b981; }
+
+/* Drawer tabs */
+.drawer-tabs { display: flex; border-bottom: 1px solid #e0e7ff; }
+.drawer-tab { flex: 1; padding: 6px 0; font-size: 10px; font-weight: 600; color: #6366f1; text-align: center; cursor: pointer; border-bottom: 2px solid transparent; }
+.drawer-tab.active { border-bottom-color: #6366f1; background: #fff; }
+.drawer-tab:not(.active) { color: #94a3b8; }
+
+/* Reasoning tab content */
+.reasoning-body { padding: 10px 14px; }
+.r-step { display: flex; gap: 8px; margin-bottom: 8px; position: relative; }
+.r-step:not(:last-child)::after {
+  content:''; position:absolute; left:9px; top:20px; bottom:-4px; width:1px; background:#c7d2fe;
+}
+.step-num {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #6366f1; color: #fff;
+  font-size: 8px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.step-body { flex: 1; }
+.step-agent { font-size: 10px; font-weight: 700; color: #0f172a; }
+.step-action { font-size: 9px; color: #6366f1; font-weight: 600; }
+.step-thought { font-size: 10px; color: #475569; font-style: italic; margin-top: 2px; line-height: 1.35; }
+.step-src { font-size: 8px; color: #6366f1; margin-top: 3px; display: flex; align-items: center; gap: 3px; }
+
+.conclusion-box {
+  background: #fff; border: 1px solid #c7d2fe; border-radius: 6px;
+  padding: 7px 10px; margin-top: 8px;
+}
+.conc-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 3px; display: flex; align-items: center; gap: 3px; }
+.conc-text { font-size: 10px; color: #334155; line-height: 1.4; }
+
+/* Drawer action row */
+.drawer-actions { display: flex; gap: 6px; padding: 8px 14px 10px; border-top: 1px solid #e0e7ff; background: #f8faff; align-items: center; }
+.d-btn { padding: 4px 10px; font-size: 10px; border-radius: 5px; border: 1px solid; font-weight: 600; cursor: pointer; }
+.d-btn.rerun   { background: #6366f1; color: #fff; border-color: #6366f1; }
+.d-btn.override { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.d-btn.docs    { background: #fff; color: #475569; border-color: #e2e8f0; }
+.d-btn.close   { margin-left: auto; background: transparent; color: #94a3b8; border-color: transparent; font-size: 11px; }
+
+/* Audit trail tab content */
+.audit-body { padding: 10px 14px; }
+.audit-timeline { position: relative; }
+.audit-entry { display: flex; gap: 8px; margin-bottom: 10px; position: relative; }
+.audit-entry:not(:last-child)::after {
+  content:''; position:absolute; left:9px; top:20px; bottom:-6px; width:1px; background:#e2e8f0;
+}
+.audit-dot {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; flex-shrink: 0;
+}
+.audit-dot.agent  { background: #ede9fe; border-color: #a78bfa; color: #5b21b6; }
+.audit-dot.person { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+.audit-dot.override { background: #d1fae5; border-color: #10b981; color: #065f46; }
+.audit-body-text { flex: 1; }
+.audit-who { font-size: 10px; font-weight: 700; color: #0f172a; }
+.audit-what { font-size: 10px; color: #475569; margin-top: 1px; }
+.audit-when { font-size: 8px; color: #94a3b8; margin-top: 2px; }
+.audit-conf { display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.audit-conf.high   { background: #dbeafe; color: #1d4ed8; }
+.audit-conf.mid    { background: #fef3c7; color: #92400e; }
+.audit-conf.manual { background: #d1fae5; color: #065f46; }
+.audit-val-change { font-size: 9px; margin-top: 3px; background: #f8fafc; border-radius: 4px; padding: 3px 6px; border: 1px solid #e2e8f0; }
+.audit-val-change .before { color: #94a3b8; text-decoration: line-through; }
+.audit-val-change .arrow  { color: #94a3b8; margin: 0 4px; }
+.audit-val-change .after  { color: #0f172a; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Inline Trace Drawer — with Override, Confidence Score &amp; Audit Trail</h1>
+<p class="sub">Click the 🤖 button on a field to expand its trace inline. Tabs switch between Reasoning and full Audit Trail.</p>
+
+<div class="shell">
+  <div class="topbar"><span class="dd r"></span><span class="dd y"></span><span class="dd g"></span><span>kyc-agentic2 · Exception Review · Attributes</span></div>
+
+  <div class="pg-hdr">
+    <div class="tabs"><button class="tab">Exception</button><button class="tab active">Attributes</button></div>
+    <div class="hdr-actions">
+      <button class="hbtn override">⚡ Manual Override</button>
+      <button class="hbtn rerun">↻ Re-run Agents</button>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="pill ok">✓ ID Complete</div>
+    <div class="pill warn">⚠ Verification Pending</div>
+    <div class="pill err">✕ 3 Exceptions</div>
+    <div style="margin-left:auto;font-size:10px;color:#94a3b8;font-weight:500">Brevan Howard Asset Management LLP</div>
+  </div>
+
+  <!-- Section 1: Entity Identification -->
+  <div class="sec">
+    <div class="sec-hdr">
+      <span class="chev">▼</span>
+      <span class="sec-title">Entity Identification</span>
+      <span style="font-size:10px;color:#94a3b8">6 attributes</span>
+    </div>
+    <div class="sec-body">
+
+      <!-- Simple OK field -->
+      <div class="frow">
+        <div class="sdot ok"></div>
+        <div class="flabel">Legal Name</div>
+        <div class="fval">Brevan Howard Asset Management LLP</div>
+        <div class="idv-txt"><span class="ok">ID✓</span><span class="sep">/</span><span class="ok">V✓</span></div>
+        <div class="src crm">CRM</div>
+        <div class="bot-btn inactive">🤖 Trace</div>
+      </div>
+
+      <!-- OPEN field with drawer below -->
+      <div class="frow open alert-row" style="border-left:3px solid #6366f1">
+        <div class="sdot err"></div>
+        <div class="flabel">LEI Number</div>
+        <div class="fval alert">549300TRJQK... · Mismatch vs GLEIF</div>
+        <div class="idv-txt"><span class="ok">ID✓</span><span class="sep">/</span><span class="warn">V⚠</span></div>
+        <div class="src third">3rd</div>
+        <div class="bot-btn active">🤖 Trace ▲</div>
+      </div>
+
+      <!-- INLINE DRAWER -->
+      <div class="drawer">
+
+        <!-- Top: field context + confidence score -->
+        <div class="drawer-top">
+          <div class="drawer-field-ctx">
+            <div class="drawer-field-name">LEI Number</div>
+            <div class="drawer-field-val">549300TRJQK6NRSF5M51 · Mismatch detected</div>
+          </div>
+          <div class="confidence-block">
+            <div class="conf-label">Confidence</div>
+            <div class="conf-score mid">64<sup>%</sup></div>
+            <div class="conf-bar-wrap"><div class="conf-bar mid" style="width:64%"></div></div>
+          </div>
+        </div>
+
+        <!-- Tabs: Reasoning / Audit Trail -->
+        <div class="drawer-tabs">
+          <div class="drawer-tab active">✦ Reasoning</div>
+          <div class="drawer-tab">📋 Audit Trail</div>
+        </div>
+
+        <!-- REASONING TAB (shown) -->
+        <div class="reasoning-body">
+          <div class="r-step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <div class="step-agent">Document Agent <span class="step-action">→ Retrieved value</span></div>
+              <div class="step-thought">"Queried GLEIF API for Brevan Howard Asset Management LLP. Returned LEI 549300TRJQK6NRSF5M51. CRM records a different suffix: 5M52. Two-character discrepancy flagged."</div>
+              <div class="step-src">📦 GLEIF Registry · 3rd Party · 2024-11-02 09:14</div>
+            </div>
+          </div>
+          <div class="r-step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <div class="step-agent">Audit Agent <span class="step-action">→ Compared sources</span></div>
+              <div class="step-thought">"Cross-referenced GLEIF output with CRM record. Values diverge at character positions 18–20. Neither source confirmed as authoritative without analyst input."</div>
+              <div class="step-src">📋 Audit Log · BH-2024-001 · 2024-11-02 09:14</div>
+            </div>
+          </div>
+          <div class="conclusion-box">
+            <div class="conc-label">🛡 Conclusion</div>
+            <div class="conc-text">Deviation detected between GLEIF and CRM records. Confidence reduced to 64% — analyst review required before verification can complete. Consider requesting updated LEI confirmation letter from the entity.</div>
+          </div>
+        </div>
+
+        <!-- Action row: Override + Re-run + Docs + Close -->
+        <div class="drawer-actions">
+          <button class="d-btn rerun">↻ Re-run Agent</button>
+          <button class="d-btn override">⚡ Override Value</button>
+          <button class="d-btn docs">📄 Source Docs</button>
+          <button class="d-btn close">✕ Close</button>
+        </div>
+      </div><!-- /drawer -->
+
+      <!-- Another field below -->
+      <div class="frow">
+        <div class="sdot ok"></div>
+        <div class="flabel">Jurisdiction</div>
+        <div class="fval">England &amp; Wales</div>
+        <div class="idv-txt"><span class="ok">ID✓</span><span class="sep">/</span><span class="ok">V✓</span></div>
+        <div class="src crm">CRM</div>
+        <div class="bot-btn inactive">🤖 Trace</div>
+      </div>
+
+      <div class="frow">
+        <div class="sdot ok"></div>
+        <div class="flabel">Company Number</div>
+        <div class="fval">04418141</div>
+        <div class="idv-txt"><span class="no">ID–</span><span class="sep">/</span><span class="ok">V✓</span></div>
+        <div class="src third">3rd</div>
+        <div class="bot-btn inactive">🤖 Trace</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Officers & Signatories (shows manually overridden field) -->
+  <div class="sec">
+    <div class="sec-hdr">
+      <span class="chev">▼</span>
+      <span class="sec-title">Registration &amp; Regulatory</span>
+      <span style="font-size:10px;color:#94a3b8">4 attributes</span>
+      <span class="pending-pill">1 pending</span>
+    </div>
+    <div class="sec-body">
+      <div class="frow">
+        <div class="sdot ok"></div>
+        <div class="flabel">FCA Permissions</div>
+        <div class="fval">Discretionary Investment Management</div>
+        <div class="idv-txt"><span class="ok">ID✓</span><span class="sep">/</span><span class="ok">V✓</span></div>
+        <div class="src forge">Forge</div>
+        <div class="bot-btn inactive">🤖 Trace</div>
+      </div>
+
+      <!-- Manually overridden field — conf = 1.0 -->
+      <div class="frow" style="background:#f0fdf4;border-left:3px solid #10b981">
+        <div class="sdot ok"></div>
+        <div class="flabel">Incorporation Date</div>
+        <div class="fval" style="display:flex;align-items:center;gap:6px">
+          2002-11-14
+          <span style="font-size:9px;background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;border-radius:4px;padding:1px 5px;font-weight:700">✎ Manually overridden</span>
+        </div>
+        <div class="idv-txt"><span class="ok">ID✓</span><span class="sep">/</span><span class="ok">V✓</span></div>
+        <div class="src crm">CRM</div>
+        <div class="bot-btn active" style="background:#10b981;border-color:#10b981">🤖 Trace ▲</div>
+      </div>
+
+      <!-- INLINE DRAWER for overridden field -->
+      <div class="drawer" style="border-left-color:#10b981">
+        <div class="drawer-top" style="border-color:#a7f3d0;background:linear-gradient(135deg,#f0fdf4,#fafffe)">
+          <div class="drawer-field-ctx">
+            <div class="drawer-field-name" style="color:#065f46">Incorporation Date</div>
+            <div class="drawer-field-val" style="color:#10b981">2002-11-14 · Manually overridden by Sarah Chen</div>
+          </div>
+          <div class="confidence-block">
+            <div class="conf-label">Confidence</div>
+            <div class="conf-score override">1.0<sup></sup></div>
+            <div class="conf-bar-wrap" style="background:#a7f3d0"><div class="conf-bar override" style="width:100%"></div></div>
+          </div>
+        </div>
+
+        <div class="drawer-tabs" style="border-color:#a7f3d0">
+          <div class="drawer-tab" style="color:#94a3b8">✦ Reasoning</div>
+          <div class="drawer-tab active" style="border-color:#10b981;color:#065f46">📋 Audit Trail</div>
+        </div>
+
+        <!-- AUDIT TRAIL TAB (shown for this field) -->
+        <div class="audit-body">
+          <div class="audit-timeline">
+
+            <!-- Entry 1: initial agent run -->
+            <div class="audit-entry">
+              <div class="audit-dot agent">🤖</div>
+              <div class="audit-body-text">
+                <div class="audit-who">Document Agent</div>
+                <div class="audit-what">Retrieved incorporation date from Companies House filing</div>
+                <div class="audit-val-change">
+                  <span class="before">—</span><span class="arrow">→</span><span class="after">2002-11-19</span>
+                </div>
+                <div class="audit-conf high">Confidence 87%</div>
+                <div class="audit-when">2024-10-28 · 14:32 UTC</div>
+              </div>
+            </div>
+
+            <!-- Entry 2: person re-ran agent -->
+            <div class="audit-entry">
+              <div class="audit-dot person">👤</div>
+              <div class="audit-body-text">
+                <div class="audit-who">James Holloway <span style="font-size:8px;color:#94a3b8;font-weight:400">(Analyst)</span></div>
+                <div class="audit-what">Re-ran agent — original date appeared inconsistent with articles</div>
+                <div class="audit-when">2024-11-01 · 09:17 UTC</div>
+              </div>
+            </div>
+
+            <!-- Entry 3: agent re-run result -->
+            <div class="audit-entry">
+              <div class="audit-dot agent">🤖</div>
+              <div class="audit-body-text">
+                <div class="audit-who">Document Agent <span style="font-size:8px;color:#94a3b8;font-weight:400">(re-run)</span></div>
+                <div class="audit-what">Re-processed Companies House + Memorandum of Association</div>
+                <div class="audit-val-change">
+                  <span class="before">2002-11-19</span><span class="arrow">→</span><span class="after">2002-11-12</span>
+                </div>
+                <div class="audit-conf mid">Confidence 71%</div>
+                <div class="audit-when">2024-11-01 · 09:18 UTC</div>
+              </div>
+            </div>
+
+            <!-- Entry 4: manual override -->
+            <div class="audit-entry">
+              <div class="audit-dot override">✎</div>
+              <div class="audit-body-text">
+                <div class="audit-who">Sarah Chen <span style="font-size:8px;color:#94a3b8;font-weight:400">(Senior Analyst)</span></div>
+                <div class="audit-what">Manual override — confirmed via original incorporation certificate (Doc #IC-2002-441)</div>
+                <div class="audit-val-change">
+                  <span class="before">2002-11-12</span><span class="arrow">→</span><span class="after">2002-11-14</span>
+                </div>
+                <div class="audit-conf manual">Confidence 1.0 · Manual</div>
+                <div class="audit-when">2024-11-02 · 11:45 UTC</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="drawer-actions" style="border-color:#a7f3d0;background:#f0fdf4">
+          <button class="d-btn rerun">↻ Re-run Agent</button>
+          <button class="d-btn override">⚡ Override Again</button>
+          <button class="d-btn docs">📄 Source Docs</button>
+          <button class="d-btn close">✕ Close</button>
+        </div>
+      </div><!-- /drawer -->
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

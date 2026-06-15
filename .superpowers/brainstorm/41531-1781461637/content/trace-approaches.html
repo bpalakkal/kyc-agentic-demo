@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Trace — Display Approaches</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; background: #f1f5f9; padding: 24px; }
+
+h1 { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.sub { font-size: 12px; color: #64748b; margin-bottom: 24px; }
+
+.options-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+.opt-card {
+  border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden;
+  cursor: pointer; transition: border-color .15s, box-shadow .15s;
+  background: #fff;
+}
+.opt-card:hover { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
+.opt-card.selected { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.2); }
+
+.opt-label {
+  padding: 9px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  font-size: 11px; font-weight: 700; color: #475569;
+  display: flex; align-items: center; gap: 8px;
+}
+.rec-badge { background: #10b981; color: #fff; font-size: 9px; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
+
+/* shared mockup frame */
+.mock { margin: 12px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; font-size: 10px; }
+.mock-bar { background: #1e293b; padding: 4px 8px; display: flex; gap: 4px; }
+.dd { width: 6px; height: 6px; border-radius: 50%; }
+.dd.r{background:#ef4444;}.dd.y{background:#f59e0b;}.dd.g{background:#10b981;}
+
+/* form rows */
+.frow { display:flex; align-items:center; gap:6px; padding:5px 10px; border-bottom:1px solid #f8fafc; background:#fff; }
+.frow:hover { background:#f8fafc; }
+.frow.active { background:#ede9fe; border-left:2px solid #6366f1; }
+.flabel { font-size:9px; font-weight:600; color:#475569; width:90px; flex-shrink:0; }
+.fval { flex:1; font-size:9px; color:#0f172a; }
+.fval.alert { color:#991b1b; }
+.idv { font-size:8px; font-weight:700; color:#10b981; flex-shrink:0; }
+.idv.warn { color:#f59e0b; }
+.sdot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.sdot.ok{background:#10b981;}.sdot.warn{background:#f59e0b;}.sdot.err{background:#ef4444;}
+.src-tag { font-size:7px; padding:1px 4px; border-radius:2px; border:1px solid; flex-shrink:0; }
+.src-tag.crm{color:#3b82f6;border-color:#bfdbfe;background:#eff6ff;}
+.src-tag.third{color:#8b5cf6;border-color:#ddd6fe;background:#f5f3ff;}
+.src-tag.forge{color:#10b981;border-color:#a7f3d0;background:#ecfdf5;}
+.bot-i { font-size:9px; padding:1px 4px; border:1px solid #6366f1; border-radius:3px; color:#6366f1; cursor:pointer; flex-shrink:0; background:#fff; }
+
+/* ── Option A: Inline drawer ── */
+.inline-drawer {
+  background: #f0f4ff; border-top: 1px solid #c7d2fe;
+  border-left: 2px solid #6366f1; padding: 8px 10px;
+  margin: 0;
+}
+.trace-hdr { font-size:8px; font-weight:700; color:#6366f1; text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:4px; margin-bottom:6px; }
+.trace-step { display:flex; gap:6px; margin-bottom:5px; }
+.step-num { width:14px; height:14px; border-radius:50%; background:#6366f1; color:#fff; font-size:7px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.step-body { flex:1; }
+.step-agent { font-size:8px; font-weight:700; color:#0f172a; }
+.step-thought { font-size:8px; color:#475569; font-style:italic; margin-top:1px; line-height:1.3; }
+.step-source { font-size:7px; color:#6366f1; margin-top:2px; }
+.conclusion-box { background:#fff; border:1px solid #c7d2fe; border-radius:5px; padding:5px 7px; margin-top:6px; }
+.conc-label { font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; margin-bottom:2px; }
+.conc-text { font-size:8px; color:#334155; line-height:1.3; }
+.trace-footer { display:flex; gap:4px; margin-top:6px; }
+.trace-btn { font-size:8px; padding:2px 7px; border-radius:4px; border:1px solid; font-weight:600; cursor:pointer; }
+.trace-btn.primary { background:#6366f1; color:#fff; border-color:#6366f1; }
+.trace-btn.ghost { background:#fff; color:#475569; border-color:#e2e8f0; }
+
+/* ── Option B: Side panel ── */
+.b-layout { display:flex; }
+.b-form { flex:1; border-right:1px solid #e2e8f0; }
+.b-panel { width:160px; background:#f8fafc; flex-shrink:0; border-left:2px solid #6366f1; }
+.b-panel-hdr { background:#6366f1; color:#fff; padding:5px 7px; font-size:8px; font-weight:700; display:flex; align-items:center; justify-content:space-between; }
+.b-panel-body { padding:7px; }
+.b-field-ctx { background:#ede9fe; border-radius:4px; padding:4px 6px; margin-bottom:6px; }
+.b-field-name { font-size:8px; font-weight:700; color:#312e81; }
+.b-field-val { font-size:8px; color:#5b21b6; margin-top:1px; }
+.b-step { display:flex; gap:4px; margin-bottom:5px; position:relative; }
+.b-step-num { width:12px; height:12px; border-radius:50%; background:#6366f1; color:#fff; font-size:6px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.b-step-body { flex:1; }
+.b-step-agent { font-size:7px; font-weight:700; color:#0f172a; }
+.b-step-thought { font-size:7px; color:#475569; font-style:italic; margin-top:1px; line-height:1.3; }
+.b-step-src { font-size:6px; color:#6366f1; margin-top:1px; }
+.b-conc { background:#fff; border:1px solid #c7d2fe; border-radius:4px; padding:4px 6px; margin-top:5px; }
+.b-conc-label { font-size:6px; font-weight:700; text-transform:uppercase; color:#94a3b8; margin-bottom:1px; }
+.b-conc-text { font-size:7px; color:#334155; line-height:1.3; }
+.b-footer { display:flex; gap:3px; margin-top:5px; }
+.b-btn { font-size:7px; padding:2px 5px; border-radius:3px; border:1px solid; font-weight:600; }
+.b-btn.p { background:#6366f1; color:#fff; border-color:#6366f1; }
+.b-btn.g { background:#fff; color:#475569; border-color:#e2e8f0; }
+
+/* ── Option C: Modal ── */
+.c-wrap { position:relative; }
+.c-overlay { position:absolute; inset:0; background:rgba(15,23,42,.35); display:flex; align-items:center; justify-content:center; border-radius:0 0 7px 7px; }
+.c-modal { background:#fff; border-radius:8px; width:88%; max-height:200px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.18); }
+.c-modal-hdr { background:#6366f1; color:#fff; padding:6px 10px; display:flex; align-items:center; justify-content:space-between; }
+.c-modal-title { font-size:9px; font-weight:700; }
+.c-modal-sub { font-size:7px; opacity:.8; }
+.c-modal-body { padding:8px 10px; overflow-y:auto; max-height:160px; }
+
+.desc { padding: 10px 14px 12px; font-size: 10px; color: #64748b; line-height: 1.5; border-top: 1px solid #f1f5f9; }
+.pro { color: #10b981; font-weight: 600; }
+.con { color: #ef4444; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>How should agent thinking appear when you click 🤖?</h1>
+<p class="sub">Three patterns for surfacing the trace, audit, and reasoning behind each attribute</p>
+
+<div class="options-grid">
+
+  <!-- Option A: Inline Drawer -->
+  <div class="opt-card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="opt-label"><span style="background:#6366f1;color:#fff;border-radius:4px;padding:1px 7px;font-size:10px">A</span> Inline drawer — expands below the field</div>
+    <div class="mock">
+      <div class="mock-bar"><span class="dd r"></span><span class="dd y"></span><span class="dd g"></span></div>
+      <!-- form rows -->
+      <div class="frow"><div class="sdot ok"></div><div class="flabel">Legal Name</div><div class="fval">Brevan Howard AM</div><div class="idv">ID✓/V✓</div><div class="src-tag crm">CRM</div><div class="bot-i">🤖</div></div>
+      <!-- Active row + drawer -->
+      <div class="frow active"><div class="sdot warn"></div><div class="flabel">LEI Number</div><div class="fval alert">549300... · ⚠</div><div class="idv warn">ID✓/V⚠</div><div class="src-tag third">3rd</div><div class="bot-i" style="background:#6366f1;color:#fff;">🤖</div></div>
+      <div class="inline-drawer">
+        <div class="trace-hdr">✦ Agent Trace · LEI Number</div>
+        <div class="trace-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-agent">Document Agent</div>
+            <div class="step-thought">"Retrieved LEI 549300TRJQK from GLEIF API; differs from CRM value by 2 chars."</div>
+            <div class="step-source">📦 GLEIF · 3rd Party</div>
+          </div>
+        </div>
+        <div class="trace-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-agent">Audit Agent</div>
+            <div class="step-thought">"Flagged for analyst review. Provenance snapshot written."</div>
+            <div class="step-source">📋 Audit Log · BH-2024-001</div>
+          </div>
+        </div>
+        <div class="conclusion-box">
+          <div class="conc-label">🛡 Conclusion</div>
+          <div class="conc-text">Deviation detected between GLEIF and CRM sources — analyst review required before verification can complete.</div>
+        </div>
+        <div class="trace-footer">
+          <div class="trace-btn primary">↻ Re-run</div>
+          <div class="trace-btn ghost">Audit log</div>
+          <div class="trace-btn ghost">Docs</div>
+        </div>
+      </div>
+      <div class="frow"><div class="sdot ok"></div><div class="flabel">Jurisdiction</div><div class="fval">England &amp; Wales</div><div class="idv">ID✓/V✓</div><div class="src-tag crm">CRM</div><div class="bot-i">🤖</div></div>
+    </div>
+    <div class="desc">
+      Trace expands inline, pushing fields below down. Form stays in context — no layer change.<br><br>
+      <span class="pro">+ No context switch, easy to read in sequence</span><br>
+      <span class="con">– Makes the form very tall; hard to compare two fields</span>
+    </div>
+  </div>
+
+  <!-- Option B: Slide-in Side Panel -->
+  <div class="opt-card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="opt-label"><span style="background:#6366f1;color:#fff;border-radius:4px;padding:1px 7px;font-size:10px">B</span> Side panel — slides in from the right <span class="rec-badge">Recommended</span></div>
+    <div class="mock">
+      <div class="mock-bar"><span class="dd r"></span><span class="dd y"></span><span class="dd g"></span></div>
+      <div class="b-layout">
+        <div class="b-form">
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Legal Name</div><div class="fval">Brevan Howard AM</div><div class="idv">ID✓/V✓</div><div class="src-tag crm">CRM</div><div class="bot-i">🤖</div></div>
+          <div class="frow active"><div class="sdot warn"></div><div class="flabel">LEI Number</div><div class="fval alert">549300... ⚠</div><div class="idv warn">ID✓/V⚠</div><div class="src-tag third">3rd</div><div class="bot-i" style="background:#6366f1;color:#fff;">🤖</div></div>
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Jurisdiction</div><div class="fval">England &amp; Wales</div><div class="idv">ID✓/V✓</div><div class="src-tag crm">CRM</div><div class="bot-i">🤖</div></div>
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Company No.</div><div class="fval">04418141</div><div class="idv">ID–/V✓</div><div class="src-tag third">3rd</div><div class="bot-i">🤖</div></div>
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Previous Names</div><div class="fval">BH Capital Mgmt</div><div class="idv">ID✓/V✓</div><div class="src-tag forge">Forge</div><div class="bot-i">🤖</div></div>
+        </div>
+        <div class="b-panel">
+          <div class="b-panel-hdr"><span>✦ Agent Trace</span><span style="opacity:.7;font-size:8px;cursor:pointer">✕</span></div>
+          <div class="b-panel-body">
+            <div class="b-field-ctx">
+              <div class="b-field-name">LEI Number</div>
+              <div class="b-field-val">549300TRJQK... · Mismatch</div>
+            </div>
+            <div class="b-step">
+              <div class="b-step-num">1</div>
+              <div class="b-step-body">
+                <div class="b-step-agent">Document Agent</div>
+                <div class="b-step-thought">"Retrieved from GLEIF; differs from CRM value by 2 chars."</div>
+                <div class="b-step-src">📦 GLEIF · 3rd Party</div>
+              </div>
+            </div>
+            <div class="b-step">
+              <div class="b-step-num">2</div>
+              <div class="b-step-body">
+                <div class="b-step-agent">Audit Agent</div>
+                <div class="b-step-thought">"Flagged for review. Provenance snapshot written."</div>
+                <div class="b-step-src">📋 Audit Log</div>
+              </div>
+            </div>
+            <div class="b-conc">
+              <div class="b-conc-label">🛡 Conclusion</div>
+              <div class="b-conc-text">Deviation between GLEIF and CRM — analyst review required.</div>
+            </div>
+            <div class="b-footer">
+              <div class="b-btn p">↻ Re-run</div>
+              <div class="b-btn g">Audit</div>
+              <div class="b-btn g">Docs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="desc">
+      Form narrows, trace panel slides in alongside. Both visible simultaneously. Clicking another 🤖 swaps the panel content.<br><br>
+      <span class="pro">+ Form stays readable, can navigate fields while trace is open</span><br>
+      <span class="con">– Form gets narrower on smaller screens</span>
+    </div>
+  </div>
+
+  <!-- Option C: Modal -->
+  <div class="opt-card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="opt-label"><span style="background:#6366f1;color:#fff;border-radius:4px;padding:1px 7px;font-size:10px">C</span> Modal dialog — focused overlay</div>
+    <div class="mock">
+      <div class="mock-bar"><span class="dd r"></span><span class="dd y"></span><span class="dd g"></span></div>
+      <div class="c-wrap">
+        <!-- dimmed form behind -->
+        <div style="opacity:.3;pointer-events:none">
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Legal Name</div><div class="fval">Brevan Howard AM</div><div class="idv">ID✓/V✓</div><div class="src-tag crm">CRM</div></div>
+          <div class="frow"><div class="sdot warn"></div><div class="flabel">LEI Number</div><div class="fval">549300... ⚠</div><div class="idv warn">ID✓/V⚠</div><div class="src-tag third">3rd</div></div>
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Jurisdiction</div><div class="fval">England &amp; Wales</div><div class="idv">ID✓/V✓</div><div class="src-tag crm">CRM</div></div>
+          <div class="frow"><div class="sdot ok"></div><div class="flabel">Company No.</div><div class="fval">04418141</div><div class="idv">ID–/V✓</div><div class="src-tag third">3rd</div></div>
+        </div>
+        <div class="c-overlay">
+          <div class="c-modal">
+            <div class="c-modal-hdr">
+              <div>
+                <div class="c-modal-title">✦ Agent Trace — LEI Number</div>
+                <div class="c-modal-sub">549300TRJQK... · Mismatch · Brevan Howard AM</div>
+              </div>
+              <span style="font-size:11px;opacity:.8;cursor:pointer">✕</span>
+            </div>
+            <div class="c-modal-body">
+              <div class="trace-step">
+                <div class="step-num">1</div>
+                <div class="step-body">
+                  <div class="step-agent">Document Agent</div>
+                  <div class="step-thought">"Retrieved LEI from GLEIF; differs from CRM by 2 chars."</div>
+                  <div class="step-source">📦 GLEIF · 3rd Party</div>
+                </div>
+              </div>
+              <div class="trace-step">
+                <div class="step-num">2</div>
+                <div class="step-body">
+                  <div class="step-agent">Audit Agent</div>
+                  <div class="step-thought">"Flagged. Provenance snapshot written to audit log."</div>
+                  <div class="step-source">📋 Audit Log · BH-2024-001</div>
+                </div>
+              </div>
+              <div class="conclusion-box">
+                <div class="conc-label">🛡 Conclusion</div>
+                <div class="conc-text">Deviation detected — analyst review required before verification completes.</div>
+              </div>
+              <div class="trace-footer" style="margin-top:6px">
+                <div class="trace-btn primary">↻ Re-run</div>
+                <div class="trace-btn ghost">View audit log</div>
+                <div class="trace-btn ghost">Source docs</div>
+                <div class="trace-btn ghost" style="margin-left:auto">Close</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="desc">
+      Full-screen modal covers everything. Most focused — field name, value, reasoning steps, conclusion, and actions all at once. Dismiss to return.<br><br>
+      <span class="pro">+ Maximum detail, distraction-free, most room for audit log / docs</span><br>
+      <span class="con">– Loses form context; must close to check another field</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
