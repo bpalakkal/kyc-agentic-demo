@@ -3853,7 +3853,7 @@ const SimpleFieldRow = ({
         )} />
 
         {/* Label */}
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 w-[130px] shrink-0 truncate leading-none">{label}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 w-[130px] shrink-0 truncate leading-none">{label}</span>
 
         {/* Value */}
         <span className={cn(
