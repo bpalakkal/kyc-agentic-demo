@@ -3545,7 +3545,7 @@ const AttributeFormView = ({
   const [openOverrideFor, setOpenOverrideFor] = useState<{ label: string; entity: string } | null>(null);
   const [overrideDraft, setOverrideDraft] = useState("");
   const [overrideNote, setOverrideNote] = useState("");
-  const [savedOverrides, setSavedOverrides] = useState<Record<string, { value: string; actor: string; timestamp: string }>>({});
+  const [savedOverrides, setSavedOverrides] = useState<Record<string, { value: string; actor: string; timestamp: string; note?: string }>>({});
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
   const [traceStepsOpen, setTraceStepsOpen] = useState(false);
   const [traceDocsOpen, setTraceDocsOpen] = useState(false);
@@ -3641,7 +3641,7 @@ const AttributeFormView = ({
   const handleSaveOverride = (draftKey: string) => {
     const d = new Date();
     const now = `${d.toISOString().slice(0, 10)} · ${d.toISOString().slice(11, 16)} UTC`;
-    setSavedOverrides(prev => ({ ...prev, [draftKey]: { value: overrideDraft, actor: "You", timestamp: now } }));
+    setSavedOverrides(prev => ({ ...prev, [draftKey]: { value: overrideDraft, actor: "You", timestamp: now, note: overrideNote || undefined } }));
     setOpenOverrideFor(null);
     setOverrideDraft("");
     setOverrideNote("");
@@ -3782,7 +3782,7 @@ const AttributeFormView = ({
 type SimpleFieldRowProps = {
   label: string;
   entity: string;
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string }>;
+  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
   openTraceFor: { label: string; entity: string } | null;
   setOpenTraceFor: Dispatch<SetStateAction<{ label: string; entity: string } | null>>;
   openOverrideFor: { label: string; entity: string } | null;
@@ -3973,7 +3973,7 @@ const SimpleFieldRow = ({
 type InlineTraceDrawerProps = {
   label: string;
   entity: string;
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string }>;
+  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
   trace: AttrTrace | null;
   traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
   traceTab: "reasoning" | "audit";
@@ -4110,7 +4110,7 @@ const InlineTraceDrawer = ({
               </button>
               {traceDocsOpen && (
                 <div className="space-y-1.5">
-                  {traceDocs.map(({ doc, attr: docAttr, entity: docEntity }) => {
+                  {traceDocs.map(({ doc, entity: docEntity }) => {
                     const meta = DOC_KIND_META[doc.kind];
                     return (
                       <div key={`${docEntity}-${doc.id}`} className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-card text-left">
@@ -4236,7 +4236,7 @@ type NestedObjectBlockProps = {
   openTraceFor: { label: string; entity: string } | null;
   setOpenTraceFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
   // all InlineTraceDrawer props (passed through for the group-level drawer)
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string }>;
+  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
   trace: AttrTrace | null;
   traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
   traceTab: "reasoning" | "audit";
@@ -4245,7 +4245,7 @@ type NestedObjectBlockProps = {
   setTraceStepsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   traceDocsOpen: boolean;
   setTraceDocsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  runAgents: (agents: AgentId[], reason: string) => void;
+  runAgents: (agentIds: AgentId[], label?: string) => void;
   openOverrideFor: { label: string; entity: string } | null;
   setOpenOverrideFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
   overrideDraft: string;
