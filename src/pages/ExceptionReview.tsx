@@ -36,7 +36,7 @@ import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap, ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
@@ -1165,42 +1165,52 @@ const ExceptionReview = () => {
     <div className="px-6 py-2 max-w-[1480px] mx-auto">
       {/* ── Exception / Attributes view toggle ──────────────────────────── */}
       <div className="flex items-center justify-between mb-3">
-        <div className="inline-flex text-[11px] font-semibold rounded-md border border-border overflow-hidden">
+        {/* Segmented pill */}
+        <div className="inline-flex items-center bg-secondary rounded-lg p-1 gap-1">
           <button
             onClick={() => setAttrViewMode("exception")}
             className={cn(
-              "px-3 py-1.5 transition-colors",
+              "flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all",
               attrViewMode === "exception"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-secondary/60"
+                ? "bg-card shadow-sm border border-border text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
+            <ShieldAlert className={cn("size-4", attrViewMode === "exception" ? "text-warning" : "text-muted-foreground")} />
             Exception
+            {(() => {
+              const n = effectiveExceptions.filter(e => e.status === "Pending").length;
+              return n > 0 ? (
+                <span className="bg-alert-soft text-alert text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-alert-soft-border">{n}</span>
+              ) : null;
+            })()}
           </button>
           <button
             onClick={() => setAttrViewMode("attributes")}
             className={cn(
-              "px-3 py-1.5 border-l border-border transition-colors",
+              "flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all",
               attrViewMode === "attributes"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-secondary/60"
+                ? "bg-card shadow-sm border border-border text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
+            <Database className={cn("size-4", attrViewMode === "attributes" ? "text-primary" : "text-muted-foreground")} />
             Attributes
+            {(() => {
+              const n = selectedEntities.reduce((sum, e) => sum + (ENTITY_PROFILES[e.name]?.attrs.length ?? 0), 0);
+              return n > 0 ? (
+                <span className="bg-secondary text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border">{n}</span>
+              ) : null;
+            })()}
           </button>
         </div>
         {attrViewMode === "attributes" && (
-          <div className="flex items-center gap-2">
-            <button className="text-[11px] px-3 py-1.5 rounded-md border border-warning/60 bg-warning-soft text-warning font-semibold flex items-center gap-1.5 hover:opacity-90 transition-opacity">
-              <Zap className="size-3" /> Manual Override
-            </button>
-            <button
-              onClick={() => runAgents(["document", "audit"], "Re-run all attributes")}
-              className="text-[11px] px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
-            >
-              <RotateCw className="size-3" /> Re-run Agents
-            </button>
-          </div>
+          <button
+            onClick={() => runAgents(["document", "audit"], "Re-run all attributes")}
+            className="text-[11px] px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
+          >
+            <RotateCw className="size-3" /> Re-run Agents
+          </button>
         )}
       </div>
 
@@ -3632,11 +3642,10 @@ const AttributeFormView = ({
     };
   });
 
-  // Status strip computation
-  const allProfiles = entitiesForTree.map(e => ENTITY_PROFILES[e.entity]).filter(Boolean);
-  const idComplete = allProfiles.length > 0 && allProfiles.every(p => p!.attrs.every(a => a.status !== "alert"));
-  const vComplete = !excs.some(e => e.status === "Pending");
-  const pendingCount = excs.filter(e => e.status === "Pending").length;
+  // Status strip — aggregate across all attributes
+  const allAttrs = entitiesForTree.flatMap(e => ENTITY_PROFILES[e.entity]?.attrs ?? []);
+  const idPendingCount = allAttrs.filter(a => a.status === "alert").length;
+  const vPendingCount  = allAttrs.filter(a => a.status === "warn" || a.status === "alert").length;
 
   const handleSaveOverride = (draftKey: string) => {
     const d = new Date();
@@ -3653,25 +3662,32 @@ const AttributeFormView = ({
       <div className="flex items-center gap-2 px-1 pb-3 flex-wrap">
         <span className={cn(
           "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold",
-          idComplete ? "bg-success-soft text-success border border-success-soft-border" : "bg-alert-soft text-alert border border-alert-soft-border"
-        )}>
-          {idComplete ? <CheckCircle2 className="size-3.5" /> : <X className="size-3.5" />}
-          {idComplete ? "ID Complete" : "ID Incomplete"}
-        </span>
-        <span className={cn(
-          "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold",
-          vComplete
+          idPendingCount === 0
             ? "bg-success-soft text-success border border-success-soft-border"
             : "bg-warning-soft text-warning border border-warning-soft-border"
         )}>
-          {vComplete ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
-          {vComplete ? "Verification Complete" : "Verification Pending"}
+          {idPendingCount === 0 ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+          {idPendingCount === 0 ? "ID Complete" : "ID Pending"}
+          {idPendingCount > 0 && (
+            <span className="bg-warning/20 text-warning font-bold text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-warning/30">
+              {idPendingCount} attr{idPendingCount !== 1 ? "s" : ""}
+            </span>
+          )}
         </span>
-        {pendingCount > 0 && (
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-alert-soft text-alert border border-alert-soft-border">
-            <X className="size-3.5" /> {pendingCount} Exception{pendingCount > 1 ? "s" : ""}
-          </span>
-        )}
+        <span className={cn(
+          "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold",
+          vPendingCount === 0
+            ? "bg-success-soft text-success border border-success-soft-border"
+            : "bg-warning-soft text-warning border border-warning-soft-border"
+        )}>
+          {vPendingCount === 0 ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+          {vPendingCount === 0 ? "V Complete" : "V Pending"}
+          {vPendingCount > 0 && (
+            <span className="bg-warning/20 text-warning font-bold text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-warning/30">
+              {vPendingCount} attr{vPendingCount !== 1 ? "s" : ""}
+            </span>
+          )}
+        </span>
         {entitiesForTree.length > 0 && (
           <span className="ml-auto text-[11px] text-muted-foreground font-medium truncate">
             {entitiesForTree.map(e => e.entity).join(" · ")}
@@ -3820,6 +3836,7 @@ const SimpleFieldRow = ({
   const isOpen  = openTraceFor?.label === label && openTraceFor?.entity === entity;
   const isOverrideOpen = openOverrideFor?.label === label && openOverrideFor?.entity === entity;
   const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
+  const isAuditOnly = pa?.source === "CRM" || isOverridden;
 
   // ID / V badge values
   const idOk  = !!pa;
@@ -3853,12 +3870,12 @@ const SimpleFieldRow = ({
         )} />
 
         {/* Label */}
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 w-[130px] shrink-0 truncate leading-none">{label}</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground w-[130px] shrink-0 truncate leading-none">{label}</span>
 
         {/* Value */}
         <span className={cn(
-          "flex-1 text-[13px] font-medium truncate leading-none",
-          isAlert ? "text-alert font-semibold" : isWarn ? "text-warning" : "text-foreground"
+          "flex-1 text-[15px] font-semibold truncate leading-none",
+          isAlert ? "text-alert" : isWarn ? "text-warning" : "text-foreground"
         )}>
           {currentValue || <span className="text-muted-foreground/30 italic text-[11px]">—</span>}
           {isOverridden && (
@@ -3878,26 +3895,41 @@ const SimpleFieldRow = ({
           </span>
         )}
 
-        {/* 🤖 Trace button */}
-        <button
-          disabled={!hasTrace}
-          onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
-          className={cn(
-            "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
-            isOpen
-              ? "bg-primary text-primary-foreground border-primary"
-              : hasTrace
-              ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
-              : "border-border/30 text-muted-foreground/30 cursor-not-allowed bg-transparent"
-          )}
-        >
-          <Bot className="size-3" />{isOpen ? "▲" : "Trace"}
-        </button>
+        {/* Trace / Audit button — CRM & overridden = Audit only; 3rd & Forge = full Trace */}
+        {isAuditOnly ? (
+          <button
+            onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
+            className={cn(
+              "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
+              isOpen
+                ? "bg-secondary text-foreground border-border"
+                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground bg-card"
+            )}
+          >
+            <ClipboardList className="size-3" />{isOpen ? "▲" : "Audit"}
+          </button>
+        ) : (
+          <button
+            disabled={!hasTrace}
+            onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
+            className={cn(
+              "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
+              isOpen
+                ? "bg-primary text-primary-foreground border-primary"
+                : hasTrace
+                ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
+                : "border-border/30 text-muted-foreground/30 cursor-not-allowed bg-transparent"
+            )}
+          >
+            <Bot className="size-3" />{isOpen ? "▲" : "Trace"}
+          </button>
+        )}
       </div>
       {isOpen && (
         <InlineTraceDrawer
           label={label}
           entity={entity}
+          isAuditOnly={isAuditOnly}
           savedOverrides={savedOverrides}
           trace={trace}
           traceDocs={traceDocs}
@@ -3974,6 +4006,7 @@ const SimpleFieldRow = ({
 type InlineTraceDrawerProps = {
   label: string;
   entity: string;
+  isAuditOnly: boolean;
   savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
   trace: AttrTrace | null;
   traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
@@ -3993,7 +4026,7 @@ type InlineTraceDrawerProps = {
 };
 
 const InlineTraceDrawer = ({
-  label, entity,
+  label, entity, isAuditOnly,
   savedOverrides, trace, traceDocs,
   traceTab, setTraceTab,
   traceStepsOpen, setTraceStepsOpen,
@@ -4020,42 +4053,53 @@ const InlineTraceDrawer = ({
 
   const auditLog = ATTR_AUDIT_LOG[label] ?? [];
 
+  // Default to audit tab for CRM/override sources
+  const effectiveTab = isAuditOnly && traceTab === "reasoning" ? "audit" : traceTab;
+
   return (
-    <div className="col-span-2 border-l-2 border-primary border-b border-border bg-gradient-to-br from-info-soft/30 to-background">
-      {/* Top: field context + confidence score */}
+    <div className={cn(
+      "col-span-2 border-b border-border",
+      isAuditOnly ? "border-l-2 border-secondary bg-secondary/20" : "border-l-2 border-primary bg-gradient-to-br from-info-soft/30 to-background"
+    )}>
+      {/* Top: field context + confidence score (hidden for audit-only) */}
       <div className="flex items-start justify-between gap-4 px-4 pt-3 pb-2.5 border-b border-border/60">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-wide text-primary flex items-center gap-1.5 mb-0.5">
-            <Sparkles className="size-3" /> Agent Trace
+          <p className={cn("text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 mb-0.5", isAuditOnly ? "text-muted-foreground" : "text-primary")}>
+            {isAuditOnly ? <ClipboardList className="size-3" /> : <Sparkles className="size-3" />}
+            {isAuditOnly ? "Audit Trail" : "Agent Trace"}
           </p>
           <p className="text-[12px] font-semibold text-foreground">{label}</p>
           <p className="text-[10px] text-muted-foreground mt-0.5">{savedOverrides[`${entity}::${label}`]?.value ?? trace?.value ?? "—"}</p>
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Confidence</p>
-          <p className={cn("text-[22px] font-black leading-none", confColor)}>{confLabel}</p>
-          <div className="w-16 h-1 rounded-full bg-border mt-1.5 ml-auto overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all", confBarColor)} style={{ width: `${Math.min(displayConf, 100)}%` }} />
+        {!isAuditOnly && (
+          <div className="text-right shrink-0">
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Confidence</p>
+            <p className={cn("text-[22px] font-black leading-none", confColor)}>{confLabel}</p>
+            <div className="w-16 h-1 rounded-full bg-border mt-1.5 ml-auto overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all", confBarColor)} style={{ width: `${Math.min(displayConf, 100)}%` }} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — Reasoning hidden for audit-only */}
       <div className="flex border-b border-border/60">
-        <button
-          onClick={() => setTraceTab("reasoning")}
-          className={cn(
-            "flex-1 py-2 text-[10px] font-semibold transition-colors border-b-2",
-            traceTab === "reasoning" ? "border-primary text-primary bg-background/60" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Sparkles className="size-3 inline mr-1" />Reasoning
-        </button>
+        {!isAuditOnly && (
+          <button
+            onClick={() => setTraceTab("reasoning")}
+            className={cn(
+              "flex-1 py-2 text-[10px] font-semibold transition-colors border-b-2",
+              effectiveTab === "reasoning" ? "border-primary text-primary bg-background/60" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Sparkles className="size-3 inline mr-1" />Reasoning
+          </button>
+        )}
         <button
           onClick={() => setTraceTab("audit")}
           className={cn(
             "flex-1 py-2 text-[10px] font-semibold transition-colors border-b-2",
-            traceTab === "audit" ? "border-primary text-primary bg-background/60" : "border-transparent text-muted-foreground hover:text-foreground"
+            effectiveTab === "audit" ? "border-primary text-primary bg-background/60" : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
           <ChevronRight className="size-3 inline mr-1" />Audit Trail {auditLog.length > 0 && `(${auditLog.length})`}
@@ -4063,7 +4107,7 @@ const InlineTraceDrawer = ({
       </div>
 
       {/* Reasoning tab */}
-      {traceTab === "reasoning" && trace && (
+      {effectiveTab === "reasoning" && trace && (
         <div className="px-4 py-3 space-y-3">
           {/* Conclusion */}
           <div className="rounded-lg border border-border bg-card p-3">
@@ -4135,12 +4179,12 @@ const InlineTraceDrawer = ({
         </div>
       )}
 
-      {traceTab === "reasoning" && !trace && (
+      {effectiveTab === "reasoning" && !trace && (
         <p className="px-4 py-6 text-[11px] text-muted-foreground italic text-center">No agent trace available for this attribute.</p>
       )}
 
       {/* Audit Trail tab */}
-      {traceTab === "audit" && (
+      {effectiveTab === "audit" && (
         <div className="px-4 py-3">
           {auditLog.length === 0 ? (
             <p className="text-[11px] text-muted-foreground italic text-center py-4">No audit history for this attribute.</p>
@@ -4197,12 +4241,14 @@ const InlineTraceDrawer = ({
 
       {/* Action row */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border/60 bg-secondary/20">
-        <button
-          onClick={() => trace && runAgents(trace.agents.map(a => a.id), `Re-verify: ${label}`)}
-          className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Play className="size-3" /> Re-run Agent
-        </button>
+        {!isAuditOnly && (
+          <button
+            onClick={() => trace && runAgents(trace.agents.map(a => a.id), `Re-verify: ${label}`)}
+            className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Play className="size-3" /> Re-run Agent
+          </button>
+        )}
         <button
           onClick={() => {
             const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
