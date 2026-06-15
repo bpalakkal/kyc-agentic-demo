@@ -1214,9 +1214,7 @@ const ExceptionReview = () => {
         )}
       </div>
 
-      {attrViewMode === "exception" && (
-      <>
-      {/* Top header */}
+      {/* Top header — entity ribbon shown in both modes */}
       <div className="rounded-xl border border-border bg-card p-4 mb-4">
         <div className="flex items-start justify-between gap-6">
           <div className="flex items-start gap-4 gap-y-2 flex-1 flex-wrap min-w-[380px]">
@@ -1373,7 +1371,8 @@ const ExceptionReview = () => {
         ))}
       </div>
 
-      
+      {attrViewMode === "exception" && (
+      <>
       <div
         className="grid gap-6"
         style={{
