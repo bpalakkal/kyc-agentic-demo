@@ -3696,21 +3696,21 @@ const AttributeFormView = ({
                   {/* Section header */}
                   <button
                     onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
-                    className="w-full flex items-center gap-2 px-4 py-3 bg-secondary/40 hover:bg-secondary/60 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/60 hover:bg-secondary/80 transition-colors text-left border-b border-border"
                   >
                     <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground flex-1">{category}</span>
-                    <span className="text-[10px] text-muted-foreground">{items.length} attribute{items.length !== 1 ? "s" : ""}</span>
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-foreground flex-1">{category}</span>
+                    <span className="text-[10px] text-muted-foreground">{items.length} attr{items.length !== 1 ? "s" : ""}</span>
                     {pendingInCat > 0 && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{pendingInCat}</span>
                     )}
                   </button>
 
                   {open && (
-                    <div className="divide-y divide-border/60">
+                    <div className="grid grid-cols-2 [&>*]:border-b [&>*]:border-border/60">
                       {items.map(({ label }) =>
                         NESTED_ATTR_PROFILES[label] ? (
-                          <div key={label} className="p-3">
+                          <div key={label} className="col-span-2 p-3">
                             <NestedObjectBlock
                               label={label}
                               entity={entity}
@@ -3834,7 +3834,8 @@ const SimpleFieldRow = ({
   return (
     <>{/* sibling slot for InlineTraceDrawer (Task 4) and override form (Task 5) */}
       <div className={cn(
-        "flex items-center gap-3 px-4 py-2.5 transition-colors",
+        "flex items-center gap-3 px-4 py-3 transition-colors",
+        (isOpen || isOverrideOpen) && "col-span-2",
         isOpen
           ? "bg-info-soft/40 border-l-2 border-primary"
           : isOverridden
@@ -3852,14 +3853,14 @@ const SimpleFieldRow = ({
         )} />
 
         {/* Label */}
-        <span className="text-[11px] font-medium text-muted-foreground w-[150px] shrink-0 truncate">{label}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 w-[130px] shrink-0 truncate leading-none">{label}</span>
 
         {/* Value */}
         <span className={cn(
-          "flex-1 text-[11px] truncate",
+          "flex-1 text-[13px] font-medium truncate leading-none",
           isAlert ? "text-alert font-semibold" : isWarn ? "text-warning" : "text-foreground"
         )}>
-          {currentValue || <span className="text-muted-foreground/40 italic">—</span>}
+          {currentValue || <span className="text-muted-foreground/30 italic text-[11px]">—</span>}
           {isOverridden && (
             <span className="ml-2 text-[9px] font-semibold text-success border border-success/40 bg-success-soft rounded px-1.5 py-0.5">✎ Overridden</span>
           )}
@@ -3916,7 +3917,7 @@ const SimpleFieldRow = ({
         />
       )}
       {isOverrideOpen && (
-        <div className="px-4 py-3 border-l-2 border-warning bg-warning-soft/20 border-b border-border/60">
+        <div className="col-span-2 px-4 py-3 border-l-2 border-warning bg-warning-soft/20 border-b border-border/60">
           <p className="text-[10px] font-semibold text-warning mb-2 flex items-center gap-1.5">
             <Zap className="size-3" /> Override value — <span className="font-normal text-muted-foreground">{label}</span>
           </p>
@@ -4020,7 +4021,7 @@ const InlineTraceDrawer = ({
   const auditLog = ATTR_AUDIT_LOG[label] ?? [];
 
   return (
-    <div className="border-l-2 border-primary border-b border-border bg-gradient-to-br from-info-soft/30 to-background">
+    <div className="col-span-2 border-l-2 border-primary border-b border-border bg-gradient-to-br from-info-soft/30 to-background">
       {/* Top: field context + confidence score */}
       <div className="flex items-start justify-between gap-4 px-4 pt-3 pb-2.5 border-b border-border/60">
         <div>
