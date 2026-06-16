@@ -3847,72 +3847,60 @@ const SimpleFieldRow = ({
                : vStatus === "alert" ? <span className="text-alert font-bold">V✕</span>
                :                       <span className="text-muted-foreground/50">V–</span>;
 
+  // Coloured accent for the value box border and left bar
+  const accentBorder = isOverridden ? "border-success" : isAlert ? "border-alert" : isWarn ? "border-warning" : "border-border";
+  const accentBg     = isOverridden ? "bg-success-soft/30" : isAlert ? "bg-alert-soft/20" : isWarn ? "bg-warning-soft/20" : "bg-secondary/30";
+  const accentBar    = isOverridden ? "bg-success" : isAlert ? "bg-alert" : isWarn ? "bg-warning" : "bg-border";
+  const valueColor   = isAlert ? "text-alert" : isWarn ? "text-warning" : "text-foreground";
+
   return (
-    <>{/* sibling slot for InlineTraceDrawer (Task 4) and override form (Task 5) */}
-      <div className={cn(
-        "flex items-center gap-3 px-4 py-3 transition-colors",
-        (isOpen || isOverrideOpen) && "col-span-2",
-        isOpen
-          ? "bg-info-soft/40 border-l-2 border-primary"
-          : isOverridden
-          ? "bg-success-soft/20 border-l-2 border-success"
-          : isAlert
-          ? "bg-alert-soft/20 border-l-2 border-alert"
-          : isWarn
-          ? "bg-warning-soft/20 border-l-2 border-warning"
-          : "hover:bg-secondary/30"
-      )}>
-        {/* Status dot */}
-        <div className={cn(
-          "size-1.5 rounded-full shrink-0",
-          isOverridden ? "bg-success" : pa ? DOT_STYLE[pa.status] : "bg-muted-foreground/30"
-        )} />
-
-        {/* Label */}
-        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground w-[130px] shrink-0 truncate leading-none">{label}</span>
-
-        {/* Value */}
-        <span className={cn(
-          "flex-1 text-[15px] font-semibold truncate leading-none",
-          isAlert ? "text-alert" : isWarn ? "text-warning" : "text-foreground"
-        )}>
-          {currentValue || <span className="text-muted-foreground/30 italic text-[11px]">—</span>}
-          {isOverridden && (
-            <span className="ml-2 text-[9px] font-semibold text-success border border-success/40 bg-success-soft rounded px-1.5 py-0.5">✎ Overridden</span>
-          )}
-        </span>
-
-        {/* ID / V inline text badges */}
-        <span className="text-[9px] shrink-0 whitespace-nowrap">
-          {idLabel}<span className="text-muted-foreground/30 mx-0.5">/</span>{vLabel}
-        </span>
-
-        {/* Source badge */}
-        {pa && (
-          <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold shrink-0", SOURCE_STYLE[pa.source])}>
-            {pa.source}
-          </span>
-        )}
-
-        {/* Trace / Audit button — CRM & overridden = Audit only; 3rd & Forge = full Trace */}
-        {isAuditOnly ? (
-          <button
-            onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
-            className={cn(
-              "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
-              isOpen
-                ? "bg-secondary text-foreground border-border"
-                : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground bg-card"
+    <>
+      {/* Stacked form-field card */}
+      <div className={cn("p-3 transition-colors", (isOpen || isOverrideOpen) && "col-span-2")}>
+        {/* Row 1: label + badges */}
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none">{label}</label>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] whitespace-nowrap">
+              {idLabel}<span className="text-muted-foreground/30 mx-0.5">/</span>{vLabel}
+            </span>
+            {pa && (
+              <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold", SOURCE_STYLE[pa.source])}>
+                {pa.source}
+              </span>
             )}
-          >
-            <ClipboardList className="size-3" />{isOpen ? "▲" : "Audit"}
-          </button>
-        ) : (
-          <button
-            disabled={!hasTrace}
-            onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
-            className={cn(
-              "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
+          </div>
+        </div>
+
+        {/* Row 2: value box with coloured left accent + trace/audit button */}
+        <div className={cn("rounded-md border flex items-center gap-2.5 px-2.5 py-2", accentBorder, accentBg)}>
+          <div className={cn("w-[3px] self-stretch min-h-[18px] rounded-full shrink-0", accentBar)} />
+          <span className={cn("flex-1 text-[13px] font-semibold leading-snug min-w-0", valueColor)}>
+            {currentValue || <span className="text-muted-foreground/30 italic text-[11px] font-normal">—</span>}
+            {isOverridden && (
+              <span className="ml-2 text-[9px] font-semibold text-success border border-success/40 bg-success-soft rounded px-1.5 py-0.5">✎ Overridden</span>
+            )}
+          </span>
+
+          {/* Trace / Audit button — CRM & overridden = Audit only; 3rd & Forge = full Trace */}
+          {isAuditOnly ? (
+            <button
+              onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
+              className={cn(
+                "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
+                isOpen
+                  ? "bg-secondary text-foreground border-border"
+                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground bg-card"
+              )}
+            >
+              <ClipboardList className="size-3" />{isOpen ? "▲" : "Audit"}
+            </button>
+          ) : (
+            <button
+              disabled={!hasTrace}
+              onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
+              className={cn(
+                "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
               isOpen
                 ? "bg-primary text-primary-foreground border-primary"
                 : hasTrace
@@ -3923,7 +3911,8 @@ const SimpleFieldRow = ({
             <Bot className="size-3" />{isOpen ? "▲" : "Trace"}
           </button>
         )}
-      </div>
+        </div>{/* end value box */}
+      </div>{/* end card */}
       {isOpen && (
         <InlineTraceDrawer
           label={label}
