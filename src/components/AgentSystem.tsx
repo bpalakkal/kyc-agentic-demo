@@ -67,6 +67,7 @@ import {
   Network, Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiFetch";
 
 // ─── Agent registry ──────────────────────────────────────────────────────────
 // Add a new AgentId value and a corresponding entry in AGENTS[] to introduce
@@ -515,7 +516,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       let currentData: unknown = null;
       if (kycRef) {
         try {
-          const sr = await fetch(`${AGENT_API_BASE}/api/entity/${kycRef}/snapshot`);
+          const sr = await apiFetch(`${AGENT_API_BASE}/api/entity/${kycRef}/snapshot`);
           if (sr.ok) {
             const snap = await sr.json() as { data?: unknown };
             currentData = snap?.data ?? null;
@@ -523,14 +524,26 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         } catch { /* non-fatal — agent runs without prior snapshot */ }
       }
 
-      // Fire-and-forget snapshot save after agent completes
-      const saveSnapshot = (data: unknown, runId?: string) => {
-        if (!kycRef) return;
-        fetch(`${AGENT_API_BASE}/api/entity/${kycRef}/snapshot`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data, agentId: cfg.slug, runId: runId ?? null }),
-        }).catch(() => { /* non-fatal */ });
+      // M8: Save snapshot after agent completes; surface failures in the dock
+      const saveSnapshot = async (data: unknown, runId?: string) => {
+        if (!kycRef || data === null) return;
+        try {
+          const r = await apiFetch(`${AGENT_API_BASE}/api/entity/${kycRef}/snapshot`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data, agentId: cfg.slug, runId: runId ?? null }),
+          });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setRuns(prev => {
+            const idx = prev.findIndex(r => r.id === run.id);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            next[idx] = { ...next[idx], thoughts: [...(next[idx].thoughts ?? []), `⚠ Snapshot save failed: ${msg}`] };
+            return next;
+          });
+        }
       };
 
       const markDone = (thoughts: string[], result?: unknown) => {
@@ -560,29 +573,31 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       };
 
       // Poll agent-steps and run-status until complete
-      const startPolling = (runId: string) => {
+      // H5: cancelled flag prevents setRuns after unmount
+      const startPolling = (runId: string, cancelled: { current: boolean }) => {
         let polls = 0;
         const poll = async () => {
+          if (cancelled.current) return;
           polls++;
-          if (polls > 1800) { markDone(["⚠ Agent run timed out after 60 minutes"]); saveSnapshot(null, runId); return; }
+          if (polls > 1800) { markDone(["⚠ Agent run timed out after 60 minutes"]); return; }
 
           // Fetch latest thinking steps and show them live
           try {
-            const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+            const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
             const stepsRaw = await sr.json() as unknown;
-            updateLiveThoughts(extractRawSteps(stepsRaw));
+            if (!cancelled.current) updateLiveThoughts(extractRawSteps(stepsRaw));
           } catch { /* non-fatal — keep polling */ }
 
           // Check completion status
           try {
-            const rr = await fetch(`${AGENT_API_BASE}/api/agent-run/${runId}`);
+            const rr = await apiFetch(`${AGENT_API_BASE}/api/agent-run/${runId}`);
             const rd = await rr.json() as Record<string, unknown>;
             const status = String(rd.status ?? "");
 
             if (["complete", "completed", "done", "succeeded"].includes(status)) {
               // Final step fetch so we get every thought before marking done
               try {
-                const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+                const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
                 const stepsRaw = await sr.json() as unknown;
                 const steps = extractRawSteps(stepsRaw);
                 markDone(
@@ -590,14 +605,14 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                   rd,
                 );
               } catch { markDone(buildThoughtsFromResult(rd, run.agentId), rd); }
-              saveSnapshot(rd, runId);
+              await saveSnapshot(rd, runId);
               return;
             }
             if (["failed", "error", "cancelled"].includes(status)) {
               // Show whatever steps ran before the failure, then append the error
               const errLine = `⚠ Run ${status}: ${String(rd.error ?? rd.message ?? "unknown error")}`;
               try {
-                const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
+                const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
                 const stepsRaw = await sr.json() as unknown;
                 const steps = extractRawSteps(stepsRaw);
                 const thoughts = steps.length > 0
@@ -614,7 +629,10 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(poll, 1500); // first poll after 1.5 s
       };
 
-      fetch(`${AGENT_API_BASE}/api/agent/${cfg.slug}`, {
+      // H5: Track cancellation so polling stops if the component unmounts
+      const cancelled = { current: false };
+
+      apiFetch(`${AGENT_API_BASE}/api/agent/${cfg.slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -629,6 +647,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           catch { throw new Error(`Server returned non-JSON (HTTP ${r.status}). Is the proxy running? (npm start)`); }
         })
         .then(async (data: unknown) => {
+          if (cancelled.current) return;
           const d = data as Record<string, unknown>;
           const runId = d.runId ?? d.run_id ?? d.id;
           const status = String(d.status ?? "");
@@ -644,22 +663,22 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
             let thoughts: string[] = [];
             if (cfg.fetchSteps && runId) {
               try {
-                const sr = await fetch(`${AGENT_API_BASE}/api/agent-steps/${String(runId)}`);
+                const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${String(runId)}`);
                 const stepsRaw = await sr.json() as unknown;
                 const steps = extractRawSteps(stepsRaw);
                 if (steps.length > 0) thoughts = buildThoughtsFromAgentSteps(steps, data);
               } catch { /* fall through */ }
             }
             markDone(thoughts.length > 0 ? thoughts : buildThoughtsFromResult(data, run.agentId), data);
-            saveSnapshot(data, String(runId ?? ""));
+            await saveSnapshot(data, String(runId ?? ""));
             return;
           }
 
           // Async: start live polling
-          startPolling(String(runId));
+          startPolling(String(runId), cancelled);
         })
         .catch((err: Error) => {
-          markDone([`⚠ API error: ${err.message}`]);
+          if (!cancelled.current) markDone([`⚠ API error: ${err.message}`]);
         });
     });
   }, []);

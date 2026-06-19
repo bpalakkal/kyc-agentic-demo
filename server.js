@@ -49,34 +49,78 @@ function getAnthropic() {
   return _anthropic;
 }
 
+// ISO timestamp for structured startup logs.
+const ts = () => new Date().toISOString();
+
+// Races a promise against a timeout so DB operations never hang indefinitely.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 // Load .env manually so the server has zero extra dependencies in production.
 // Railway and other platforms inject env vars directly, so this is a no-op there.
 try {
   const __dir = dirname(fileURLToPath(import.meta.url));
   const env = readFileSync(resolve(__dir, ".env"), "utf8");
   for (const line of env.split("\n")) {
-    const [k, ...v] = line.split("=");
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [k, ...v] = trimmed.split("=");
     if (k && v.length) process.env[k.trim()] = v.join("=").trim();
   }
 } catch {
   // .env not present — rely on shell / platform environment variables
 }
 
+// C2: Never disable TLS in production — prevents an accidental NODE_TLS_REJECT_UNAUTHORIZED=0
+// in .env from reaching Railway. Local dev keeps it via the .env file.
+if (process.env.NODE_ENV === 'production' && process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') {
+  console.warn(`[${new Date().toISOString()}] ⚠ NODE_TLS_REJECT_UNAUTHORIZED=0 is not allowed in production — unsetting`);
+  delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+}
+
 const { ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET } = process.env;
 
+// ─── Auth middleware (C3) ─────────────────────────────────────────────────────
+// Validates the Supabase JWT sent by the browser.  Applied to all data routes.
+// The /api/health and /api/zoom/* routes are the only public exceptions.
+async function requireAuth(req, res, next) {
+  if (!sbAvailable) return res.status(503).json({ error: 'Auth service unavailable' });
+  const header = req.headers.authorization ?? '';
+  if (!header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing Authorization header' });
+  }
+  const token = header.slice(7);
+  try {
+    const { data: { user }, error } = await sbModule.sb.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ error: 'Invalid or expired token' });
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Auth verification failed' });
+  }
+}
+
 // ─── Supabase ─────────────────────────────────────────────────────────────────
-// Import lazily so the server starts even when Supabase creds are absent.
 let sbModule = null;
-async function getSb() {
-  if (!sbModule) sbModule = await import('./src/db/supabase.js');
+let sbAvailable = false;
+
+function getSb() {
+  if (!sbAvailable) throw new Error("Supabase unavailable — check SUPABASE_URL and SUPABASE_SERVICE_KEY in Railway Variables");
   return sbModule;
 }
 
 // ─── Neo4j ────────────────────────────────────────────────────────────────────
-// Import lazily so the server starts even when Neo4j creds are absent.
 let neo4jModule = null;
-async function getNeo4j() {
-  if (!neo4jModule) neo4jModule = await import('./src/db/neo4j.js');
+let neo4jAvailable = false;
+
+function getNeo4j() {
+  if (!neo4jAvailable) throw new Error("Neo4j unavailable — check NEO4J_URI, NEO4J_USER, and NEO4J_PASSWORD in Railway Variables");
   return neo4jModule;
 }
 
@@ -207,7 +251,7 @@ async function proxyFetch(url, options = {}, timeoutMs = 25000) {
 
 // Invoke an agent.  Body is forwarded as-is from the frontend, including
 // { async: true } when the frontend uses asyncMode.
-app.post("/api/agent/:slug", async (req, res) => {
+app.post("/api/agent/:slug", requireAuth, async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/invoke/${req.params.slug}`;
   console.log(`[agent-proxy] Invoking agent: ${url}`, req.body);
   const { status, data } = await proxyFetch(url, {
@@ -219,21 +263,21 @@ app.post("/api/agent/:slug", async (req, res) => {
 });
 
 // Agent thinking steps — polled every 2 s by the frontend while a run is live.
-app.get("/api/agent-steps/:runId", async (req, res) => {
+app.get("/api/agent-steps/:runId", requireAuth, async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/execution-logs/${req.params.runId}/agent-steps`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
 });
 
 // Run status — polled alongside agent-steps to detect completion / failure.
-app.get("/api/agent-run/:runId", async (req, res) => {
+app.get("/api/agent-run/:runId", requireAuth, async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
 });
 
 // Artifacts list for a completed run.
-app.get("/api/agent-artifacts/:runId", async (req, res) => {
+app.get("/api/agent-artifacts/:runId", requireAuth, async (req, res) => {
   const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}/artifacts`;
   const { status, data } = await proxyFetch(url);
   res.status(status).json(data);
@@ -241,10 +285,14 @@ app.get("/api/agent-artifacts/:runId", async (req, res) => {
 
 // Binary artifact download — streams file content back to the browser.
 // ?path= must be the relative downloadUrl returned by the artifacts endpoint.
-app.get("/api/artifact-download", async (req, res) => {
+app.get("/api/artifact-download", requireAuth, async (req, res) => {
   const artifactPath = req.query.path;
   if (!artifactPath || typeof artifactPath !== "string") {
     return res.status(400).json({ error: "path query param is required" });
+  }
+  // C4: Validate path to prevent SSRF — must look like /artifacts/<safe-segments>
+  if (!/^\/artifacts\/[A-Za-z0-9_\-\/\.]+$/.test(artifactPath)) {
+    return res.status(400).json({ error: "Invalid artifact path" });
   }
   const url = `${AWS_AGENT_BASE}${artifactPath}`;
   try {
@@ -264,9 +312,9 @@ app.get("/api/artifact-download", async (req, res) => {
 // ─── Supabase API endpoints ───────────────────────────────────────────────────
 
 // GET /api/entities — work queue list
-app.get('/api/entities', async (_req, res) => {
+app.get('/api/entities', requireAuth, async (_req, res) => {
   try {
-    const { getEntities } = await getSb();
+    const { getEntities } = getSb();
     res.json(await getEntities());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -274,9 +322,9 @@ app.get('/api/entities', async (_req, res) => {
 });
 
 // GET /api/entity/:kycRef — single entity row
-app.get('/api/entity/:kycRef', async (req, res) => {
+app.get('/api/entity/:kycRef', requireAuth, async (req, res) => {
   try {
-    const { getEntity } = await getSb();
+    const { getEntity } = getSb();
     res.json(await getEntity(req.params.kycRef));
   } catch (err) {
     const status = err.message?.includes('No rows') ? 404 : 500;
@@ -285,9 +333,9 @@ app.get('/api/entity/:kycRef', async (req, res) => {
 });
 
 // GET /api/entity/:kycRef/snapshot — latest Forge JSON snapshot
-app.get('/api/entity/:kycRef/snapshot', async (req, res) => {
+app.get('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
   try {
-    const { getLatestSnapshot } = await getSb();
+    const { getLatestSnapshot } = getSb();
     const snap = await getLatestSnapshot(req.params.kycRef);
     if (!snap) return res.status(404).json({ error: 'No snapshot found' });
     res.json(snap);
@@ -298,13 +346,13 @@ app.get('/api/entity/:kycRef/snapshot', async (req, res) => {
 
 // POST /api/entity/:kycRef/snapshot — save a new Forge JSON snapshot
 // Body: { data: <Forge JSON object>, agentId?: string, runId?: string }
-app.post('/api/entity/:kycRef/snapshot', async (req, res) => {
+app.post('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
   const { data, agentId, runId } = req.body ?? {};
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ error: 'body.data (object) is required' });
   }
   try {
-    const { saveSnapshot } = await getSb();
+    const { saveSnapshot } = getSb();
     const row = await saveSnapshot(req.params.kycRef, data, { agentId, runId });
     res.status(201).json(row);
   } catch (err) {
@@ -312,10 +360,44 @@ app.post('/api/entity/:kycRef/snapshot', async (req, res) => {
   }
 });
 
-// GET /api/entity/:kycRef/exceptions — all exceptions for an entity
-app.get('/api/entity/:kycRef/exceptions', async (req, res) => {
+// GET /api/entity/:kycRef/attributes — extracted attribute rows from latest snapshot
+// Query: ?group=core|wgq  (optional filter)
+app.get('/api/entity/:kycRef/attributes', requireAuth, async (req, res) => {
   try {
-    const { getExceptions } = await getSb();
+    const { getAttributes } = getSb();
+    const group = ['core', 'wgq'].includes(req.query.group) ? req.query.group : undefined;
+    res.json(await getAttributes(req.params.kycRef, { group }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef/attributes/trace/:attrName — full lineage for one attribute
+app.get('/api/entity/:kycRef/attributes/trace/:attrName', requireAuth, async (req, res) => {
+  try {
+    const { getAttributeTrace } = getSb();
+    const result = await getAttributeTrace(req.params.kycRef, req.params.attrName);
+    if (!result) return res.status(404).json({ error: 'Attribute not found in latest snapshot' });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef/persons — person records from latest snapshot grouped by role
+app.get('/api/entity/:kycRef/persons', requireAuth, async (req, res) => {
+  try {
+    const { getPersons } = getSb();
+    res.json(await getPersons(req.params.kycRef));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef/exceptions — all exceptions for an entity
+app.get('/api/entity/:kycRef/exceptions', requireAuth, async (req, res) => {
+  try {
+    const { getExceptions } = getSb();
     res.json(await getExceptions(req.params.kycRef));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -323,13 +405,15 @@ app.get('/api/entity/:kycRef/exceptions', async (req, res) => {
 });
 
 // PATCH /api/entity/:kycRef/exception/:num/resolve — mark exception resolved
-// Body: { resolutionOption?: number, resolution?: string, resolvedBy?: string }
-app.patch('/api/entity/:kycRef/exception/:num/resolve', async (req, res) => {
+// Body: { resolutionOption?: number, resolution?: string }
+app.patch('/api/entity/:kycRef/exception/:num/resolve', requireAuth, async (req, res) => {
   const num = parseInt(req.params.num, 10);
   if (!Number.isFinite(num)) return res.status(400).json({ error: 'num must be an integer' });
   try {
-    const { resolveException } = await getSb();
-    const row = await resolveException(req.params.kycRef, num, req.body ?? {});
+    const { resolveException } = getSb();
+    // C5: resolvedBy always comes from the verified JWT identity, never from the request body
+    const resolvedBy = req.user.email ?? req.user.id;
+    const row = await resolveException(req.params.kycRef, num, { ...req.body, resolvedBy });
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -340,9 +424,9 @@ app.patch('/api/entity/:kycRef/exception/:num/resolve', async (req, res) => {
 
 // GET /api/neo4j/entity/:kycId/graph — Cytoscape-ready graph for a single entity
 // Only returns Entity and Person neighbours (filters out Exception/Attribute/Action noise).
-app.get('/api/neo4j/entity/:kycId/graph', async (req, res) => {
+app.get('/api/neo4j/entity/:kycId/graph', requireAuth, async (req, res) => {
   try {
-    const { runGraphQuery } = await getNeo4j();
+    const { runGraphQuery } = getNeo4j();
     const graph = await runGraphQuery(
       `MATCH (center:Entity { caseId: $kycId })
        OPTIONAL MATCH (center)-[r]-(neighbor)
@@ -358,11 +442,11 @@ app.get('/api/neo4j/entity/:kycId/graph', async (req, res) => {
 
 // POST /api/neo4j/expand — expand a node by its internal elementId
 // Body: { elementId: string }
-app.post('/api/neo4j/expand', async (req, res) => {
+app.post('/api/neo4j/expand', requireAuth, async (req, res) => {
   const { elementId } = req.body ?? {};
   if (!elementId) return res.status(400).json({ error: 'elementId is required' });
   try {
-    const { runGraphQuery } = await getNeo4j();
+    const { runGraphQuery } = getNeo4j();
     const graph = await runGraphQuery(
       `MATCH (center) WHERE elementId(center) = $elementId
        OPTIONAL MATCH (center)-[r]-(neighbor)
@@ -432,30 +516,31 @@ const KYC_TOOLS = [
 async function executeTool(name, input) {
   try {
     if (name === "get_entity") {
-      const { getEntities } = await getSb();
-      const all = await getEntities();
-      const entity = all.find(e => e.kyc_ref === input.kyc_ref);
-      return entity ?? { error: `No entity found with kyc_ref: ${input.kyc_ref}` };
+      const { getEntity } = getSb();
+      try {
+        return await getEntity(input.kyc_ref);
+      } catch {
+        return { error: `No entity found with kyc_ref: ${input.kyc_ref}` };
+      }
     }
     if (name === "list_entities") {
-      const { getEntities } = await getSb();
-      let rows = await getEntities();
-      if (input.risk_rating) rows = rows.filter(e => e.risk_rating === input.risk_rating);
-      if (input.priority)    rows = rows.filter(e => e.priority    === input.priority);
-      return rows.slice(0, input.limit ?? 15);
+      const { getEntities } = getSb();
+      return await getEntities({
+        riskRating: input.risk_rating,
+        priority:   input.priority,
+        limit:      input.limit ?? 15,
+      });
     }
     if (name === "get_exceptions") {
-      const { getExceptions } = await getSb();
+      const { getExceptions } = getSb();
       return await getExceptions(input.kyc_ref);
     }
     if (name === "search_entities") {
-      const { getEntities } = await getSb();
-      const q = input.name.toLowerCase();
-      const rows = await getEntities();
-      return rows.filter(e => (e.entity_name ?? "").toLowerCase().includes(q)).slice(0, 10);
+      const { searchEntities } = getSb();
+      return await searchEntities(input.name);
     }
     if (name === "query_graph") {
-      const { runGraphQuery } = await getNeo4j();
+      const { runGraphQuery } = getNeo4j();
       return await runGraphQuery(
         `MATCH (center:Entity { caseId: $kycId })
          OPTIONAL MATCH (center)-[r]-(neighbor)
@@ -472,7 +557,7 @@ async function executeTool(name, input) {
 
 // POST /api/chat — streaming KYC assistant backed by Claude + live DB tools.
 // Streams SSE events: { type:"text"|"tool_call"|"done"|"error", ... }
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", requireAuth, async (req, res) => {
   const { messages = [], entityContext } = req.body ?? {};
 
   res.setHeader("Content-Type",  "text/event-stream");
@@ -500,9 +585,14 @@ Always use tools to retrieve live data before answering. Then respond with analy
 
   try {
     let continueLoop = true;
+    let toolCallIterations = 0;
     let currentMessages = [...anthropicMessages];
 
     while (continueLoop) {
+      if (++toolCallIterations > 10) {
+        send({ type: "error", message: "Tool call loop limit reached" });
+        break;
+      }
       const stream = await getAnthropic().messages.stream({
         model:      "claude-sonnet-4-6",
         max_tokens: 1024,
@@ -566,9 +656,87 @@ Always use tools to retrieve live data before answering. Then respond with analy
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+app.get("/api/health", async (_req, res) => {
+  const checks = {};
 
+  if (!sbAvailable) {
+    checks.supabase = "unavailable";
+  } else {
+    try {
+      await withTimeout(sbModule.sb.from("entities").select("kyc_ref").limit(1), 5000, "Supabase health");
+      checks.supabase = "ok";
+    } catch (err) {
+      checks.supabase = `error: ${err.message}`;
+    }
+  }
+
+  if (!neo4jAvailable) {
+    checks.neo4j = "unavailable";
+  } else {
+    try {
+      await withTimeout(neo4jModule.runQuery("RETURN 1 AS ok", {}), 5000, "Neo4j health");
+      checks.neo4j = "ok";
+    } catch (err) {
+      checks.neo4j = `error: ${err.message}`;
+    }
+  }
+
+  // Supabase is required; Neo4j is optional (graph feature only)
+  const ok = checks.supabase === "ok";
+  // Only expose details to authenticated internal callers; external probes get ok/fail only
+  const detailed = req.headers['x-health-token'] === process.env.HEALTH_SECRET;
+  res.status(ok ? 200 : 503).json(detailed ? { ok, ...checks } : { ok });
+});
+
+// ─── Startup ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT ?? 3001;
-app.listen(PORT, () =>
-  console.log(`\n✓ KYC proxy server running → http://localhost:${PORT}\n`)
-);
+
+(async () => {
+  console.log(`[${ts()}] Starting KYC proxy server...`);
+
+  // Log which credential groups are present so Railway deployment logs are informative
+  const envCheck = {
+    ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY,
+    SUPABASE_URL:       process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+    NEO4J_URI:          process.env.NEO4J_URI,
+    ZOOM_ACCOUNT_ID:    process.env.ZOOM_ACCOUNT_ID,
+    AWS_AGENT_BASE:     process.env.AWS_AGENT_BASE,
+  };
+  for (const [k, v] of Object.entries(envCheck)) {
+    console.log(`[${ts()}] ${v ? "✓" : "✗"} ${k}${v ? "" : " — MISSING"}`);
+  }
+
+  // ── Supabase ──────────────────────────────────────────────────────────────
+  try {
+    // supabase.js throws at module level when creds are missing — caught here
+    sbModule = await withTimeout(import("./src/db/supabase.js"), 10000, "Supabase import");
+    // Verify we can actually reach the database before marking available
+    await withTimeout(sbModule.sb.from("entities").select("kyc_ref").limit(1), 10000, "Supabase probe");
+    sbAvailable = true;
+    console.log(`[${ts()}] ✓ Supabase connected`);
+  } catch (err) {
+    console.error(`[${ts()}] ✗ Supabase unavailable: ${err.message}`);
+    console.error(`[${ts()}]   Supabase routes will return 503 until credentials are fixed`);
+  }
+
+  // ── Neo4j (optional) ──────────────────────────────────────────────────────
+  const neo4jUri = process.env.NEO4J_URI;
+  if (!neo4jUri || neo4jUri.includes("localhost")) {
+    console.warn(`[${ts()}] ✗ NEO4J_URI not configured — graph queries disabled`);
+  } else {
+    try {
+      neo4jModule = await withTimeout(import("./src/db/neo4j.js"), 10000, "Neo4j import");
+      await withTimeout(neo4jModule.runQuery("RETURN 1 AS ok", {}), 10000, "Neo4j probe");
+      neo4jAvailable = true;
+      console.log(`[${ts()}] ✓ Neo4j connected`);
+    } catch (err) {
+      console.error(`[${ts()}] ✗ Neo4j unavailable: ${err.message}`);
+      console.error(`[${ts()}]   Graph routes will return 503 until credentials are fixed`);
+    }
+  }
+
+  app.listen(PORT, () =>
+    console.log(`[${ts()}] ✓ KYC proxy server listening → http://localhost:${PORT}`)
+  );
+})();

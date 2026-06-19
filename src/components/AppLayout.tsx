@@ -18,6 +18,8 @@ import { supabase } from "@/lib/supabase";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { AgentProvider, AgentRecommendationStrip, useAgents, AGENT_API_BASE } from "@/components/AgentSystem";
+import { apiFetch } from "@/lib/apiFetch";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const tabs = [
   { to: "/", label: "Dashboard", end: true },
@@ -105,7 +107,7 @@ const AiChatFloating = () => {
     abortRef.current = new AbortController();
 
     try {
-      const res = await fetch(`${AGENT_API_BASE}/api/chat`, {
+      const res = await apiFetch(`${AGENT_API_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
@@ -456,7 +458,9 @@ const AppLayout = () => {
         <AgentRecommendationStrip route={location.pathname} />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-          <Outlet />
+          <ErrorBoundary label="main-outlet">
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
 

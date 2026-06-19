@@ -34,11 +34,13 @@ import { useState, useEffect, useRef, useMemo, type Dispatch, type SetStateActio
 import { Link, useLocation } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
-  Send, Mail, Plus, Minus, Maximize2, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
+  Send, Mail, Plus, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
   ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap, ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiFetch";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -48,6 +50,21 @@ import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES,
 import { GraphView } from "@/components/GraphView";
 import { Input }    from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { ForgeAttrRow, ForgeTraceRow, ForgePersonRow } from "@/types/forgeTypes";
+import { PERSON_ROLE_LABELS } from "@/types/forgeTypes";
+import {
+  type AttrTrace, type AttrDoc, type AttrDocKind, type EntityAttr, type EntityProfile, type AuditEntry,
+  type CaseDoc,
+  ENTITY_PROFILES, ATTRIBUTE_TRACES, SOURCE_STYLE, DOT_STYLE, SOURCE_AGENT,
+  STATUS_LABEL, COMPLETENESS_LABEL, COMPLETENESS_STYLE, DOC_KIND_META,
+  ATTR_AUDIT_LOG, NESTED_ATTR_PROFILES, CASE_DOCUMENTS, TRACE_DOCS,
+  COMMENTS_BY_KYC, WATCHERS_BY_KYC, ACTIVITY_BY_KYC,
+} from "@/data/kycMockData";
+import { ForgeLineagePanel } from "@/components/kyc/ForgeLineagePanel";
+import { ForgePersonCard } from "@/components/kyc/ForgePersonCard";
+import { WgqTabContent } from "@/components/kyc/WgqTabContent";
+import { CollabPanel } from "@/components/kyc/CollabPanel";
+import { SimpleFieldRow, InlineTraceDrawer, NestedObjectBlock } from "@/components/kyc/SimpleFieldRow";
 
 
 
@@ -888,7 +905,7 @@ const DEFAULT_SELECTED_ENTITIES = [
   { name: "Marshall Wace LLP", kyc: "KYC-30188", drg: "London Alternatives DRG" },
 ];
 
-// KYC refs that have fully-curated exceptions in the hardcoded array above
+// KYC refs that have fully-curated hardcoded exceptions (used as fallback only)
 const HARDCODED_KYCS = new Set(exceptions.map((e) => e.kyc));
 
 // ─── DB exception types ───────────────────────────────────────────────────────
@@ -995,12 +1012,13 @@ const ExceptionReview = () => {
   const [dynamicComparisons, setDynamicComparisons] = useState<Record<string, Compare>>({});
 
   useEffect(() => {
-    const missing = selectedEntities.filter((e) => !HARDCODED_KYCS.has(e.kyc));
-    if (missing.length === 0) { setDbExceptions([]); return; }
+    // M1: Always fetch from DB for all selected entities.
+    // Hardcoded exceptions remain as fallback when DB returns empty (effectiveExceptions below).
+    if (selectedEntities.length === 0) { setDbExceptions([]); return; }
 
     Promise.all(
-      missing.map((ent) =>
-        fetch(`${AGENT_API_BASE}/api/entity/${ent.kyc}/exceptions`)
+      selectedEntities.map((ent) =>
+        apiFetch(`${AGENT_API_BASE}/api/entity/${ent.kyc}/exceptions`)
           .then((r) => (r.ok ? r.json() : Promise.resolve([])) as Promise<DbExcRow[]>)
           .then((rows) => rows.map((row) => ({ exc: dbRowToExc(row, ent.name), cmp: dbSourcesToCompare(row.sources), excId: `db-${row.kyc_ref}-${row.exception_number}` })))
           .catch(() => [])
@@ -1017,7 +1035,11 @@ const ExceptionReview = () => {
   }, [selectedEntities]);
 
   const effectiveExceptions = useMemo(() => {
-    const all = [...filteredExceptions, ...dbExceptions];
+    // DB exceptions take precedence; for entities with no DB data, fall back to
+    // hardcoded curated exceptions (Brevan Howard / Marshall Wace demo data).
+    const dbKycs = new Set(dbExceptions.map((e) => e.kyc));
+    const hardcodedFallback = filteredExceptions.filter((e) => !dbKycs.has(e.kyc));
+    const all = [...dbExceptions, ...hardcodedFallback];
     if (all.length > 0) return all;
     return selectedEntities.map(buildStubException);
   }, [filteredExceptions, dbExceptions, selectedEntities]);
@@ -1039,7 +1061,13 @@ const ExceptionReview = () => {
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [reachOutModal, setReachOutModal] = useState<null | "email" | "zoom">(null);
   const [reachOutCount, setReachOutCount] = useState(0);
+  const [outreachEmail, setOutreachEmail] = useState("");
   const [zoomDuration, setZoomDuration] = useState("30 min");
+  const [zoomDate, setZoomDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [zoomTime, setZoomTime] = useState("10:00");
   const [zoomLoading, setZoomLoading] = useState(false);
   const [zoomMeeting, setZoomMeeting] = useState<{
     id: number; join_url: string; start_url: string; password: string; topic: string;
@@ -1458,20 +1486,19 @@ const ExceptionReview = () => {
           </ul>
         </aside>
 
-        {/* Center: Exception summary — auto-collapses when either right pane opens */}
+        {/* Center: Exception summary — auto-collapses when right pane opens */}
         {rightPaneOpen ? (
           <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
             <button
-              onClick={() => { setRightPaneOpen(false); }}
+              onClick={() => setRightPaneOpen(false)}
               className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
               title="Expand exception summary"
             >
               <ChevronDown className="size-3.5 -rotate-90" />
             </button>
             <button
-              onClick={() => { setRightPaneOpen(false); }}
+              onClick={() => setRightPaneOpen(false)}
               className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
-              title="Expand exception summary"
             >
               <Settings2 className="size-3" /> Exception Summary
             </button>
@@ -1616,8 +1643,6 @@ const ExceptionReview = () => {
                 <span className="font-semibold text-foreground">Why this may be acceptable:</span> {active.acceptability}
               </p>
               <p className="text-[12px] italic text-muted-foreground mb-3">Choose one of the items below to continue</p>
-
-
               <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-3", isResolved && "opacity-60")}>
                 {active.resolutions.map((opt) => {
                   const sel = selectedResolution === opt.id;
@@ -1673,8 +1698,6 @@ const ExceptionReview = () => {
                   );
                 })}
               </div>
-
-              {/* Confirm trigger bar */}
               {selectedResolution && !isResolved && (() => {
                 const sel = active.resolutions.find((o) => o.id === selectedResolution)!;
                 return (
@@ -1685,18 +1708,8 @@ const ExceptionReview = () => {
                       <span className="text-muted-foreground"> · {sel.agents.length} agents · SLA {getSla(sel.title, sel.recommended)}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => setSelectedResolution(null)}
-                        disabled={isRunning}
-                        className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-secondary disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleConfirmRun}
-                        disabled={isRunning}
-                        className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 inline-flex items-center gap-1.5"
-                      >
+                      <button onClick={() => setSelectedResolution(null)} disabled={isRunning} className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-secondary disabled:opacity-50">Cancel</button>
+                      <button onClick={handleConfirmRun} disabled={isRunning} className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 inline-flex items-center gap-1.5">
                         <Play className="size-3" />
                         {isRunning ? "Running agents…" : "Confirm & run agents"}
                       </button>
@@ -1704,22 +1717,17 @@ const ExceptionReview = () => {
                   </div>
                 );
               })()}
-
               {isResolved && (
                 <div className="mt-3 rounded-lg border border-success/40 bg-success-soft/60 p-3 text-[12px] flex items-center gap-2">
                   <CheckCircle2 className="size-4 text-success shrink-0" />
                   <span><span className="font-semibold">Resolved.</span> Agents have completed this resolution — actions are locked.</span>
                 </div>
               )}
-
               {active.resolutions.filter((o) => selectedResolution === o.id).map((opt) => (
                 <div key={opt.id} className="mt-3">
                   <AgentReasoningBlock exception={active} resolution={opt} />
                 </div>
               ))}
-
-
-
               <div className="mt-3 rounded-lg border border-border p-3">
                 <input className="w-full bg-transparent text-sm placeholder:text-muted-foreground outline-none" placeholder="Or enter a custom resolution note…" />
                 <div className="flex items-center justify-end mt-2">
@@ -1733,7 +1741,7 @@ const ExceptionReview = () => {
         </section>
         )}
 
-        {/* Right: Attributes / Document Locker — collapsible */}
+        {/* Right: Document Locker / Collaboration — collapsible */}
         {rightPaneOpen ? (
           <aside className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between mb-4 border-b border-border">
@@ -1763,17 +1771,14 @@ const ExceptionReview = () => {
                   <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{(COMMENTS_BY_KYC[active.kyc]?.length ?? 0)}</span>
                 </button>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setRightPaneOpen(false)}
-                  className="ml-2 size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
-                  title="Collapse pane"
-                >
-                  <ChevronRight className="size-3.5" />
-                </button>
-              </div>
+              <button
+                onClick={() => setRightPaneOpen(false)}
+                className="ml-2 size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+                title="Collapse pane"
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
             </div>
-
             {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
             {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
           </aside>
@@ -1824,10 +1829,12 @@ const ExceptionReview = () => {
       </>
       )}
       {attrViewMode === "attributes" && (
+        <ErrorBoundary label="AttributeFormView">
         <AttributeFormView
           selectedEntities={selectedEntities}
           exceptions={effectiveExceptions}
         />
+        </ErrorBoundary>
       )}
 
 
@@ -1864,8 +1871,14 @@ const ExceptionReview = () => {
                 <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">To</p>
                 <div className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 bg-secondary/30">
                   <UserCircle2 className="size-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm flex-1">compliance@brevanhoward.com</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-info-soft text-primary border border-primary/20">Compliance Team</span>
+                  <input
+                    type="email"
+                    value={outreachEmail}
+                    onChange={(e) => setOutreachEmail(e.target.value)}
+                    placeholder={`compliance@${active.entity.split(' ')[0].toLowerCase()}.com`}
+                    className="text-sm flex-1 bg-transparent outline-none min-w-0"
+                  />
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-info-soft text-primary border border-primary/20 shrink-0">Compliance Team</span>
                 </div>
               </div>
               <div>
@@ -1980,7 +1993,7 @@ const ExceptionReview = () => {
                 <div className="space-y-1.5">
                   {[
                     { name: "KYC Analyst", email: "analyst@kpmg.com", you: true },
-                    { name: "Compliance Team", email: "compliance@brevanhoward.com" },
+                    { name: "Compliance Team", email: outreachEmail || `compliance@${active.entity.split(' ')[0].toLowerCase()}.com` },
                     { name: "RM Anderson", email: "rm.anderson@kpmg.com" },
                   ].map((a) => (
                     <div key={a.email} className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 bg-secondary/20">
@@ -1996,13 +2009,25 @@ const ExceptionReview = () => {
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Date</p>
                   <div className="rounded-lg border border-border px-3 py-2 flex items-center gap-2 text-sm">
-                    <Calendar className="size-3.5 text-muted-foreground shrink-0" /> May 27, 2026
+                    <Calendar className="size-3.5 text-muted-foreground shrink-0" />
+                    <input
+                      type="date"
+                      value={zoomDate}
+                      onChange={(e) => setZoomDate(e.target.value)}
+                      className="bg-transparent outline-none flex-1 text-sm"
+                    />
                   </div>
                 </div>
                 <div>
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Time</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">Time (UTC)</p>
                   <div className="rounded-lg border border-border px-3 py-2 flex items-center gap-2 text-sm">
-                    <Clock className="size-3.5 text-muted-foreground shrink-0" /> 10:00 AM GMT
+                    <Clock className="size-3.5 text-muted-foreground shrink-0" />
+                    <input
+                      type="time"
+                      value={zoomTime}
+                      onChange={(e) => setZoomTime(e.target.value)}
+                      className="bg-transparent outline-none flex-1 text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -2057,7 +2082,7 @@ const ExceptionReview = () => {
                     try {
                       const agenda = (document.getElementById("zoom-agenda") as HTMLTextAreaElement)?.value ?? "";
                       const durationMins = parseInt(zoomDuration);
-                      const startTime = new Date("2026-05-27T10:00:00Z").toISOString();
+                      const startTime = new Date(`${zoomDate}T${zoomTime}:00Z`).toISOString();
                       const res = await fetch(`${AGENT_API_BASE}/api/zoom/create-meeting`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -2098,762 +2123,6 @@ const ExceptionReview = () => {
 };
 
 // ---------- Attribute Tree with Agent Tracing ----------
-
-type AttrTrace = {
-  value: string;
-  status: "verified" | "flagged";
-  confidence: number;
-  agents: { id: AgentId; name: string; action: string; thought: string; source: string }[];
-  conclusion: string;
-};
-
-const ATTRIBUTE_TRACES: Record<string, AttrTrace> = {
-  "Persons of Significant Control": {
-    value: "Mr Alan Eldad Howard · 75–100% voting rights (PSC address drift)",
-    status: "flagged",
-    confidence: 88,
-    agents: [
-      { id: "beneficial-owner", name: "Beneficial Owner Agent", action: "Pulled live PSC register", thought: "Companies House returns 1 PSC: Mr Alan Eldad Howard, b. 1963-09, British, voting-rights 75–100% and right-to-share-surplus-assets 25–50%.", source: "Companies House PSC API · OC302636" },
-      { id: "document", name: "Document Intelligence", action: "Cross-checked CS01 filing", thought: "Latest CS01 (03/14/2026) lists a different correspondence address than the live PSC record. 14-day notification window has lapsed.", source: "Form CS01 · 03/14/2026" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Assessed Schedule 1A CA 2006", thought: "PSC address change must be filed via PSC02 within 14 days. Failure is a technical breach, not an AML event.", source: "Companies Act 2006 Sch. 1A" },
-      { id: "audit", name: "Audit Agent", action: "Logged trace for review", thought: "Wrote provenance entry to immutable audit log with all 3 source citations.", source: "Audit Log #30214-A14" },
-    ],
-    conclusion: "PSC identity confirmed; address drift flagged for client PSC02 correction filing.",
-  },
-  "Designated Members": {
-    value: "2 corporate members · 1 Jersey-domiciled (EDD required)",
-    status: "flagged",
-    confidence: 92,
-    agents: [
-      { id: "identity", name: "Identity Agent", action: "Enumerated designated members", thought: "Found 2 corporate-llp-designated-members: BH Partnership Holdings Limited (Jersey 106333) and Brevan Howard Asset Management Services Limited (UK 11117501).", source: "Companies House Officers · OC302636" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Applied EDD jurisdiction matrix", thought: "Jersey is listed on internal EDD policy POL-EDD-23. UK member is in-scope but standard tier.", source: "EDD Policy POL-EDD-23" },
-      { id: "beneficial-owner", name: "Beneficial Owner Agent", action: "Attempted UBO traversal on Jersey leg", thought: "JFSC registry returned active entity but no on-file natural-person UBO map. EDD pack required.", source: "JFSC Registry Lookup" },
-    ],
-    conclusion: "Two designated members verified; Jersey corporate member triggers EDD workflow.",
-  },
-  "Registered Office": {
-    value: "4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB",
-    status: "verified",
-    confidence: 99,
-    agents: [
-      { id: "document", name: "Document Intelligence", action: "Extracted from Companies House primary record", thought: "entity_registered_address returns '4th Floor Phoenix House, 1 Station Hill, Reading, Berkshire, RG1 1NB, United Kingdom' for OC302636.", source: "Companies House · OC302636" },
-      { id: "identity", name: "Identity Agent", action: "Cross-verified with FCA register", thought: "FCA Register principal place of business matches the Companies House registered office. No divergence.", source: "FCA Register FRN lookup" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Confirmed RG postcode jurisdiction", thought: "Reading, Berkshire — UK jurisdiction, FCA-supervised. Active and in good standing.", source: "Royal Mail PAF · UK gov" },
-    ],
-    conclusion: "Registered office is confirmed across Companies House and FCA register with no divergence.",
-  },
-  "Company Number": {
-    value: "OC302636 · LLP, incorporated 2002-07-16",
-    status: "verified",
-    confidence: 100,
-    agents: [
-      { id: "document", name: "Document Intelligence", action: "Pulled Companies House primary record", thought: "OC302636 returns entity_company_type='llp', entity_company_status='active', entity_incorporated_on='2002-07-16'.", source: "Companies House · OC302636" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Confirmed LLP status under LLP Act 2000", thought: "Active limited liability partnership under the Limited Liability Partnerships Act 2000.", source: "LLP Act 2000" },
-      { id: "audit", name: "Audit Agent", action: "Stamped immutable record reference", thought: "Pinned snapshot of Companies House response with retrieval timestamp.", source: "Audit Log #30214-CN01" },
-    ],
-    conclusion: "Company number, type, status, and incorporation date verified directly from the statutory register.",
-  },
-  "Previous Names": {
-    value: "Rivage Capital Management LLP (until 2007)",
-    status: "flagged",
-    confidence: 95,
-    agents: [
-      { id: "identity", name: "Identity Agent", action: "Read previous name history", thought: "entity_previous_company_names contains 'RIVAGE CAPITAL MANAGEMENT LLP'. Same company number preserved through name change.", source: "Companies House Name History" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Verified FCA permission continuity", thought: "FCA Register shows FRN unchanged through the name change — regulatory continuity confirmed.", source: "FCA Register FRN history" },
-      { id: "document", name: "Document Intelligence", action: "Flagged CRM gap", thought: "Internal CRM does not store the prior name. Lineage view will break for analysts on legacy contracts.", source: "CRM Entity Record" },
-    ],
-    conclusion: "Name change is lawful and regulator-attested; CRM backfill of prior name is recommended.",
-  },
-  "FCA Permissions": {
-    value: "Investment management + Managing an AIF (added 2026-02-11)",
-    status: "flagged",
-    confidence: 79,
-    agents: [
-      { id: "regulatory", name: "Regulatory Agent", action: "Polled FCA Register live", thought: "FRN 211088 shows newly added 'Managing an AIF' permission effective 02/11/2026.", source: "FCA Register · FRN 211088" },
-      { id: "document", name: "Document Intelligence", action: "Compared with CRM snapshot", thought: "CRM permission set last refreshed 11/02/2025 — does not include the new AIF permission. Drift confirmed.", source: "CRM Permission Set" },
-      { id: "risk-scoring", name: "Risk Scoring Agent", action: "Computed risk-model impact", thought: "AIFMD scope adds Article 23 disclosure obligations. Tier may need recomputation post-sync.", source: "Risk Model v4.1 · AIFMD SI 2013/1773" },
-    ],
-    conclusion: "FCA permission scope has drifted from internal record; sync and re-score required.",
-  },
-  "Sanctions Screening": {
-    value: "1 fuzzy false-positive cleared (PSC name)",
-    status: "verified",
-    confidence: 97,
-    agents: [
-      { id: "sanctions", name: "Sanctions Agent", action: "Screened all PSCs and officers", thought: "Ran HMT, OFAC, EU CFSP, UN 1267. One 84% fuzzy hit on PSC name; identity divergence on DOB and nationality.", source: "HMT · OFAC SDN · EU CFSP · UN 1267" },
-      { id: "identity", name: "Identity Agent", action: "Confirmed identity divergence", thought: "HMRC-verified passport and Companies House DOB confirm a different individual from the listed namesake.", source: "Passport · Companies House DOB" },
-      { id: "audit", name: "Audit Agent", action: "Logged false-positive clearance", thought: "Cleared identity pair added to screening allowlist with full evidence chain.", source: "Audit Log #30188-S03" },
-    ],
-    conclusion: "Sanctions name-match is a confirmed false positive; cleared with retained evidence.",
-  },
-  "Controllers": {
-    value: "2 controllers identified (LLP designated members + 25%+ PSCs)",
-    status: "verified",
-    confidence: 94,
-    agents: [
-      { id: "identity", name: "Identity Agent", action: "Resolved controller set under FCA SUP 11", thought: "Aggregated designated members + PSCs holding ≥25% voting or capital rights. Returned 2 controllers with shareholding bands.", source: "FCA SUP 11.2 · Companies House" },
-      { id: "beneficial-owner", name: "Beneficial Owner Agent", action: "Verified upstream ownership chain", thought: "Traversed corporate-member upstream to ultimate natural persons. No undisclosed holders above the 25% threshold.", source: "Companies House PSC · JFSC Registry" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Cross-checked FCA Form A history", thought: "All current controllers have approved Form A submissions on file with the FCA. No notification gaps.", source: "FCA Form A archive" },
-      { id: "audit", name: "Audit Agent", action: "Pinned controller snapshot", thought: "Immutable snapshot of resolved controller graph stamped to audit log.", source: "Audit Log #30214-CTL" },
-    ],
-    conclusion: "Controller set reconciled across Companies House, FCA, and upstream registries with no gaps.",
-  },
-  "Principal Place of Business": {
-    value: "4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB",
-    status: "verified",
-    confidence: 99,
-    agents: [
-      { id: "document", name: "Document Intelligence", action: "Extracted PPoB from FCA register", thought: "FCA Register principal-place-of-business field returns the Reading address for FRN 209517.", source: "FCA Register · FRN 209517" },
-      { id: "identity", name: "Identity Agent", action: "Reconciled with Companies House registered office", thought: "Companies House registered office matches FCA PPoB exactly — no divergence.", source: "Companies House · OC302636" },
-      { id: "regulatory", name: "Regulatory Agent", action: "Confirmed UK supervision footprint", thought: "PPoB sits inside FCA jurisdictional perimeter; no cross-border passporting impact.", source: "FCA Handbook · PERG 2" },
-    ],
-    conclusion: "Principal place of business confirmed and synchronised between FCA and Companies House.",
-  },
-};
-
-// Aliases so tree labels resolve to existing traces
-ATTRIBUTE_TRACES["Persons with Significant Control"] = ATTRIBUTE_TRACES["Persons of Significant Control"];
-ATTRIBUTE_TRACES["FCA Regulatory Permissions"] = ATTRIBUTE_TRACES["FCA Permissions"];
-ATTRIBUTE_TRACES["Previous Company Names"] = ATTRIBUTE_TRACES["Previous Names"];
-
-
-type AttrDocKind = "filing" | "screenshot" | "register" | "passport" | "letter";
-type AttrDoc = {
-  id: string;
-  title: string;
-  source: string;
-  date: string;
-  kind: AttrDocKind;
-  pages?: number;
-  // Body content: paragraphs with optional highlight markers (surround with %% ... %%)
-  body: string[];
-  // Optional pseudo-screenshot fields (rendered as a styled register screenshot)
-  fields?: { label: string; value: string; highlight?: boolean }[];
-};
-type EntityAttr = { label: string; value: string; source: "CRM" | "3rd" | "Forge"; status: "ok" | "warn" | "alert"; docs?: AttrDoc[] };
-type EntityProfile = { name: string; kyc?: string; attrs: EntityAttr[]; caseFile: string };
-
-const SOURCE_STYLE: Record<EntityAttr["source"], string> = {
-  CRM: "bg-info-soft text-primary border-primary/30",
-  "3rd": "bg-warning-soft text-warning border-warning-soft-border",
-  Forge: "bg-secondary text-foreground border-border",
-};
-const DOT_STYLE: Record<EntityAttr["status"], string> = {
-  ok: "bg-success", warn: "bg-warning", alert: "bg-alert",
-};
-
-const ENTITY_PROFILES: Record<string, EntityProfile> = {
-  "London Alternatives DRG": {
-    name: "London Alternatives DRG",
-    attrs: [
-      { label: "Jurisdiction", value: "United Kingdom", source: "CRM", status: "ok" },
-      { label: "Entity Count", value: "2 in-scope RIAs", source: "Forge", status: "ok" },
-      { label: "Constituent Entities", value: "Brevan Howard AM LLP · Marshall Wace LLP", source: "Forge", status: "ok" },
-      { label: "Primary Regulator", value: "Financial Conduct Authority (UK)", source: "3rd", status: "ok" },
-      { label: "Customer Type", value: "Registered Investment Advisers (LLP)", source: "CRM", status: "ok" },
-      { label: "KYC Refresh Cycle", value: "Annual", source: "Forge", status: "ok" },
-      { label: "CIP Status", value: "In Progress — 2 attributes pending", source: "Forge", status: "warn" },
-      { label: "AML Policy Version", value: "AML-POL-UK-2025-v2", source: "Forge", status: "ok" },
-      { label: "Open Exceptions", value: "5 (under review)", source: "Forge", status: "warn" },
-      { label: "Sanctions Screening", value: "Cleared — 2026-04-19", source: "3rd", status: "ok" },
-      { label: "PEP Exposure", value: "None Identified", source: "3rd", status: "ok" },
-      { label: "Cross-Border Exposure", value: "Jersey (BH corporate member) — EDD active", source: "Forge", status: "warn" },
-    ],
-    caseFile: `# London Alternatives DRG — Case File\n\n**Case ID:** DRG-LON-ALT-2026-001  \n**Risk Tier:** Elevated  \n**Last Refresh:** 2026-04-19\n\n## Group Overview\nThe London Alternatives DRG consolidates 2 UK-domiciled limited liability partnerships operating as FCA-authorised Registered Investment Advisers running alternative-investment / hedge-fund strategies.\n\n## Constituent Entities\n| Entity | CH # | FCA FRN | Status |\n|--------|------|---------|--------|\n| Brevan Howard Asset Management LLP | OC302636 | 209517 | Active |\n| Marshall Wace LLP | OC302228 | 211088 | Active |\n\n## Regulatory Footprint\n- **FCA** — both entities authorised as investment managers\n- **AIFMD** — Marshall Wace recently added 'Managing an AIF' permission\n- **HMT / OFSI** — sanctions regime applicable\n\n## Open Exceptions (5)\n1. Undisclosed PSC Address Change — *Brevan Howard*\n2. Cross-Jurisdiction Corporate Member (Jersey) — *Brevan Howard*\n3. Previous Company Name Continuity — *Brevan Howard*\n4. FCA Permission Scope Drift — *Marshall Wace*\n5. Sanctions Screening — PSC Name Hit — *Marshall Wace*\n\n## Risk Notes\n- Jersey-domiciled corporate member triggers EDD on the Brevan Howard leg.\n- Sanctions name hit on Marshall Wace PSC is a confirmed false positive.\n\n## Next Actions\n- Resolve 5 open exceptions before **2026-04-25** SLA.\n- Complete EDD pack on BH Partnership Holdings Limited (Jersey).\n- Sync Marshall Wace permission set with FCA register.`,
-  },
-  "Brevan Howard Asset Management LLP": {
-    name: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214",
-    attrs: [
-      { label: "Legal Form", value: "Limited Liability Partnership (LLP)", source: "3rd", status: "ok" },
-      { label: "Company Number", value: "OC302636", source: "3rd", status: "ok",
-        docs: [{
-          id: "ch-cert-bh", title: "Certificate of Incorporation on Change of Name",
-          source: "Companies House", date: "2007-04-16", kind: "filing", pages: 1,
-          body: [
-            "I HEREBY CERTIFY that **RIVAGE CAPITAL MANAGEMENT LLP**, having by special resolution changed its name, is now incorporated under the name of",
-            "%%BREVAN HOWARD ASSET MANAGEMENT LLP%%",
-            "Given at Companies House, Cardiff, the 16th day of April 2007.",
-          ],
-          fields: [
-            { label: "Company Number", value: "OC302636", highlight: true },
-            { label: "Type", value: "Limited Liability Partnership" },
-            { label: "Effective Date", value: "16 April 2007" },
-          ],
-        }],
-      },
-      { label: "Incorporated On", value: "2002-07-16", source: "3rd", status: "ok" },
-      { label: "Company Status", value: "Active", source: "3rd", status: "ok" },
-      { label: "Registered Office", value: "4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB", source: "3rd", status: "ok",
-        docs: [{
-          id: "ch-ad01-bh", title: "Form AD01 — Change of Registered Office",
-          source: "Companies House", date: "2019-08-22", kind: "filing", pages: 2,
-          body: [
-            "Form AD01 — Notice of change of registered office address, filed under section 87 of the Companies Act 2006.",
-            "The registered office of the company has been changed to:",
-            "%%4th Floor Phoenix House, 1 Station Hill, Reading, Berkshire, RG1 1NB, United Kingdom%%",
-            "Signed by a designated member of the LLP on 22 August 2019. Accepted and registered by the Registrar of Companies for England and Wales.",
-          ],
-          fields: [
-            { label: "Company Name", value: "Brevan Howard Asset Management LLP" },
-            { label: "Company Number", value: "OC302636" },
-            { label: "New Office", value: "4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB", highlight: true },
-          ],
-        }],
-      },
-      { label: "Previous Names", value: "Rivage Capital Management LLP (until 2007)", source: "3rd", status: "warn",
-        docs: [{
-          id: "ch-prevnames-bh", title: "Companies House — Previous Names Snapshot",
-          source: "Companies House Public Data API", date: "2026-04-19", kind: "screenshot",
-          body: [
-            "Snapshot captured from the Companies House web service for company OC302636.",
-            "Previous company names recorded against the same registration number:",
-          ],
-          fields: [
-            { label: "Current Name", value: "Brevan Howard Asset Management LLP" },
-            { label: "Previous Name", value: "Rivage Capital Management LLP", highlight: true },
-            { label: "Effective From", value: "2002-07-16" },
-            { label: "Effective To", value: "2007-04-16", highlight: true },
-          ],
-        }],
-      },
-      { label: "Primary Regulator", value: "FCA · FRN 209517", source: "3rd", status: "ok" },
-      { label: "FCA Permissions", value: "Investment management, MiFID II", source: "3rd", status: "ok",
-        docs: [{
-          id: "fca-perms-bh", title: "FCA Register — Permissions Snapshot",
-          source: "FCA Register · FRN 209517", date: "2026-04-19", kind: "screenshot",
-          body: [
-            "Snapshot of the regulatory permissions held by Brevan Howard Asset Management LLP as recorded on the FCA Register.",
-          ],
-          fields: [
-            { label: "FRN", value: "209517" },
-            { label: "Status", value: "Authorised" },
-            { label: "Permissions", value: "Arranging deals in investments · Managing investments · Advising on investments (except Pension Transfers)", highlight: true },
-            { label: "Last Updated", value: "2026-04-19" },
-          ],
-        }],
-      },
-      { label: "Designated Members", value: "2 corporate (1 UK, 1 Jersey)", source: "Forge", status: "alert" },
-      { label: "Persons of Significant Control", value: "Mr Alan Eldad Howard (75–100% voting)", source: "3rd", status: "warn",
-        docs: [
-          {
-            id: "ch-psc-bh", title: "PSC Register Extract — Mr A E Howard",
-            source: "Companies House PSC API", date: "2026-04-19", kind: "screenshot",
-            body: [
-              "Live extract from the Persons with Significant Control register for OC302636.",
-            ],
-            fields: [
-              { label: "Name", value: "Mr Alan Eldad Howard" },
-              { label: "Date of Birth", value: "September 1963" },
-              { label: "Nationality", value: "British" },
-              { label: "Country of Residence", value: "United Kingdom" },
-              { label: "Voting Rights", value: "75% to 100%", highlight: true },
-              { label: "Correspondence Address", value: "82 Baker Street, London, W1U 6AE", highlight: true },
-            ],
-          },
-          {
-            id: "ch-cs01-bh", title: "Form CS01 — Confirmation Statement (excerpt)",
-            source: "Companies House Filing", date: "2026-03-14", kind: "filing", pages: 6,
-            body: [
-              "Confirmation statement filed under section 853A of the Companies Act 2006 on behalf of Brevan Howard Asset Management LLP.",
-              "Part 4 — Persons with Significant Control. The following information is confirmed as accurate at the confirmation date:",
-              "Mr Alan Eldad Howard, correspondence address: %%27 Hill Street, London, W1J 5LP%%.",
-              "Note: address differs from the live PSC register entry — PSC02 amendment outstanding.",
-            ],
-          },
-        ],
-      },
-      { label: "PSC Date of Birth", value: "1963-09", source: "3rd", status: "ok" },
-      { label: "PSC Nationality", value: "British", source: "3rd", status: "ok",
-        docs: [{
-          id: "passport-aeh", title: "Passport — Mr A E Howard (redacted)",
-          source: "HMRC-verified identity document", date: "2024-11-02", kind: "passport",
-          body: [
-            "HMRC-verified passport scan retained in the Evidence Locker for identity verification purposes.",
-          ],
-          fields: [
-            { label: "Surname", value: "HOWARD" },
-            { label: "Given Names", value: "ALAN ELDAD" },
-            { label: "Nationality", value: "BRITISH CITIZEN", highlight: true },
-            { label: "Date of Birth", value: "•• SEP 1963" },
-            { label: "Passport No.", value: "•••••••42" },
-            { label: "Issuing Authority", value: "HMPO" },
-          ],
-        }],
-      },
-      { label: "Sanctions Screening", value: "Cleared — 2026-04-19", source: "3rd", status: "ok" },
-      { label: "Last KYC Refresh", value: "2025-11-02", source: "Forge", status: "ok" },
-      { label: "Risk Tier", value: "Elevated (Jersey EDD active)", source: "Forge", status: "alert" },
-    ],
-    caseFile: `# Brevan Howard Asset Management LLP\n\n**KYC ID:** KYC-30214  \n**Companies House #:** OC302636  \n**FCA FRN:** 209517\n\n## Entity Summary\nUK-domiciled limited liability partnership and FCA-authorised investment manager. Founded in 2002 as **Rivage Capital Management LLP**; renamed to Brevan Howard Asset Management LLP in 2007. Runs global macro and multi-strategy hedge funds for institutional clients.\n\n## Registered Particulars (Companies House)\n- **Number:** OC302636  \n- **Type:** LLP  \n- **Status:** Active  \n- **Incorporated:** 2002-07-16  \n- **Office:** 4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB, United Kingdom\n\n## Designated Members\n| Name | Domicile | Reg. # |\n|------|----------|--------|\n| BH Partnership Holdings Limited | Jersey | 106333 |\n| Brevan Howard Asset Management Services Limited | United Kingdom | 11117501 |\n\n## Persons of Significant Control\n- **Mr Alan Eldad Howard** — b. 1963-09, British  \n  Voting rights: 75–100% (LLP)  \n  Right to share of surplus assets: 25–50%  \n  Correspondence: 82 Baker Street, London W1U 6AE *(address drift flagged)*\n\n## Active Exceptions\n- **Undisclosed PSC Address Change** — PSC02 correction requested\n- **Cross-Jurisdiction Corporate Member (Jersey)** — EDD pack pending\n- **Previous Company Name Continuity** — CRM backfill recommended\n\n## Next Actions\n1. Run EDD on BH Partnership Holdings Limited (Jersey).\n2. Request PSC02 correction filing from client.\n3. Backfill 'Rivage Capital Management LLP' alias into CRM.`,
-  },
-  "Marshall Wace LLP": {
-    name: "Marshall Wace LLP",
-    kyc: "KYC-30188",
-    attrs: [
-      { label: "Legal Form", value: "Limited Liability Partnership (LLP)", source: "3rd", status: "ok" },
-      { label: "Company Number", value: "OC302228", source: "3rd", status: "ok" },
-      { label: "Incorporated On", value: "2003-04-02", source: "3rd", status: "ok" },
-      { label: "Company Status", value: "Active", source: "3rd", status: "ok" },
-      { label: "Registered Office", value: "George House, 131 Sloane Street, London, SW1X 9AT", source: "3rd", status: "ok",
-        docs: [{
-          id: "ch-office-mw", title: "Companies House Register — Registered Office",
-          source: "Companies House", date: "2026-04-19", kind: "screenshot",
-          body: ["Live extract of the registered office on file for OC302228."],
-          fields: [
-            { label: "Company Name", value: "Marshall Wace LLP" },
-            { label: "Office Address", value: "George House, 131 Sloane Street, London, SW1X 9AT", highlight: true },
-            { label: "Country", value: "United Kingdom" },
-          ],
-        }],
-      },
-      { label: "Primary Regulator", value: "FCA · FRN 211088", source: "3rd", status: "ok" },
-      { label: "FCA Permissions", value: "Investment management + Managing an AIF (drift)", source: "3rd", status: "alert",
-        docs: [{
-          id: "fca-perms-mw", title: "FCA Register — Permissions Snapshot",
-          source: "FCA Register · FRN 211088", date: "2026-04-19", kind: "screenshot",
-          body: [
-            "Snapshot of the regulatory permissions held by Marshall Wace LLP. A new permission was activated on 2026-02-11 and has not yet been mirrored into the internal CRM permission set.",
-          ],
-          fields: [
-            { label: "FRN", value: "211088" },
-            { label: "Status", value: "Authorised" },
-            { label: "Existing Permissions", value: "Arranging deals in investments · Managing investments" },
-            { label: "New Permission", value: "Managing an AIF (effective 2026-02-11)", highlight: true },
-          ],
-        }],
-      },
-      { label: "Designated Members", value: "4 individuals + 1 corporate", source: "3rd", status: "ok" },
-      { label: "Persons of Significant Control", value: "Sir Paul Marshall, Ian Wace (each 25–50% voting)", source: "3rd", status: "ok",
-        docs: [{
-          id: "ch-psc-mw", title: "PSC Register Extract — Marshall Wace LLP",
-          source: "Companies House PSC API", date: "2026-04-19", kind: "screenshot",
-          body: ["Live extract of all Persons with Significant Control associated with OC302228."],
-          fields: [
-            { label: "PSC 1", value: "Sir Paul Marshall · b. Aug 1959 · British", highlight: true },
-            { label: "Voting Rights (1)", value: "25% to 50%" },
-            { label: "PSC 2", value: "Ian Wace · b. Dec 1963 · British", highlight: true },
-            { label: "Voting Rights (2)", value: "25% to 50%" },
-          ],
-        }],
-      },
-      { label: "Sanctions Screening", value: "1 fuzzy hit cleared (false positive)", source: "3rd", status: "warn",
-        docs: [
-          {
-            id: "hmt-screening-mw", title: "HMT Consolidated List — Match Detail",
-            source: "HMT / OFSI Consolidated List", date: "2026-04-01", kind: "register",
-            body: ["The matched record on the HMT consolidated list (designation has since been lifted)."],
-            fields: [
-              { label: "Listed Name", value: "Paul Marshall", highlight: true },
-              { label: "Date of Birth", value: "1971", highlight: true },
-              { label: "Nationality", value: "Zimbabwean", highlight: true },
-              { label: "Regime", value: "Zimbabwe (de-listed 2014)" },
-              { label: "Match Score", value: "84% (fuzzy name only)" },
-            ],
-          },
-          {
-            id: "wc-log-mw", title: "World-Check Screening Log",
-            source: "Refinitiv World-Check One", date: "2026-04-19", kind: "screenshot",
-            body: [
-              "Screening run executed against all PSCs and officers of Marshall Wace LLP. One fuzzy match returned and cleared with documented identity divergence.",
-              "%%Cleared as confirmed false positive — DOB and nationality differ from listed namesake.%%",
-            ],
-          },
-        ],
-      },
-      { label: "PEP Exposure", value: "None Identified", source: "3rd", status: "ok" },
-      { label: "AUM Disclosed", value: "≈ USD 70bn (2025)", source: "CRM", status: "ok" },
-      { label: "Last KYC Refresh", value: "2025-11-02", source: "Forge", status: "ok" },
-      { label: "Risk Tier", value: "Elevated (FCA scope drift)", source: "Forge", status: "alert" },
-    ],
-    caseFile: `# Marshall Wace LLP\n\n**KYC ID:** KYC-30188  \n**Companies House #:** OC302228  \n**FCA FRN:** 211088\n\n## Entity Summary\nUK-domiciled limited liability partnership and FCA-authorised investment manager. Co-founded in 1997 by Sir Paul Marshall and Ian Wace; LLP registered in 2003. Runs long/short equity and quantitative TOPS strategies for global institutions.\n\n## Registered Particulars (Companies House)\n- **Number:** OC302228  \n- **Type:** LLP  \n- **Status:** Active  \n- **Incorporated:** 2003-04-02  \n- **Office:** George House, 131 Sloane Street, London, SW1X 9AT, United Kingdom\n\n## Persons of Significant Control\n| Name | DOB | Nationality | Voting Rights |\n|------|-----|-------------|---------------|\n| Sir Paul Marshall | 1959-08 | British | 25–50% |\n| Ian Wace | 1963-12 | British | 25–50% |\n\n## FCA Permissions\n- Arranging deals in investments\n- Managing investments\n- **Managing an AIF** *(added 2026-02-11 — CRM sync pending)*\n\n## Active Exceptions\n- **FCA Permission Scope Drift** — sync CRM with FCA register\n- **Sanctions Screening — PSC Name Hit** — confirmed false positive on 'Paul Marshall' (different DOB & nationality)\n\n## Next Actions\n1. Sync CRM permission set with FCA register.\n2. Request AIFMD Article 23 disclosure pack from client.\n3. Add cleared name pair to sanctions allowlist.`,
-  },
-  "Long Focus Capital Management, LLC": {
-    name: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215",
-    attrs: [
-      { label: "Entity Name", value: "LONG FOCUS CAPITAL MANAGEMENT, LLC", source: "CRM", status: "ok" },
-      { label: "Legal Entity Type", value: "Limited Liability Company", source: "3rd", status: "ok" },
-      { label: "Country of Incorporation", value: "USA", source: "3rd", status: "ok" },
-      { label: "Date of Incorporation", value: "2012-05-10", source: "3rd", status: "ok" },
-      { label: "LEI Code", value: "Not provided · no GLEIF match", source: "3rd", status: "alert" },
-      { label: "Trading Names", value: "Long Focus Capital", source: "CRM", status: "ok" },
-      { label: "Previous Names", value: "Focus Capital Partners LLC", source: "3rd", status: "ok" },
-      { label: "Verification of Existence", value: "Verified via Delaware State Registry", source: "3rd", status: "ok" },
-      { label: "US Registration Number", value: "801-12345 (client) vs 801-67890 (SEC IAPD)", source: "3rd", status: "alert" },
-      { label: "UK Registration Number", value: "N/A", source: "CRM", status: "ok" },
-      { label: "Regulator", value: "SEC", source: "3rd", status: "ok" },
-      { label: "Listing Status", value: "Not Listed", source: "3rd", status: "ok" },
-      { label: "Entity GIIN", value: "987XYZ.654ABC.AB.123", source: "3rd", status: "ok" },
-      { label: "Section 13 / 15d Indicator", value: "No", source: "CRM", status: "ok" },
-      { label: "CFTC Registered", value: "No", source: "CRM", status: "ok" },
-      { label: "Legal Registered Address", value: "1209 Orange Street, Wilmington, DE 19801, USA", source: "3rd", status: "ok" },
-      { label: "Principal Place of Business", value: "Conflict: Website 123 Main St vs Form ADV 456 Broad Ave", source: "3rd", status: "alert" },
-      { label: "Foreign Branches", value: "UK Branch · FCA #123456", source: "3rd", status: "ok" },
-      { label: "Sub-Advisor Address", value: "N/A", source: "CRM", status: "ok" },
-      { label: "Entity Classification", value: "Registered Investment Adviser (RIA)", source: "Forge", status: "ok" },
-      { label: "Entity Risk Rating", value: "Medium-High", source: "Forge", status: "warn" },
-      { label: "CIP Classification", value: "Legal Entity — LLC", source: "Forge", status: "ok" },
-      { label: "Nature of Business", value: "Long/Short Equity Investment Management", source: "CRM", status: "ok" },
-      { label: "Sole Proprietorship", value: "No", source: "CRM", status: "ok" },
-      { label: "Parent Listed on US Exchange", value: "No", source: "CRM", status: "ok" },
-      { label: "Other Business Activity", value: "None", source: "CRM", status: "ok" },
-      { label: "Source of Funds", value: "Management Fees, Performance Fees", source: "CRM", status: "ok" },
-      { label: "Source of Wealth", value: "Founder's Capital", source: "CRM", status: "ok" },
-      { label: "Assets Under Management", value: "$2.4B", source: "CRM", status: "ok" },
-      { label: "Transacting With", value: "Third Party Funds", source: "CRM", status: "ok" },
-      { label: "US Tax ID", value: "98-7654321", source: "3rd", status: "ok" },
-      { label: "UK Tax ID", value: "N/A", source: "CRM", status: "ok" },
-      { label: "Corporate Officer", value: "Michael J. Anderson (CEO)", source: "3rd", status: "ok" },
-      { label: "Board Directors", value: "Michael J. Anderson, Sarah K. Lee", source: "3rd", status: "ok" },
-      { label: "Compliance Officer Attestation", value: "Sarah Chen (CCO) · signed attestation not on file", source: "3rd", status: "alert" },
-      { label: "MLRO / Equivalent", value: "N/A", source: "CRM", status: "ok" },
-      { label: "Authorized Signatory", value: "Michael J. Anderson", source: "CRM", status: "ok" },
-      { label: "Power of Attorney", value: "None on file", source: "CRM", status: "ok" },
-      { label: "Key Controller", value: "Michael J. Anderson", source: "CRM", status: "ok" },
-      { label: "Beneficial Owner (25%+)", value: "Unresolved — chain ends at Long Focus Holdings LLC", source: "3rd", status: "alert" },
-      { label: "List of Subsidiaries", value: "Long Focus UK Branch", source: "3rd", status: "ok" },
-      { label: "Trustee", value: "N/A", source: "CRM", status: "ok" },
-      { label: "Tax Residency", value: "United States (Delaware)", source: "3rd", status: "ok" },
-      { label: "FATCA Classification", value: "Reporting Model 1 FFI", source: "Forge", status: "ok" },
-      { label: "CRS Classification", value: "Investment Entity", source: "Forge", status: "ok" },
-      { label: "Sanctions Screening", value: "Cleared — 2026-05-12 (OFAC/EU/UN)", source: "3rd", status: "ok" },
-      { label: "PEP Screening", value: "No Match", source: "3rd", status: "ok" },
-      { label: "Adverse Media Screening", value: "No Material Adverse Media", source: "3rd", status: "ok" },
-      { label: "Last KYC Refresh", value: "2025-09-18", source: "Forge", status: "ok" },
-      { label: "Next KYC Refresh Due", value: "2026-09-18 (Annual)", source: "Forge", status: "ok" },
-      { label: "Wolfsberg Questionnaire", value: "Not Applicable (non-bank RIA)", source: "Forge", status: "ok" },
-      { label: "Source of Funds Verified", value: "Yes — management & performance fees", source: "Forge", status: "ok" },
-      { label: "EIN / TIN Verified", value: "98-7654321 · IRS verified", source: "3rd", status: "ok" },
-    ],
-    caseFile: `# Long Focus Capital Management, LLC\n\n**KYC ID:** KYC-30215  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware) with UK branch  \n**Client Risk Rating:** High  \n**Open Exceptions:** 5\n\n## Entity Summary\nDelaware-incorporated LLC operating as a SEC-registered investment adviser with a UK branch (FCA #123456). Founded 2012 (previously Focus Capital Partners LLC). Runs long/short equity strategies; AUM $2.4B.\n\n## Registered Particulars\n- **Legal Form:** Limited Liability Company  \n- **Incorporated:** 2012-05-10 · Delaware, USA  \n- **Registered Office:** 1209 Orange Street, Wilmington, DE 19801  \n- **Regulator:** SEC (CRD pending reconciliation — see exception 1)  \n- **GIIN:** 987XYZ.654ABC.AB.123  \n- **US Tax ID:** 98-7654321\n\n## Key People\n| Role | Name |\n|------|------|\n| CEO / Authorized Signatory | Michael J. Anderson |\n| Board Director | Sarah K. Lee |\n| Chief Compliance Officer | Sarah Chen *(attestation outstanding)* |\n\n## Open Exceptions (5)\n1. **US Registration Number Mismatch** — 801-12345 vs 801-67890 (IAPD)\n2. **Outstanding LEI Code** — no GLEIF match\n3. **Principal Place of Business Mismatch** — website vs Form ADV\n4. **Missing Compliance Officer Attestation** — Sarah Chen, signature missing\n5. **Beneficial Ownership Not Identified** — chain ends at Long Focus Holdings LLC\n\n## Next Actions\n1. Verify CRD via SEC IAPD and update to 801-67890.\n2. Request LEI from client (or confirm no reportable derivatives activity).\n3. Adopt Form ADV principal address (456 Broad Avenue).\n4. Send DocuSign attestation to CCO Sarah Chen.\n5. Issue formal FinCEN BOI report request to client.`,
-  },
-  "Brookfield Asset Management PIC US, LLC": {
-    name: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216",
-    attrs: [
-      { label: "Entity Name", value: "BROOKFIELD ASSET MANAGEMENT PIC US, LLC", source: "CRM", status: "ok" },
-      { label: "Legal Entity Type", value: "Limited Liability Company", source: "3rd", status: "ok" },
-      { label: "Country of Incorporation", value: "United States (Delaware)", source: "3rd", status: "ok" },
-      { label: "Date of Incorporation", value: "2009-07-22", source: "3rd", status: "ok" },
-      { label: "LEI Code", value: "549300FML6EDDNTAVG88", source: "3rd", status: "ok" },
-      { label: "Trading Names", value: "BAM PIC US", source: "CRM", status: "ok" },
-      { label: "Previous Names", value: "None", source: "CRM", status: "ok" },
-      { label: "Verification of Existence", value: "Active — SEC registered investment adviser + Delaware entity", source: "3rd", status: "ok" },
-      { label: "US Registration Number", value: "CRD: 151599 / SEC#: 801-72031", source: "3rd", status: "ok" },
-      { label: "UK Registration Number", value: "Not applicable", source: "CRM", status: "ok" },
-      { label: "Regulator", value: "U.S. SEC (registered investment adviser)", source: "3rd", status: "ok" },
-      { label: "Listing Status", value: "Not listed (private LLC)", source: "3rd", status: "ok" },
-      { label: "Legal Registered Address", value: "C/O Corporation Service Company, 251 Little Falls Drive, Wilmington, DE 19808, USA", source: "3rd", status: "ok" },
-      { label: "Principal Place of Business", value: "225 Liberty Street, 8th Floor, New York, NY 10281-1023, USA", source: "3rd", status: "ok" },
-      { label: "Website", value: "www.brookfield.com", source: "3rd", status: "ok" },
-      { label: "Entity Classification", value: "Investment adviser / asset manager", source: "Forge", status: "alert" },
-      { label: "Entity Risk Rating", value: "High (system) vs Low (initial classification Jan 2026)", source: "Forge", status: "alert" },
-      { label: "CIP Classification", value: "NFIE (client-confirmed) vs Financial Entity (system-flagged)", source: "Forge", status: "alert" },
-      { label: "Nature of Business", value: "Investment advisory services — private funds, pooled vehicles, institutional accounts", source: "CRM", status: "ok" },
-      { label: "Sole Proprietorship", value: "No", source: "CRM", status: "ok" },
-      { label: "Parent Listed on US Exchange", value: "Yes — Brookfield Asset Management group", source: "CRM", status: "ok" },
-      { label: "Other Business Activity", value: "Multi-sector alternatives — real estate, infrastructure, energy, private equity", source: "CRM", status: "ok" },
-      { label: "Source of Funds", value: "Institutional investor capital (pooled vehicles, funds)", source: "CRM", status: "ok" },
-      { label: "Source of Wealth", value: "Investment management earnings / fund structures", source: "CRM", status: "ok" },
-      { label: "Assets Under Management", value: "~USD 105.3B (regulatory AUM, Dec 31 2025)", source: "CRM", status: "ok" },
-      { label: "Transacting With", value: "Third-party client funds", source: "CRM", status: "ok" },
-      { label: "Sub-Advisor Name", value: "Fairfield Realty Advisors LLC, Thayer Lodging Group LLC", source: "CRM", status: "ok" },
-      { label: "Key Controller", value: "Brookfield Asset Management group", source: "3rd", status: "ok" },
-      { label: "Beneficial Owner (25%+)", value: "Brookfield Asset Management group", source: "3rd", status: "ok" },
-      { label: "Acting Person", value: "Identified — authority documentation pending (PoA required)", source: "Forge", status: "alert" },
-      { label: "Power of Attorney", value: "Not provided", source: "CRM", status: "warn" },
-      { label: "Sanctions Screening", value: "Cleared — 2026-05-20 (OFAC/EU/UN/HMT)", source: "3rd", status: "ok" },
-      { label: "PEP Screening", value: "No Match", source: "3rd", status: "ok" },
-      { label: "Adverse Media Screening", value: "No Material Adverse Media", source: "3rd", status: "ok" },
-      { label: "Last KYC Refresh", value: "2026-01-15 (UK policy closure)", source: "Forge", status: "ok" },
-      { label: "Next KYC Refresh Due", value: "2027-01-15 (Annual)", source: "Forge", status: "ok" },
-    ],
-    caseFile: `# Brookfield Asset Management PIC US, LLC\n\n**KYC ID:** KYC-30216  \n**Entity Type:** Registered Investment Adviser (RIA)  \n**Jurisdiction:** US (Delaware)  \n**Client Risk Rating:** Low (initial) / High (system — Cayman entities)  \n**Open Exceptions:** 3\n\n## Entity Summary\nDelaware-incorporated LLC operating as a SEC-registered investment adviser under the Brookfield Asset Management group. Provides investment advisory services to private funds, pooled vehicles, and institutional accounts across real estate and alternative assets. Regulatory AUM approximately USD 105.3B (Dec 2025).\n\n## Registered Particulars\n- **Legal Form:** Limited Liability Company  \n- **Incorporated:** 2009-07-22 · Delaware, USA  \n- **Registered Office:** C/O Corporation Service Company, 251 Little Falls Drive, Wilmington, DE 19808  \n- **Principal Office:** 225 Liberty Street, 8th Floor, New York, NY 10281-1023  \n- **Regulator:** U.S. SEC · CRD 151599 / SEC# 801-72031  \n- **LEI:** 549300FML6EDDNTAVG88  \n- **Parent:** Brookfield Asset Management group (publicly listed)\n\n## Sub-Advisers\n- Fairfield Realty Advisors LLC\n- Thayer Lodging Group LLC\n\n## Open Exceptions (3)\n1. **Risk Rating Discrepancy** — System High vs initial Low (Cayman ownership trigger)\n2. **CIP Classification / NAICS Code** — Client confirmed NFIE vs system Financial Entity flag\n3. **Acting Person Authority Documentation Gap** — PoA or signatory list required\n\n## Next Actions\n1. Seek Compliance confirmation for 25% ownership drilldown threshold.\n2. Engage Legal to assess NFIE vs Financial Entity classification.\n3. Request Power of Attorney or authorised signatory list from client.`,
-  },
-};
-
-const TRACE_ALIAS: Record<string, string[]> = {
-  "Persons of Significant Control": ["Persons with Significant Control"],
-  "FCA Permissions": ["FCA Regulatory Permissions"],
-  "Previous Names": ["Previous Company Names"],
-  "Registered Office": ["Principal Place of Business"],
-};
-
-const TRACE_DOCS: Record<string, { entity: string; attr: EntityAttr; doc: AttrDoc }[]> = (() => {
-  const out: Record<string, { entity: string; attr: EntityAttr; doc: AttrDoc }[]> = {};
-  for (const [entityName, profile] of Object.entries(ENTITY_PROFILES)) {
-    for (const a of profile.attrs) {
-      if (!a.docs?.length) continue;
-      const keys = [a.label, ...(TRACE_ALIAS[a.label] ?? [])];
-      for (const k of keys) {
-        (out[k] ??= []).push(...a.docs.map((d) => ({ entity: entityName, attr: a, doc: d })));
-      }
-    }
-  }
-  return out;
-})();
-
-// Controllers trace reuses PSC + Designated Members evidence
-TRACE_DOCS["Controllers"] = [
-  ...(TRACE_DOCS["Persons of Significant Control"] ?? []),
-];
-TRACE_DOCS["Designated Members"] = [
-  ...(TRACE_DOCS["Persons of Significant Control"] ?? []).slice(0, 1),
-];
-
-type AuditEntry = {
-  type: "agent" | "analyst_action" | "override";
-  actor: string;
-  role?: string;
-  action: string;
-  valueBefore?: string;
-  valueAfter?: string;
-  confidence?: number;   // 0–100 for agents; 100 for overrides (rendered as "1.0")
-  isManual?: boolean;    // true → render confidence as "1.0" in green
-  timestamp: string;
-  source?: string;
-};
-
-const ATTR_AUDIT_LOG: Record<string, AuditEntry[]> = {
-  "LEI Number": [
-    {
-      type: "agent", actor: "Document Agent", action: "Retrieved from GLEIF registry",
-      valueAfter: "549300TRJQK6NRSF5M51", confidence: 87,
-      timestamp: "2024-10-28 · 14:32 UTC", source: "GLEIF Registry",
-    },
-    {
-      type: "analyst_action", actor: "James Holloway", role: "Analyst",
-      action: "Re-ran agent — value inconsistent with CRM record",
-      timestamp: "2024-11-01 · 09:17 UTC",
-    },
-    {
-      type: "agent", actor: "Document Agent", action: "Re-processed GLEIF + CRM cross-reference",
-      valueBefore: "549300TRJQK6NRSF5M51", valueAfter: "549300TRJQK6NRSF5M52", confidence: 71,
-      timestamp: "2024-11-01 · 09:18 UTC", source: "GLEIF + CRM",
-    },
-  ],
-  "Incorporation Date": [
-    {
-      type: "agent", actor: "Document Agent", action: "Retrieved from Companies House filing",
-      valueAfter: "2002-11-19", confidence: 87,
-      timestamp: "2024-10-28 · 14:32 UTC", source: "Companies House",
-    },
-    {
-      type: "analyst_action", actor: "James Holloway", role: "Analyst",
-      action: "Re-ran agent — date inconsistent with articles of association",
-      timestamp: "2024-11-01 · 09:17 UTC",
-    },
-    {
-      type: "agent", actor: "Document Agent", action: "Re-processed Companies House + MoA",
-      valueBefore: "2002-11-19", valueAfter: "2002-11-12", confidence: 71,
-      timestamp: "2024-11-01 · 09:18 UTC", source: "Companies House + MoA",
-    },
-    {
-      type: "override", actor: "Sarah Chen", role: "Senior Analyst",
-      action: "Manual override — confirmed via incorporation certificate #IC-2002-441",
-      valueBefore: "2002-11-12", valueAfter: "2002-11-14",
-      confidence: 100, isManual: true,
-      timestamp: "2024-11-02 · 11:45 UTC",
-    },
-  ],
-  "Persons of Significant Control": [
-    {
-      type: "agent", actor: "Document Agent", action: "Retrieved from Companies House PSC register",
-      valueAfter: "Alan Howard · 75–100% voting rights", confidence: 88,
-      timestamp: "2024-11-01 · 10:05 UTC", source: "Companies House",
-    },
-    {
-      type: "agent", actor: "Audit Agent", action: "Cross-referenced against OFAC + Refinitiv",
-      confidence: 82, timestamp: "2024-11-01 · 10:06 UTC", source: "OFAC / Refinitiv",
-    },
-  ],
-};
-
-type NestedSubField = {
-  label: string;
-  value: string;
-  source: EntityAttr["source"];
-  status: EntityAttr["status"];
-};
-type NestedEntry = { name: string; tag: string; fields: NestedSubField[] };
-
-const NESTED_ATTR_PROFILES: Record<string, NestedEntry[]> = {
-  "Persons of Significant Control": [
-    {
-      name: "Alan Howard", tag: "Founder · 75–100%",
-      fields: [
-        { label: "Name", value: "Alan Howard", source: "CRM", status: "ok" },
-        { label: "Date of Birth", value: "1964-09-15", source: "CRM", status: "ok" },
-        { label: "Country", value: "United Kingdom", source: "Forge", status: "ok" },
-      ],
-    },
-    {
-      name: "Nagi Kawkabani", tag: "CEO · 28%",
-      fields: [
-        { label: "Name", value: "Nagi Kawkabani", source: "CRM", status: "ok" },
-        { label: "Date of Birth", value: "Unconfirmed", source: "3rd", status: "warn" },
-        { label: "Country", value: "Switzerland", source: "3rd", status: "ok" },
-      ],
-    },
-  ],
-  "Persons with Significant Control": [
-    {
-      name: "Alan Howard", tag: "Founder · 75–100%",
-      fields: [
-        { label: "Name", value: "Alan Howard", source: "CRM", status: "ok" },
-        { label: "Date of Birth", value: "1964-09-15", source: "CRM", status: "ok" },
-        { label: "Country", value: "United Kingdom", source: "Forge", status: "ok" },
-      ],
-    },
-  ],
-  "Beneficial Owner (25%+)": [
-    {
-      name: "BH Capital Ltd (Cayman)", tag: "UBO · 61%",
-      fields: [
-        { label: "Entity Name", value: "BH Capital Ltd", source: "3rd", status: "ok" },
-        { label: "Jurisdiction", value: "Cayman Islands", source: "Forge", status: "alert" },
-        { label: "Ownership %", value: "61.4%", source: "CRM", status: "ok" },
-      ],
-    },
-  ],
-  "Directors": [
-    {
-      name: "Aron Landy", tag: "CEO",
-      fields: [
-        { label: "Name", value: "Aron Landy", source: "CRM", status: "ok" },
-        { label: "Date of Birth", value: "1970-04-22", source: "CRM", status: "ok" },
-        { label: "Nationality", value: "British", source: "3rd", status: "ok" },
-      ],
-    },
-    {
-      name: "Carsten Kengeter", tag: "Non-exec Director",
-      fields: [
-        { label: "Name", value: "Carsten Kengeter", source: "CRM", status: "ok" },
-        { label: "Date of Birth", value: "1967-01-09", source: "CRM", status: "ok" },
-        { label: "Nationality", value: "German", source: "3rd", status: "warn" },
-      ],
-    },
-  ],
-};
-
-
-
-// ---------- Document Locker ----------
-
-type CaseDoc = {
-  id: string;
-  title: string;
-  entity: string;
-  kyc: string;
-  source: string;
-  kind: AttrDocKind;
-  date: string;
-  size: string;
-  url: string;
-  linkedAttrs: string[];
-};
-
-const CASE_DOCUMENTS: CaseDoc[] = [
-  {
-    id: "d1", title: "Annual Confirmation Statement (CS01)", entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214", source: "Companies House", kind: "filing", date: "2026-03-14", size: "2.5 KB",
-    url: "/sample-docs/cs01-brevan-howard.pdf",
-    linkedAttrs: ["Principal Place of Business", "Registered Office"],
-  },
-  {
-    id: "d2", title: "Persons with Significant Control Register", entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214", source: "Companies House", kind: "register", date: "2026-05-12", size: "2.7 KB",
-    url: "/sample-docs/psc-register-brevan-howard.pdf",
-    linkedAttrs: ["Persons with Significant Control", "Controllers"],
-  },
-  {
-    id: "d3", title: "Passport — Alan E. Howard", entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214", source: "HMRC GOV.UK Verify", kind: "passport", date: "2024-11-02", size: "2.5 KB",
-    url: "/sample-docs/passport-alan-howard.pdf",
-    linkedAttrs: ["Persons with Significant Control"],
-  },
-  {
-    id: "d4", title: "FCA Register Extract — FRN 170583", entity: "Marshall Wace LLP",
-    kyc: "KYC-30188", source: "FCA Register", kind: "register", date: "2026-05-22", size: "2.4 KB",
-    url: "/sample-docs/fca-register-marshall-wace.pdf",
-    linkedAttrs: ["Previous Company Names", "FCA Regulatory Permissions"],
-  },
-  {
-    id: "d5", title: "FCA Name Change Notification (2007)", entity: "Marshall Wace LLP",
-    kyc: "KYC-30188", source: "FCA Correspondence", kind: "letter", date: "2007-09-03", size: "2.2 KB",
-    url: "/sample-docs/fca-name-change-letter.pdf",
-    linkedAttrs: ["Previous Company Names"],
-  },
-  {
-    id: "d6", title: "CRM Snapshot — Customer 360", entity: "Marshall Wace LLP",
-    kyc: "KYC-30188", source: "Salesforce CRM", kind: "screenshot", date: "2026-02-11", size: "2.5 KB",
-    url: "/sample-docs/crm-snapshot-mw.pdf",
-    linkedAttrs: ["Previous Company Names", "FCA Regulatory Permissions"],
-  },
-  // ===== Long Focus Capital Management, LLC =====
-  {
-    id: "d7", title: "Client Onboarding Form (signed)", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "Client Submission", kind: "filing", date: "2026-04-02", size: "—",
-    url: "/sample-docs/cs01-brevan-howard.pdf",
-    linkedAttrs: ["US Registration Number", "Principal Place of Business", "LEI Code"],
-  },
-  {
-    id: "d8", title: "Form ADV (Part 1 + Schedule A)", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "SEC IAPD", kind: "filing", date: "2026-03-30", size: "—",
-    url: "/sample-docs/cs01-brevan-howard.pdf",
-    linkedAttrs: ["US Registration Number", "Principal Place of Business", "Beneficial Owner (25%+)"],
-  },
-  {
-    id: "d9", title: "SEC IAPD Registration Extract — CRD 801-67890", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "SEC IAPD", kind: "register", date: "2026-05-15", size: "—",
-    url: "/sample-docs/fca-register-marshall-wace.pdf",
-    linkedAttrs: ["US Registration Number", "Regulator"],
-  },
-  {
-    id: "d10", title: "GLEIF LEI Lookup — No Match", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "GLEIF Registry", kind: "register", date: "2026-05-20", size: "—",
-    url: "/sample-docs/fca-register-marshall-wace.pdf",
-    linkedAttrs: ["LEI Code"],
-  },
-  {
-    id: "d11", title: "Compliance Officer Attestation (DRAFT — unsigned)", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "Internal · DocuSign Envelope", kind: "letter", date: "2026-04-10", size: "—",
-    url: "/sample-docs/fca-name-change-letter.pdf",
-    linkedAttrs: ["Compliance Officer Attestation"],
-  },
-  {
-    id: "d12", title: "Delaware Secretary of State — Certificate of Formation", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "Delaware State Registry", kind: "filing", date: "2012-05-10", size: "—",
-    url: "/sample-docs/cs01-brevan-howard.pdf",
-    linkedAttrs: ["Date of Incorporation", "Country of Incorporation", "Legal Registered Address"],
-  },
-  {
-    id: "d13", title: "Corporate Website Snapshot — Contact Page", entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215", source: "longfocuscapital.com (archived)", kind: "screenshot", date: "2026-05-18", size: "—",
-    url: "/sample-docs/crm-snapshot-mw.pdf",
-    linkedAttrs: ["Principal Place of Business"],
-  },
-  // ===== Brookfield Asset Management PIC US, LLC =====
-  {
-    id: "d14", title: "SEC Form ADV Part 1A", entity: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216", source: "SEC IAPD", kind: "filing", date: "2026-03-31", size: "—",
-    url: "/sample-docs/cs01-brevan-howard.pdf",
-    linkedAttrs: ["US Registration Number", "Entity Classification", "Principal Place of Business"],
-  },
-  {
-    id: "d15", title: "Delaware Entity Registry — Active Status", entity: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216", source: "Delaware Division of Corporations", kind: "register", date: "2026-05-20", size: "—",
-    url: "/sample-docs/psc-register-brevan-howard.pdf",
-    linkedAttrs: ["Legal Entity Type", "Date of Incorporation", "Legal Registered Address"],
-  },
-  {
-    id: "d16", title: "Internal Risk Classification Record", entity: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216", source: "Forge · Risk Engine", kind: "screenshot", date: "2026-05-15", size: "—",
-    url: "/sample-docs/crm-snapshot-mw.pdf",
-    linkedAttrs: ["Entity Risk Rating", "CIP Classification"],
-  },
-];
 
 const DocumentLocker = ({ selectedEntityNames }: { selectedEntityNames: string[] }) => {
   const [query, setQuery] = useState("");
@@ -3108,6 +2377,35 @@ const ATTR_CATEGORY_MAP: Record<string, AttrCategory> = {
 const categoryOf = (label: string): AttrCategory =>
   ATTR_CATEGORY_MAP[label] ?? "Entity Identification";
 
+// M3: Shared categorization helper — replaces the duplicate implementations in
+// AttributeTree and AttributeFormView.  Pass pendingOnly=true to filter unflagged attrs.
+function buildAttrCategories(
+  entity: string,
+  attrs: string[],
+  excs: Exc[],
+  options: { pendingOnly?: boolean } = {},
+): { category: AttrCategory; items: { label: string; flagged: boolean }[] }[] {
+  const profile = ENTITY_PROFILES[entity];
+  const isFlagged = (label: string) => {
+    const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
+    const pa = profile?.attrs.find((x) => x.label === label);
+    const excFlagged = excs.some(
+      (exc) => exc.entity === entity && exc.status === "Pending" &&
+        (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
+    );
+    return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
+  };
+  const visible = options.pendingOnly ? attrs.filter(isFlagged) : attrs;
+  const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
+    "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
+    "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
+  };
+  for (const label of visible) buckets[categoryOf(label)].push({ label, flagged: !!isFlagged(label) });
+  return ATTR_CATEGORY_ORDER
+    .map((c) => ({ category: c, items: buckets[c] }))
+    .filter((g) => g.items.length > 0);
+}
+
 type SelectedAttr = { label: string; entity: string };
 
 const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntities: { name: string; kyc: string; drg?: string }[]; exceptions: Exc[] }) => {
@@ -3335,27 +2633,8 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
   const drgEntries = Object.entries(drgGroups);
 
   // Helper: per entity, return ordered [category, labels[]] for those categories that have at least one (visible) attribute
-  const categorize = (entity: string, attrs: string[]) => {
-    const profile = ENTITY_PROFILES[entity];
-    const isFlagged = (label: string) => {
-      const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
-      const pa = profile?.attrs.find((x) => x.label === label);
-      const excFlagged = excs.some(
-        (exc) => exc.entity === entity && exc.status === "Pending" &&
-          (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
-      );
-      return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
-    };
-    const filtered = showOnlyPending ? attrs.filter(isFlagged) : attrs;
-    const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
-      "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
-      "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
-    };
-    for (const label of filtered) buckets[categoryOf(label)].push({ label, flagged: !!isFlagged(label) });
-    return ATTR_CATEGORY_ORDER
-      .map((c) => ({ category: c, items: buckets[c] }))
-      .filter((g) => g.items.length > 0);
-  };
+  const categorize = (entity: string, attrs: string[]) =>
+    buildAttrCategories(entity, attrs, excs, { pendingOnly: showOnlyPending });
 
   const isCatOpen = (entity: string, cat: AttrCategory, idx: number) => {
     const key = `${entity}::${cat}`;
@@ -3556,14 +2835,55 @@ const AttributeFormView = ({
   const [overrideNote, setOverrideNote] = useState("");
   const [savedOverrides, setSavedOverrides] = useState<Record<string, { value: string; actor: string; timestamp: string; note?: string }>>({});
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
-  const [traceStepsOpen, setTraceStepsOpen] = useState(false);
-  const [traceDocsOpen, setTraceDocsOpen] = useState(false);
-  const [traceTab, setTraceTab] = useState<"reasoning" | "audit">("reasoning");
+
+  // Forge live data
+  const [forgeAttrs, setForgeAttrs] = useState<Record<string, ForgeAttrRow>>({});
+  const [forgePersons, setForgePersons] = useState<Record<string, ForgePersonRow[]>>({});
+  const [forgeTrace, setForgeTrace] = useState<ForgeTraceRow | null>(null);
+  const [attrTab, setAttrTab] = useState<'core' | 'wgq'>('core');
 
   const { runAgents } = useAgents();
 
-  // Reset disclosure state when selected trace changes
-  useEffect(() => { setTraceStepsOpen(false); setTraceDocsOpen(false); setTraceTab("reasoning"); }, [openTraceFor]);
+  // Stable key so the effect only re-runs when the set of selected entities changes
+  const entityKycKey = selectedEntities.map(e => e.kyc).join(',');
+
+  // Fetch Forge attributes + persons for ALL selected entities in parallel
+  useEffect(() => {
+    if (selectedEntities.length === 0) { setForgeAttrs({}); setForgePersons({}); return; }
+    let cancelled = false;
+    Promise.all(selectedEntities.map(e => Promise.all([
+      apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(e.kyc)}/attributes`).then(r => r.ok ? r.json() : []),
+      apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(e.kyc)}/persons`).then(r => r.ok ? r.json() : {}),
+    ]))).then(results => {
+      if (cancelled) return;
+      const attrMap: Record<string, ForgeAttrRow> = {};
+      const personMap: Record<string, ForgePersonRow[]> = {};
+      for (const [attrs, persons] of results) {
+        for (const a of (attrs as ForgeAttrRow[])) attrMap[a.attribute_name] = a;
+        Object.assign(personMap, persons as Record<string, ForgePersonRow[]>);
+      }
+      setForgeAttrs(attrMap);
+      setForgePersons(personMap);
+      const hasWgq = Object.values(attrMap).some(a => a.attribute_group === 'wgq' && a.display_value);
+      const hasCore = Object.values(attrMap).some(a => a.attribute_group === 'core' && a.display_value);
+      if (hasWgq && !hasCore) setAttrTab('wgq');
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [entityKycKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch full lineage trace when user opens trace for a Forge attribute
+  useEffect(() => {
+    if (!openTraceFor) { setForgeTrace(null); return; }
+    const kycRef = selectedEntities.find(e => e.name === openTraceFor.entity)?.kyc;
+    if (!kycRef || !forgeAttrs[openTraceFor.label]) { setForgeTrace(null); return; }
+    let cancelled = false;
+    apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/attributes/trace/${encodeURIComponent(openTraceFor.label)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!cancelled) setForgeTrace(data as ForgeTraceRow | null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [openTraceFor?.label, openTraceFor?.entity]);
+
   // Close override form when trace changes
   useEffect(() => { setOpenOverrideFor(null); setOverrideDraft(""); setOverrideNote(""); }, [openTraceFor]);
 
@@ -3599,27 +2919,8 @@ const AttributeFormView = ({
     return (TRACE_DOCS[openTraceFor.label] ?? []).filter(d => d.entity === openTraceFor.entity);
   }, [openTraceFor]);
 
-  // Categorize attributes for a given entity (no pending filter — show all in form view)
-  const categorize = (entity: string, attrs: string[]) => {
-    const profile = ENTITY_PROFILES[entity];
-    const isFlagged = (label: string) => {
-      const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
-      const pa = profile?.attrs.find(x => x.label === label);
-      const excFlagged = excs.some(
-        exc => exc.entity === entity && exc.status === "Pending" &&
-          (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
-      );
-      return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
-    };
-    const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
-      "Entity Identification": [], "Registration & Regulatory": [], "Address & Operations": [],
-      "Classification & Risk": [], "Financial Profile": [], "Officers & Signatories": [], "Ownership & Control": [],
-    };
-    for (const label of attrs) buckets[categoryOf(label)].push({ label, flagged: !!isFlagged(label) });
-    return ATTR_CATEGORY_ORDER
-      .map(c => ({ category: c, items: buckets[c] }))
-      .filter(g => g.items.length > 0);
-  };
+  const categorize = (entity: string, attrs: string[]) =>
+    buildAttrCategories(entity, attrs, excs);
 
   const isCatOpen = (key: string, idx: number) => {
     if (key in openCats) return openCats[key];
@@ -3630,14 +2931,18 @@ const AttributeFormView = ({
   const entitiesForTree = selectedEntities.map(e => {
     const profile = ENTITY_PROFILES[e.name];
     const profileLabels = profile?.attrs.map(a => a.label) ?? [];
-    const excTitleLabels = profileLabels.length === 0
+    // When no curated profile, use Forge core attribute names as the attribute list
+    const forgeLabels = profileLabels.length === 0
+      ? Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name)
+      : [];
+    const excTitleLabels = profileLabels.length === 0 && forgeLabels.length === 0
       ? excs.filter(exc => exc.kyc === e.kyc && !exc.id.startsWith("stub-") && !exc.attrLabel).map(exc => exc.title)
       : [];
     const dbAttrLabels = excs.filter(exc => exc.kyc === e.kyc && exc.attrLabel).map(exc => exc.attrLabel!);
     return {
       entity: e.name,
       kyc: e.kyc,
-      attrs: Array.from(new Set([...profileLabels, ...excTitleLabels, ...dbAttrLabels])),
+      attrs: Array.from(new Set([...profileLabels, ...forgeLabels, ...excTitleLabels, ...dbAttrLabels])),
     };
   });
 
@@ -3656,7 +2961,8 @@ const AttributeFormView = ({
   };
 
   return (
-    <div className="space-y-0">
+    <div className="grid gap-4" style={{ gridTemplateColumns: openTraceFor ? "minmax(0,1fr) 360px" : "1fr" }}>
+    <div className="space-y-0 min-w-0">
       {/* Status strip */}
       <div className="flex items-center gap-2 px-1 pb-3 flex-wrap">
         <span className={cn(
@@ -3694,727 +3000,210 @@ const AttributeFormView = ({
         )}
       </div>
 
-      {/* Sections */}
-      {entitiesForTree.map(({ entity, attrs }) => {
-        const groups = categorize(entity, attrs);
+      {/* Attributes / Questionnaire tab control */}
+      {(() => {
+        const hasWgq = Object.values(forgeAttrs).some(a => a.attribute_group === 'wgq');
+        if (!hasWgq) return null;
         return (
-          <div key={entity}>
-            {entitiesForTree.length > 1 && (
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1 py-2">{entity}</p>
-            )}
-            {groups.map(({ category, items }, idx) => {
-              const catKey = `${entity}::${category}`;
-              const open = isCatOpen(catKey, idx);
-              const pendingInCat = items.filter(i => i.flagged).length;
-              return (
-                <div key={category} className="rounded-xl border border-border bg-card mb-3 overflow-hidden">
-                  {/* Section header */}
-                  <button
-                    onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/60 hover:bg-secondary/80 transition-colors text-left border-b border-border"
-                  >
-                    <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-foreground flex-1">{category}</span>
-                    <span className="text-[10px] text-muted-foreground">{items.length} attr{items.length !== 1 ? "s" : ""}</span>
-                    {pendingInCat > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{pendingInCat}</span>
-                    )}
-                  </button>
-
-                  {open && (
-                    <div className="grid grid-cols-2 [&>*]:border-b [&>*]:border-border/60">
-                      {items.map(({ label }) =>
-                        NESTED_ATTR_PROFILES[label] ? (
-                          <div key={label} className="col-span-2 p-3">
-                            <NestedObjectBlock
-                              label={label}
-                              entity={entity}
-                              openTraceFor={openTraceFor}
-                              setOpenTraceFor={setOpenTraceFor}
-                              savedOverrides={savedOverrides}
-                              trace={trace}
-                              traceDocs={traceDocs}
-                              traceTab={traceTab}
-                              setTraceTab={setTraceTab}
-                              traceStepsOpen={traceStepsOpen}
-                              setTraceStepsOpen={setTraceStepsOpen}
-                              traceDocsOpen={traceDocsOpen}
-                              setTraceDocsOpen={setTraceDocsOpen}
-                              runAgents={runAgents}
-                              openOverrideFor={openOverrideFor}
-                              setOpenOverrideFor={setOpenOverrideFor}
-                              overrideDraft={overrideDraft}
-                              setOverrideDraft={setOverrideDraft}
-                              setOverrideNote={setOverrideNote}
-                            />
-                          </div>
-                        ) : (
-                          <SimpleFieldRow
-                            key={label}
-                            label={label}
-                            entity={entity}
-                            savedOverrides={savedOverrides}
-                            openTraceFor={openTraceFor}
-                            setOpenTraceFor={setOpenTraceFor}
-                            openOverrideFor={openOverrideFor}
-                            setOpenOverrideFor={setOpenOverrideFor}
-                            overrideDraft={overrideDraft}
-                            setOverrideDraft={setOverrideDraft}
-                            overrideNote={overrideNote}
-                            setOverrideNote={setOverrideNote}
-                            handleSaveOverride={handleSaveOverride}
-                            trace={trace}
-                            traceDocs={traceDocs}
-                            traceTab={traceTab}
-                            setTraceTab={setTraceTab}
-                            traceStepsOpen={traceStepsOpen}
-                            setTraceStepsOpen={setTraceStepsOpen}
-                            traceDocsOpen={traceDocsOpen}
-                            setTraceDocsOpen={setTraceDocsOpen}
-                            runAgents={runAgents}
-                          />
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="flex items-center gap-1 mb-3 border-b border-border pb-0">
+            <button
+              onClick={() => setAttrTab('core')}
+              className={cn(
+                "px-4 py-2 text-[12px] font-semibold border-b-2 -mb-px transition-colors",
+                attrTab === 'core' ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >Attributes</button>
+            <button
+              onClick={() => setAttrTab('wgq')}
+              className={cn(
+                "px-4 py-2 text-[12px] font-semibold border-b-2 -mb-px transition-colors",
+                attrTab === 'wgq' ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >Questionnaire</button>
           </div>
         );
-      })}
+      })()}
+
+      {/* ── Core attribute sections ─────────────────────────────────────── */}
+      {attrTab === 'core' && (
+        <>
+          {entitiesForTree.map(({ entity, attrs }) => {
+            const groups = categorize(entity, attrs);
+            return (
+              <div key={entity}>
+                {entitiesForTree.length > 1 && (
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1 py-2">{entity}</p>
+                )}
+                {groups.map(({ category, items }, idx) => {
+                  const catKey = `${entity}::${category}`;
+                  const open = isCatOpen(catKey, idx);
+                  const pendingInCat = items.filter(i => i.flagged).length;
+                  return (
+                    <div key={category} className="rounded-xl border border-border bg-card mb-3 overflow-hidden">
+                      <button
+                        onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/60 hover:bg-secondary/80 transition-colors text-left border-b border-border"
+                      >
+                        <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-foreground flex-1">{category}</span>
+                        <span className="text-[10px] text-muted-foreground">{items.length} attr{items.length !== 1 ? "s" : ""}</span>
+                        {pendingInCat > 0 && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{pendingInCat}</span>
+                        )}
+                      </button>
+                      {open && (
+                        <div className="grid grid-cols-2 [&>*]:border-b [&>*]:border-border/60">
+                          {items.map(({ label }) =>
+                            NESTED_ATTR_PROFILES[label] ? (
+                              <div key={label} className="col-span-2 p-3">
+                                <NestedObjectBlock
+                                  label={label}
+                                  entity={entity}
+                                  openTraceFor={openTraceFor}
+                                  setOpenTraceFor={setOpenTraceFor}
+                                  savedOverrides={savedOverrides}
+                                  trace={trace}
+                                  traceDocs={traceDocs}
+                                  runAgents={runAgents}
+                                  openOverrideFor={openOverrideFor}
+                                  setOpenOverrideFor={setOpenOverrideFor}
+                                  overrideDraft={overrideDraft}
+                                  setOverrideDraft={setOverrideDraft}
+                                  setOverrideNote={setOverrideNote}
+                                />
+                              </div>
+                            ) : (
+                              <SimpleFieldRow
+                                key={label}
+                                label={label}
+                                entity={entity}
+                                forgeAttr={forgeAttrs[label] ?? null}
+                                savedOverrides={savedOverrides}
+                                openTraceFor={openTraceFor}
+                                setOpenTraceFor={setOpenTraceFor}
+                                openOverrideFor={openOverrideFor}
+                                setOpenOverrideFor={setOpenOverrideFor}
+                                overrideDraft={overrideDraft}
+                                setOverrideDraft={setOverrideDraft}
+                                overrideNote={overrideNote}
+                                setOverrideNote={setOverrideNote}
+                                handleSaveOverride={handleSaveOverride}
+                                trace={trace}
+                                traceDocs={traceDocs}
+                                runAgents={runAgents}
+                              />
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {/* ── Person role sections ──────────────────────────────────────── */}
+          {PERSON_ROLE_LABELS.map(({ role, label: roleLabel }) => {
+            const persons = forgePersons[role];
+            if (!persons?.length) return null;
+            const catKey = `persons::${role}`;
+            const open = catKey in openCats ? openCats[catKey] : true;
+            const excCount = persons.reduce((n, p) =>
+              n + Object.values(p.attributes).filter((a: { exception_flag?: boolean }) => a.exception_flag).length, 0);
+            return (
+              <div key={role} className="rounded-xl border border-border bg-card mb-3 overflow-hidden">
+                <button
+                  onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/60 hover:bg-secondary/80 transition-colors text-left border-b border-border"
+                >
+                  <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
+                  <UserCircle2 className="size-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-foreground flex-1">{roleLabel}</span>
+                  <span className="text-[10px] text-muted-foreground">{persons.length} record{persons.length !== 1 ? "s" : ""}</span>
+                  {excCount > 0 && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{excCount}</span>
+                  )}
+                </button>
+                {open && (
+                  <div className="divide-y divide-border/60">
+                    {persons.map((p, i) => (
+                      <ForgePersonCard key={i} person={p} role={role} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* ── WGQ Questionnaire tab ─────────────────────────────────────────── */}
+      {attrTab === 'wgq' && (
+        <WgqTabContent forgeAttrs={forgeAttrs} openCats={openCats} setOpenCats={setOpenCats} />
+      )}
 
       {entitiesForTree.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-10">No entities selected.</p>
       )}
     </div>
-  );
-};
 
-// ─── Module-scope sub-components (hoisted out of AttributeFormView to prevent ───
-// ─── React re-mounting on every render due to new function reference identity) ───
-
-type SimpleFieldRowProps = {
-  label: string;
-  entity: string;
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
-  openTraceFor: { label: string; entity: string } | null;
-  setOpenTraceFor: Dispatch<SetStateAction<{ label: string; entity: string } | null>>;
-  openOverrideFor: { label: string; entity: string } | null;
-  setOpenOverrideFor: Dispatch<SetStateAction<{ label: string; entity: string } | null>>;
-  trace: AttrTrace | null;
-  traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
-  traceTab: "reasoning" | "audit";
-  setTraceTab: Dispatch<SetStateAction<"reasoning" | "audit">>;
-  traceStepsOpen: boolean;
-  setTraceStepsOpen: Dispatch<SetStateAction<boolean>>;
-  traceDocsOpen: boolean;
-  setTraceDocsOpen: Dispatch<SetStateAction<boolean>>;
-  runAgents: (agentIds: AgentId[], label?: string) => void;
-  overrideDraft: string;
-  setOverrideDraft: Dispatch<SetStateAction<string>>;
-  overrideNote: string;
-  setOverrideNote: Dispatch<SetStateAction<string>>;
-  handleSaveOverride: (draftKey: string) => void;
-};
-
-const SimpleFieldRow = ({
-  label, entity,
-  savedOverrides, openTraceFor, setOpenTraceFor, openOverrideFor, setOpenOverrideFor,
-  trace, traceDocs, traceTab, setTraceTab,
-  traceStepsOpen, setTraceStepsOpen, traceDocsOpen, setTraceDocsOpen,
-  runAgents, overrideDraft, setOverrideDraft, overrideNote, setOverrideNote, handleSaveOverride,
-}: SimpleFieldRowProps) => {
-  const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
-  const overrideKey = `${entity}::${label}`;
-  const override = savedOverrides[overrideKey];
-  const currentValue = override?.value ?? pa?.value ?? "";
-  const isOverridden = !!override;
-  const isAlert = !isOverridden && pa?.status === "alert";
-  const isWarn  = !isOverridden && pa?.status === "warn";
-  const isOpen  = openTraceFor?.label === label && openTraceFor?.entity === entity;
-  const isOverrideOpen = openOverrideFor?.label === label && openOverrideFor?.entity === entity;
-  const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
-  const isAuditOnly = pa?.source === "CRM" || isOverridden;
-
-  // ID / V badge values
-  const idOk  = !!pa;
-  const vStatus: "ok" | "warn" | "alert" | "none" = isOverridden ? "ok" : (pa?.status ?? "none");
-
-  const idLabel = idOk ? <span className="text-success font-bold">ID✓</span> : <span className="text-muted-foreground/50">ID–</span>;
-  const vLabel = vStatus === "ok"    ? <span className="text-success font-bold">V✓</span>
-               : vStatus === "warn"  ? <span className="text-warning font-bold">V⚠</span>
-               : vStatus === "alert" ? <span className="text-alert font-bold">V✕</span>
-               :                       <span className="text-muted-foreground/50">V–</span>;
-
-  // Coloured accent for the value box border and left bar
-  const accentBorder = isOverridden ? "border-success" : isAlert ? "border-alert" : isWarn ? "border-warning" : "border-border";
-  const accentBg     = isOverridden ? "bg-success-soft/30" : isAlert ? "bg-alert-soft/20" : isWarn ? "bg-warning-soft/20" : "bg-secondary/30";
-  const accentBar    = isOverridden ? "bg-success" : isAlert ? "bg-alert" : isWarn ? "bg-warning" : "bg-border";
-  const valueColor   = isAlert ? "text-alert" : isWarn ? "text-warning" : "text-foreground";
-
-  return (
-    <>
-      {/* Stacked form-field card */}
-      <div className={cn("p-3 transition-colors", (isOpen || isOverrideOpen) && "col-span-2")}>
-        {/* Row 1: label + badges */}
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none">{label}</label>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] whitespace-nowrap">
-              {idLabel}<span className="text-muted-foreground/30 mx-0.5">/</span>{vLabel}
-            </span>
-            {pa && (
-              <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold", SOURCE_STYLE[pa.source])}>
-                {pa.source}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Row 2: value box with coloured left accent + trace/audit button */}
-        <div className={cn("rounded-md border flex items-center gap-2.5 px-2.5 py-2", accentBorder, accentBg)}>
-          <div className={cn("w-[3px] self-stretch min-h-[18px] rounded-full shrink-0", accentBar)} />
-          <span className={cn("flex-1 text-[13px] font-semibold leading-snug min-w-0", valueColor)}>
-            {currentValue || <span className="text-muted-foreground/30 italic text-[11px] font-normal">—</span>}
-            {isOverridden && (
-              <span className="ml-2 text-[9px] font-semibold text-success border border-success/40 bg-success-soft rounded px-1.5 py-0.5">✎ Overridden</span>
-            )}
-          </span>
-
-          {/* Trace / Audit button — CRM & overridden = Audit only; 3rd & Forge = full Trace */}
-          {isAuditOnly ? (
-            <button
-              onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
-              className={cn(
-                "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
-                isOpen
-                  ? "bg-secondary text-foreground border-border"
-                  : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground bg-card"
-              )}
-            >
-              <ClipboardList className="size-3" />{isOpen ? "▲" : "Audit"}
-            </button>
-          ) : (
-            <button
-              disabled={!hasTrace}
-              onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
-              className={cn(
-                "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
-              isOpen
-                ? "bg-primary text-primary-foreground border-primary"
-                : hasTrace
-                ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
-                : "border-border/30 text-muted-foreground/30 cursor-not-allowed bg-transparent"
-            )}
-          >
-            <Bot className="size-3" />{isOpen ? "▲" : "Trace"}
-          </button>
-        )}
-        </div>{/* end value box */}
-      </div>{/* end card */}
-      {isOpen && (
-        <InlineTraceDrawer
-          label={label}
-          entity={entity}
-          isAuditOnly={isAuditOnly}
-          savedOverrides={savedOverrides}
-          trace={trace}
-          traceDocs={traceDocs}
-          traceTab={traceTab}
-          setTraceTab={setTraceTab}
-          traceStepsOpen={traceStepsOpen}
-          setTraceStepsOpen={setTraceStepsOpen}
-          traceDocsOpen={traceDocsOpen}
-          setTraceDocsOpen={setTraceDocsOpen}
-          runAgents={runAgents}
-          setOpenTraceFor={setOpenTraceFor}
-          openOverrideFor={openOverrideFor}
-          setOpenOverrideFor={setOpenOverrideFor}
-          overrideDraft={overrideDraft}
-          setOverrideDraft={setOverrideDraft}
-          setOverrideNote={setOverrideNote}
-        />
-      )}
-      {isOverrideOpen && (
-        <div className="col-span-2 px-4 py-3 border-l-2 border-warning bg-warning-soft/20 border-b border-border/60">
-          <p className="text-[10px] font-semibold text-warning mb-2 flex items-center gap-1.5">
-            <Zap className="size-3" /> Override value — <span className="font-normal text-muted-foreground">{label}</span>
-          </p>
-          {overrideDraft.length > 80 ? (
-            <Textarea
-              className="text-[12px] min-h-[60px] max-h-[120px] resize-y mb-2"
-              value={overrideDraft}
-              onChange={e => setOverrideDraft(e.target.value)}
-              placeholder={`Enter corrected value for ${label}`}
-              autoFocus
-            />
-          ) : (
-            <Input
-              className="h-8 text-[12px] mb-2"
-              value={overrideDraft}
-              onChange={e => setOverrideDraft(e.target.value)}
-              placeholder={`Enter corrected value for ${label}`}
-              autoFocus
-            />
-          )}
-          <Textarea
-            className="text-[11px] min-h-[48px] resize-none mb-3"
-            value={overrideNote}
-            onChange={e => setOverrideNote(e.target.value)}
-            placeholder="Reason for override (optional)"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              disabled={!overrideDraft.trim()}
-              onClick={() => handleSaveOverride(`${entity}::${label}`)}
-              className={cn(
-                "text-[11px] font-semibold px-3 py-1.5 rounded-md transition-colors",
-                overrideDraft.trim()
-                  ? "bg-success text-white hover:bg-success/90"
-                  : "bg-muted text-muted-foreground cursor-not-allowed"
-              )}
-            >
-              Save override
-            </button>
-            <button
-              onClick={() => { setOpenOverrideFor(null); setOverrideDraft(""); setOverrideNote(""); }}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Cancel
-            </button>
-            <span className="ml-auto text-[9px] text-muted-foreground">Confidence will be set to 1.0</span>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-type InlineTraceDrawerProps = {
-  label: string;
-  entity: string;
-  isAuditOnly: boolean;
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
-  trace: AttrTrace | null;
-  traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
-  traceTab: "reasoning" | "audit";
-  setTraceTab: Dispatch<SetStateAction<"reasoning" | "audit">>;
-  traceStepsOpen: boolean;
-  setTraceStepsOpen: Dispatch<SetStateAction<boolean>>;
-  traceDocsOpen: boolean;
-  setTraceDocsOpen: Dispatch<SetStateAction<boolean>>;
-  runAgents: (agentIds: AgentId[], label?: string) => void;
-  setOpenTraceFor: Dispatch<SetStateAction<{ label: string; entity: string } | null>>;
-  openOverrideFor: { label: string; entity: string } | null;
-  setOpenOverrideFor: Dispatch<SetStateAction<{ label: string; entity: string } | null>>;
-  overrideDraft: string;
-  setOverrideDraft: Dispatch<SetStateAction<string>>;
-  setOverrideNote: Dispatch<SetStateAction<string>>;
-};
-
-const InlineTraceDrawer = ({
-  label, entity, isAuditOnly,
-  savedOverrides, trace, traceDocs,
-  traceTab, setTraceTab,
-  traceStepsOpen, setTraceStepsOpen,
-  traceDocsOpen, setTraceDocsOpen,
-  runAgents, setOpenTraceFor,
-  openOverrideFor, setOpenOverrideFor,
-  overrideDraft, setOverrideDraft, setOverrideNote,
-}: InlineTraceDrawerProps) => {
-  const isManualOverride = !!savedOverrides[`${entity}::${label}`];
-  const displayConf = isManualOverride
-    ? 100
-    : (trace?.confidence ?? 0);
-  const confLabel = isManualOverride ? "1.0" : `${Math.round(displayConf)}%`;
-  const confColor = isManualOverride
-    ? "text-success"
-    : displayConf >= 90 ? "text-primary"
-    : displayConf >= 70 ? "text-warning"
-    : "text-alert";
-  const confBarColor = isManualOverride
-    ? "bg-success"
-    : displayConf >= 90 ? "bg-primary"
-    : displayConf >= 70 ? "bg-warning"
-    : "bg-alert";
-
-  const auditLog = ATTR_AUDIT_LOG[label] ?? [];
-
-  // Default to audit tab for CRM/override sources
-  const effectiveTab = isAuditOnly && traceTab === "reasoning" ? "audit" : traceTab;
-
-  return (
-    <div className={cn(
-      "col-span-2 border-b border-border",
-      isAuditOnly ? "border-l-2 border-secondary bg-secondary/20" : "border-l-2 border-primary bg-gradient-to-br from-info-soft/30 to-background"
-    )}>
-      {/* Top: field context + confidence score (hidden for audit-only) */}
-      <div className="flex items-start justify-between gap-4 px-4 pt-3 pb-2.5 border-b border-border/60">
-        <div>
-          <p className={cn("text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 mb-0.5", isAuditOnly ? "text-muted-foreground" : "text-primary")}>
-            {isAuditOnly ? <ClipboardList className="size-3" /> : <Sparkles className="size-3" />}
-            {isAuditOnly ? "Audit Trail" : "Agent Trace"}
-          </p>
-          <p className="text-[12px] font-semibold text-foreground">{label}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{savedOverrides[`${entity}::${label}`]?.value ?? trace?.value ?? "—"}</p>
-        </div>
-        {!isAuditOnly && (
-          <div className="text-right shrink-0">
-            <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Confidence</p>
-            <p className={cn("text-[22px] font-black leading-none", confColor)}>{confLabel}</p>
-            <div className="w-16 h-1 rounded-full bg-border mt-1.5 ml-auto overflow-hidden">
-              <div className={cn("h-full rounded-full transition-all", confBarColor)} style={{ width: `${Math.min(displayConf, 100)}%` }} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Tabs — Reasoning hidden for audit-only */}
-      <div className="flex border-b border-border/60">
-        {!isAuditOnly && (
-          <button
-            onClick={() => setTraceTab("reasoning")}
-            className={cn(
-              "flex-1 py-2 text-[10px] font-semibold transition-colors border-b-2",
-              effectiveTab === "reasoning" ? "border-primary text-primary bg-background/60" : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Sparkles className="size-3 inline mr-1" />Reasoning
-          </button>
-        )}
-        <button
-          onClick={() => setTraceTab("audit")}
-          className={cn(
-            "flex-1 py-2 text-[10px] font-semibold transition-colors border-b-2",
-            effectiveTab === "audit" ? "border-primary text-primary bg-background/60" : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <ChevronRight className="size-3 inline mr-1" />Audit Trail {auditLog.length > 0 && `(${auditLog.length})`}
-        </button>
-      </div>
-
-      {/* Reasoning tab */}
-      {effectiveTab === "reasoning" && trace && (
-        <div className="px-4 py-3 space-y-3">
-          {/* Conclusion */}
-          <div className="rounded-lg border border-border bg-card p-3">
-            <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 flex items-center gap-1">
-              <ShieldCheck className="size-3 text-success" /> Conclusion
+    {/* Trace / Audit right pane */}
+    {openTraceFor && (
+      <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col overflow-hidden self-start sticky top-4">
+        {/* Pane header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none mb-0.5">
+              {(() => {
+                const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(a => a.label === openTraceFor.label);
+                const isOverridden = !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`];
+                return (pa?.source === "CRM" || isOverridden) ? "Audit Trail" : "Agent Trace";
+              })()}
             </p>
-            <p className="text-[11px] leading-snug text-foreground">{trace.conclusion}</p>
+            <p className="text-[13px] font-semibold truncate">{openTraceFor.label}</p>
+            <p className="text-[10px] text-muted-foreground truncate">{openTraceFor.entity}</p>
           </div>
-
-          {/* Agent steps */}
           <button
-            onClick={() => setTraceStepsOpen(v => !v)}
-            className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
+            onClick={() => setOpenTraceFor(null)}
+            className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors shrink-0 ml-3"
+            title="Close trace pane"
           >
-            <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="size-3 text-primary" /> Reasoning steps ({trace.agents.length})
-            </span>
-            <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceStepsOpen && "rotate-180")} />
+            <X className="size-3.5" />
           </button>
-          {traceStepsOpen && (
-            <ol className="space-y-3 px-1">
-              {trace.agents.map((a, i) => (
-                <li key={a.id} className="relative pl-7">
-                  <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[9px] font-bold">{i + 1}</span>
-                  {i < trace.agents.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-10px] w-px bg-border" />}
-                  <p className="text-[11px] font-semibold">{a.name} <span className="text-muted-foreground font-normal">→ {a.action}</span></p>
-                  <p className="text-[10px] text-muted-foreground italic mt-0.5 leading-snug">"{a.thought}"</p>
-                  <p className="text-[9px] text-primary mt-1 flex items-center gap-1"><Database className="size-2.5" />{a.source}</p>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {/* Source docs */}
-          {traceDocs.length > 0 && (
-            <>
-              <button
-                onClick={() => setTraceDocsOpen(v => !v)}
-                className="w-full flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-secondary/40 transition-colors"
-              >
-                <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5">
-                  <Paperclip className="size-3 text-primary" /> Source documents ({traceDocs.length})
-                </span>
-                <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", traceDocsOpen && "rotate-180")} />
-              </button>
-              {traceDocsOpen && (
-                <div className="space-y-1.5">
-                  {traceDocs.map(({ doc, entity: docEntity }) => {
-                    const meta = DOC_KIND_META[doc.kind];
-                    return (
-                      <div key={`${docEntity}-${doc.id}`} className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border bg-card text-left">
-                        <FileText className="size-3.5 text-muted-foreground shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-medium truncate">{doc.title}</p>
-                          <p className="text-[9px] text-muted-foreground truncate">{docEntity} · {doc.source}</p>
-                        </div>
-                        <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold uppercase tracking-wide shrink-0", meta.tone)}>{meta.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-          {trace && !trace.agents.length && (
-            <p className="text-[11px] text-muted-foreground italic text-center py-3">No reasoning steps available.</p>
-          )}
         </div>
-      )}
-
-      {effectiveTab === "reasoning" && !trace && (
-        <p className="px-4 py-6 text-[11px] text-muted-foreground italic text-center">No agent trace available for this attribute.</p>
-      )}
-
-      {/* Audit Trail tab */}
-      {effectiveTab === "audit" && (
-        <div className="px-4 py-3">
-          {auditLog.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground italic text-center py-4">No audit history for this attribute.</p>
-          ) : (
-            <div className="space-y-0">
-              {auditLog.map((entry, idx) => (
-                <div key={idx} className="flex gap-3 relative pb-4">
-                  {idx < auditLog.length - 1 && (
-                    <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
-                  )}
-                  {/* Icon */}
-                  <div className={cn(
-                    "size-[22px] rounded-full border-2 flex items-center justify-center text-[9px] shrink-0 mt-0.5",
-                    entry.type === "agent"         ? "border-primary/40 bg-info-soft text-primary"
-                    : entry.type === "override"    ? "border-success/40 bg-success-soft text-success"
-                    :                                "border-warning/40 bg-warning-soft text-warning"
-                  )}>
-                    {entry.type === "agent" ? "🤖" : entry.type === "override" ? "✎" : "👤"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold text-foreground">
-                      {entry.actor}
-                      {entry.role && <span className="ml-1 font-normal text-muted-foreground text-[9px]">({entry.role})</span>}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{entry.action}</p>
-                    {(entry.valueBefore !== undefined || entry.valueAfter !== undefined) && (
-                      <div className="mt-1 text-[9px] bg-secondary/50 rounded px-2 py-1 inline-flex items-center gap-1.5 border border-border">
-                        {entry.valueBefore && <span className="line-through text-muted-foreground">{entry.valueBefore}</span>}
-                        {entry.valueBefore && entry.valueAfter && <ChevronRight className="size-2.5 text-muted-foreground shrink-0" />}
-                        {entry.valueAfter && <span className="font-semibold text-foreground">{entry.valueAfter}</span>}
-                      </div>
-                    )}
-                    {entry.confidence !== undefined && (
-                      <span className={cn(
-                        "mt-1 inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded border",
-                        entry.isManual
-                          ? "bg-success-soft text-success border-success/30"
-                          : entry.confidence >= 90 ? "bg-info-soft text-primary border-primary/20"
-                          : entry.confidence >= 70 ? "bg-warning-soft text-warning border-warning/20"
-                          : "bg-alert-soft text-alert border-alert/20"
-                      )}>
-                        Confidence {entry.isManual ? "1.0 · Manual" : `${Math.round(entry.confidence)}%`}
-                      </span>
-                    )}
-                    {entry.source && <p className="text-[9px] text-primary mt-0.5 flex items-center gap-0.5"><Database className="size-2.5" />{entry.source}</p>}
-                    <p className="text-[9px] text-muted-foreground mt-1">{entry.timestamp}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Trace content */}
+        <div className="overflow-y-auto flex-1" style={{ maxHeight: "calc(100vh - 260px)" }}>
+          {/* Forge lineage section — shown when live data is available */}
+          {forgeTrace && (
+            <ForgeLineagePanel trace={forgeTrace} />
           )}
+          <InlineTraceDrawer
+            label={openTraceFor.label}
+            entity={openTraceFor.entity}
+            isAuditOnly={(() => {
+              const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(a => a.label === openTraceFor.label);
+              const isOverridden = !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`];
+              return (pa?.source === "CRM") || isOverridden;
+            })()}
+            savedOverrides={savedOverrides}
+            trace={trace}
+            traceDocs={traceDocs}
+            runAgents={runAgents}
+            setOpenTraceFor={setOpenTraceFor}
+            openOverrideFor={openOverrideFor}
+            setOpenOverrideFor={setOpenOverrideFor}
+            overrideDraft={overrideDraft}
+            setOverrideDraft={setOverrideDraft}
+            setOverrideNote={setOverrideNote}
+          />
         </div>
-      )}
-
-      {/* Action row */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border/60 bg-secondary/20">
-        {!isAuditOnly && (
-          <button
-            onClick={() => trace && runAgents(trace.agents.map(a => a.id), `Re-verify: ${label}`)}
-            className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Play className="size-3" /> Re-run Agent
-          </button>
-        )}
-        <button
-          onClick={() => {
-            const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
-            const current = savedOverrides[`${entity}::${label}`]?.value ?? pa?.value ?? "";
-            setOverrideDraft(current);
-            setOverrideNote("");
-            setOpenOverrideFor({ label, entity });
-          }}
-          className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-md border border-warning/60 bg-warning-soft text-warning hover:opacity-90 transition-opacity"
-        >
-          <Zap className="size-3" /> Override Value
-        </button>
-        {traceDocs.length > 0 && (
-          <button className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground transition-colors">
-            <Paperclip className="size-3" /> Source Docs
-          </button>
-        )}
-        <button
-          onClick={() => setOpenTraceFor(null)}
-          className="ml-auto text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ✕ Close
-        </button>
-      </div>
+      </aside>
+    )}
     </div>
   );
 };
 
-type NestedObjectBlockProps = {
-  label: string;
-  entity: string;
-  openTraceFor: { label: string; entity: string } | null;
-  setOpenTraceFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
-  // all InlineTraceDrawer props (passed through for the group-level drawer)
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
-  trace: AttrTrace | null;
-  traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
-  traceTab: "reasoning" | "audit";
-  setTraceTab: React.Dispatch<React.SetStateAction<"reasoning" | "audit">>;
-  traceStepsOpen: boolean;
-  setTraceStepsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  traceDocsOpen: boolean;
-  setTraceDocsOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  runAgents: (agentIds: AgentId[], label?: string) => void;
-  openOverrideFor: { label: string; entity: string } | null;
-  setOpenOverrideFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
-  overrideDraft: string;
-  setOverrideDraft: React.Dispatch<React.SetStateAction<string>>;
-  setOverrideNote: React.Dispatch<React.SetStateAction<string>>;
-};
-
-const NestedObjectBlock = ({
-  label, entity,
-  openTraceFor, setOpenTraceFor,
-  savedOverrides, trace, traceDocs,
-  traceTab, setTraceTab,
-  traceStepsOpen, setTraceStepsOpen,
-  traceDocsOpen, setTraceDocsOpen,
-  runAgents, openOverrideFor, setOpenOverrideFor,
-  overrideDraft, setOverrideDraft, setOverrideNote,
-}: NestedObjectBlockProps) => {
-  const entries = NESTED_ATTR_PROFILES[label];
-  if (!entries) return null;
-
-  const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
-  const groupStatus: EntityAttr["status"] = entries.flatMap(e => e.fields).some(f => f.status === "alert")
-    ? "alert" : entries.flatMap(e => e.fields).some(f => f.status === "warn") ? "warn" : "ok";
-  const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
-  const isGroupOpen = openTraceFor?.label === label && openTraceFor?.entity === entity;
-
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      {/* Object-level header */}
-      <div className={cn(
-        "flex items-center gap-2 px-4 py-2.5 border-b border-border",
-        groupStatus === "alert" ? "bg-alert-soft/20" : groupStatus === "warn" ? "bg-warning-soft/20" : "bg-secondary/30"
-      )}>
-        <div className={cn("size-1.5 rounded-full shrink-0", DOT_STYLE[groupStatus])} />
-        <span className="text-[11px] font-semibold text-foreground flex-1">{label}</span>
-        {/* Group-level ID/V summary badge */}
-        <span className="text-[9px] font-bold">
-          <span className="text-success">ID✓</span>
-          <span className="text-muted-foreground/30 mx-0.5">/</span>
-          <span className={groupStatus === "ok" ? "text-success" : groupStatus === "warn" ? "text-warning" : "text-alert"}>
-            {groupStatus === "ok" ? "V✓" : groupStatus === "warn" ? "V⚠" : "V✕"}
-          </span>
-        </span>
-        {pa && <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold", SOURCE_STYLE[pa.source])}>{pa.source}</span>}
-        <button
-          disabled={!hasTrace}
-          onClick={() => setOpenTraceFor(isGroupOpen ? null : { label, entity })}
-          className={cn(
-            "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors",
-            isGroupOpen ? "bg-primary text-primary-foreground border-primary"
-              : hasTrace ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
-              : "border-border/30 text-muted-foreground/30 cursor-not-allowed"
-          )}
-        >
-          <Bot className="size-3" />{isGroupOpen ? "▲" : "Trace"}
-        </button>
-      </div>
-
-      {/* Group-level trace drawer */}
-      {isGroupOpen && (
-        <InlineTraceDrawer
-          label={label}
-          entity={entity}
-          savedOverrides={savedOverrides}
-          trace={trace}
-          traceDocs={traceDocs}
-          traceTab={traceTab}
-          setTraceTab={setTraceTab}
-          traceStepsOpen={traceStepsOpen}
-          setTraceStepsOpen={setTraceStepsOpen}
-          traceDocsOpen={traceDocsOpen}
-          setTraceDocsOpen={setTraceDocsOpen}
-          runAgents={runAgents}
-          setOpenTraceFor={setOpenTraceFor}
-          openOverrideFor={openOverrideFor}
-          setOpenOverrideFor={setOpenOverrideFor}
-          overrideDraft={overrideDraft}
-          setOverrideDraft={setOverrideDraft}
-          setOverrideNote={setOverrideNote}
-        />
-      )}
-
-      {/* Entries */}
-      {entries.map((entry, ei) => (
-        <div key={ei} className="border-b border-border/50 last:border-b-0">
-          {/* Entry header */}
-          <div className="flex items-center gap-2 px-4 py-1.5 bg-secondary/20">
-            <div className={cn(
-              "size-1.5 rounded-full shrink-0",
-              entry.fields.some(f => f.status === "alert") ? "bg-alert"
-                : entry.fields.some(f => f.status === "warn") ? "bg-warning"
-                : "bg-success"
-            )} />
-            <span className="text-[10px] font-semibold text-foreground">{entry.name}</span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-semibold">{entry.tag}</span>
-          </div>
-          {/* Sub-fields */}
-          {entry.fields.map(field => {
-            const vOk = field.status === "ok";
-            const vWarn = field.status === "warn";
-            return (
-              <div key={field.label} className={cn(
-                "flex items-center gap-3 pl-8 pr-4 py-2 border-t border-border/30 hover:bg-secondary/20 transition-colors",
-                field.status === "alert" ? "bg-alert-soft/10" : ""
-              )}>
-                <div className={cn("size-1.5 rounded-full shrink-0", DOT_STYLE[field.status])} />
-                <span className="text-[10px] font-medium text-muted-foreground w-[120px] shrink-0">{field.label}</span>
-                <span className={cn(
-                  "flex-1 text-[10px]",
-                  field.status === "alert" ? "text-alert font-semibold" : field.status === "warn" ? "text-warning" : "text-foreground"
-                )}>{field.value}</span>
-                <span className="text-[8px] font-bold whitespace-nowrap">
-                  <span className="text-success">ID✓</span>
-                  <span className="text-muted-foreground/30 mx-0.5">/</span>
-                  <span className={vOk ? "text-success" : vWarn ? "text-warning" : "text-alert"}>
-                    {vOk ? "V✓" : vWarn ? "V⚠" : "V✕"}
-                  </span>
-                </span>
-                <span className={cn("text-[8px] px-1 py-0.5 rounded border font-semibold", SOURCE_STYLE[field.source])}>{field.source}</span>
-                <button
-                  disabled
-                  className="flex items-center gap-1 text-[8px] font-semibold px-1.5 py-0.5 rounded border border-border/30 text-muted-foreground/30 cursor-not-allowed"
-                  title="Trace available on the object level above"
-                >
-                  <Bot className="size-2.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-};
 
 const EntityDetailPanel = ({ profile, onClose }: { profile: EntityProfile; onClose: () => void }) => {
   const [tab, setTab] = useState<"attrs" | "case">("attrs");
@@ -4511,36 +3300,6 @@ const EntityDetailPanel = ({ profile, onClose }: { profile: EntityProfile; onClo
       </div>
     </div>
   );
-};
-
-// ---------- Per-attribute mini trace ----------
-
-const SOURCE_AGENT: Record<EntityAttr["source"], { name: string; system: string; icon: string }> = {
-  CRM: { name: "CRM Sync Agent", system: "Salesforce CRM (Customer 360)", icon: "🗂" },
-  "3rd": { name: "External Data Agent", system: "GLEIF / SEC EDGAR / OFAC / Refinitiv", icon: "🌐" },
-  Forge: { name: "Forge Policy Agent", system: "Internal Forge Knowledge Graph", icon: "⚙" },
-};
-
-const STATUS_LABEL: Record<EntityAttr["status"], string> = {
-  ok: "Verified", warn: "Review", alert: "Action Required",
-};
-
-const COMPLETENESS_LABEL: Record<EntityAttr["status"], string> = {
-  ok: "Complete", warn: "Review", alert: "Incomplete",
-};
-
-const COMPLETENESS_STYLE: Record<EntityAttr["status"], string> = {
-  ok: "bg-success-soft text-success border-success-soft-border",
-  warn: "bg-warning-soft text-warning border-warning-soft-border",
-  alert: "bg-alert-soft text-alert border-alert-soft-border",
-};
-
-const DOC_KIND_META: Record<AttrDocKind, { label: string; tone: string }> = {
-  filing:     { label: "Filing",         tone: "bg-info-soft text-primary border-primary/30" },
-  screenshot: { label: "Screenshot",     tone: "bg-secondary text-foreground border-border" },
-  register:   { label: "Register Entry", tone: "bg-warning-soft text-[hsl(30_70%_40%)] border-warning-soft-border" },
-  passport:   { label: "Identity Doc",   tone: "bg-success-soft text-success border-success-soft-border" },
-  letter:     { label: "Letter",         tone: "bg-info-soft text-primary border-primary/30" },
 };
 
 const AttributeRow = ({ attr, entity }: { attr: EntityAttr; entity: string }) => {
@@ -5203,100 +3962,6 @@ const EscalationDialog = ({
 
 export default ExceptionReview;
 
-// ---------- Collaboration Comments (per-case) ----------
-
-type CaseComment = {
-  author: string;
-  initials: string;
-  role: string;
-  time: string;
-  body: string;
-  kind: "comment" | "ai" | "action";
-};
-
-const COMMENTS_BY_KYC: Record<string, CaseComment[]> = {
-  "KYC-30214": [
-    { author: "Quinn Doe", initials: "QD", role: "Reviewer · L2", time: "Today, 7:08 AM", kind: "comment",
-      body: "Drafted outreach to Brevan Howard Compliance for the PSC02 correction. Expecting filing within the 7-day SLA." },
-    { author: "Aanya Sharma", initials: "AS", role: "EDD Specialist", time: "Yesterday, 6:03 AM", kind: "comment",
-      body: "BH Partnership Holdings (Jersey) still needs source-of-funds before we can sign off on the Jersey leg." },
-    { author: "Identity Agent", initials: "AI", role: "AI · auto-note", time: "Yesterday, 3:12 PM", kind: "ai",
-      body: "Refreshed CS01 and PSC register for OC302636 from Companies House. 1 new diff detected on PSC address." },
-  ],
-  "KYC-30188": [
-    { author: "Marcus Lee", initials: "ML", role: "Reviewer · L2", time: "Today, 8:21 AM", kind: "comment",
-      body: "FCA permission scope drift confirmed against latest Gabriel return — pinging RM for AIFMD Article 23 pack." },
-    { author: "Sanctions Agent", initials: "AI", role: "AI · auto-note", time: "April 21, 2026, 2:11 PM", kind: "ai",
-      body: "Auto-cleared 1 sanctions false positive on PSC name match — DOB & nationality divergence verified." },
-    { author: "You", initials: "YO", role: "Reviewer · L1", time: "April 22, 2026, 7:18 AM", kind: "action",
-      body: "Confirmed PSC for Marshall Wace LLP — no further action needed on the beneficial-owner leg." },
-  ],
-  "KYC-30215": [
-    { author: "Marcus Lee", initials: "ML", role: "Reviewer · L2", time: "April 21, 2026, 11:02 AM", kind: "comment",
-      body: "LEI mismatch with GLEIF — requested re-issue confirmation from Long Focus client services." },
-    { author: "Document Agent", initials: "AI", role: "AI · auto-note", time: "April 20, 2026, 4:30 PM", kind: "ai",
-      body: "Pulled Form ADV Part 1A from SEC IAPD. Compliance officer attestation date precedes last refresh." },
-  ],
-  "KYC-30216": [
-    { author: "Priya Patel", initials: "PP", role: "Approver · L3", time: "Today, 9:15 AM", kind: "comment",
-      body: "Risk rating discrepancy needs Compliance sign-off before we can proceed. Escalating to the risk committee." },
-    { author: "Risk Agent", initials: "AI", role: "AI · auto-note", time: "Yesterday, 11:30 AM", kind: "ai",
-      body: "Cayman-domiciled ownership entities detected in submitted structure chart. Risk model auto-triggered High classification per jurisdiction matrix." },
-    { author: "Dana Ortiz", initials: "DO", role: "US Compliance", time: "May 20, 2026, 3:45 PM", kind: "comment",
-      body: "Reviewing NFIE vs Investment Entity classification — awaiting Legal's position on the nature-of-business trigger." },
-  ],
-};
-
-const kindTone: Record<CaseComment["kind"], string> = {
-  comment: "bg-info-soft text-primary",
-  ai: "bg-success-soft text-success",
-  action: "bg-secondary text-foreground",
-};
-
-// ---------- Watchers, Activity ----------
-
-type Watcher = { name: string; initials: string; role: string };
-const WATCHERS_BY_KYC: Record<string, Watcher[]> = {
-  "KYC-30214": [
-    { name: "Quinn Doe", initials: "QD", role: "Reviewer · L2" },
-    { name: "Aanya Sharma", initials: "AS", role: "EDD Specialist" },
-    { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
-  ],
-  "KYC-30188": [
-    { name: "Marcus Lee", initials: "ML", role: "Reviewer · L2" },
-    { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
-  ],
-  "KYC-30215": [
-    { name: "Marcus Lee", initials: "ML", role: "Reviewer · L2" },
-    { name: "Dana Ortiz", initials: "DO", role: "US Compliance" },
-  ],
-  "KYC-30216": [
-    { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
-    { name: "Dana Ortiz", initials: "DO", role: "US Compliance" },
-    { name: "Quinn Doe", initials: "QD", role: "Reviewer · L2" },
-  ],
-};
-
-type Activity = { time: string; text: string };
-const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
-  "KYC-30214": [
-    { time: "Today, 7:08 AM", text: "Quinn Doe posted a comment" },
-    { time: "Today, 6:00 AM", text: "Identity Agent refreshed Companies House data" },
-    { time: "Yesterday, 4:40 PM", text: "Form CS01 uploaded to locker" },
-    { time: "Yesterday, 3:12 PM", text: "Document Agent attached PSC register diff" },
-    { time: "2 days ago", text: "Case assigned to Quinn Doe" },
-  ],
-  "KYC-30188": [
-    { time: "Today, 8:21 AM", text: "Marcus Lee posted a comment" },
-    { time: "Yesterday, 2:11 PM", text: "Sanctions Agent auto-cleared 1 false positive" },
-    { time: "April 22, 2026, 7:18 AM", text: "You confirmed PSC for Marshall Wace LLP" },
-  ],
-  "KYC-30215": [
-    { time: "April 21, 2026, 11:02 AM", text: "Marcus Lee posted a comment" },
-    { time: "April 20, 2026, 4:30 PM", text: "Document Agent pulled Form ADV Part 1A" },
-  ],
-};
-
 // ── Merge entities from entities.md (auto-generated at build time) ─────────────
 // Static data takes precedence; generated data only adds entities not already here.
 {
@@ -5317,199 +3982,4 @@ const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
   for (const [k, v] of Object.entries(GENERATED_WATCHERS))  { if (!WATCHERS_BY_KYC[k])  (WATCHERS_BY_KYC as Record<string, typeof v>)[k]  = v; }
   for (const [k, v] of Object.entries(GENERATED_ACTIVITY))  { if (!ACTIVITY_BY_KYC[k])  (ACTIVITY_BY_KYC as Record<string, typeof v>)[k]  = v; }
 }
-
-type CollabSubTab = "comments" | "watchers" | "activity";
-
-const CollabPanel = ({ entity, kyc }: { entity: string; kyc: string }) => {
-  const [sub, setSub] = useState<CollabSubTab>("comments");
-  const [draft, setDraft] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const [localComments, setLocalComments] = useState<CaseComment[]>(
-    () => COMMENTS_BY_KYC[kyc] ?? [
-      { author: "System", initials: "SY", role: "Auto", time: "Today",
-        body: `No collaboration activity yet on ${entity}. Be the first to leave a note.`, kind: "comment" as const },
-    ]
-  );
-  const [localActivity, setLocalActivity] = useState<Activity[]>(
-    () => ACTIVITY_BY_KYC[kyc] ?? []
-  );
-
-  // Reset when switching to a different case
-  useEffect(() => {
-    setLocalComments(COMMENTS_BY_KYC[kyc] ?? [
-      { author: "System", initials: "SY", role: "Auto", time: "Today",
-        body: `No collaboration activity yet on ${entity}. Be the first to leave a note.`, kind: "comment" as const },
-    ]);
-    setLocalActivity(ACTIVITY_BY_KYC[kyc] ?? []);
-    setDraft("");
-  }, [kyc, entity]);
-
-  const watchers = WATCHERS_BY_KYC[kyc] ?? [];
-
-  const subTabs: { id: CollabSubTab; label: string; count: number }[] = [
-    { id: "comments", label: "Comments", count: localComments.length },
-    { id: "watchers", label: "Watchers", count: watchers.length },
-    { id: "activity", label: "Activity", count: localActivity.length },
-  ];
-
-  const handlePost = () => {
-    const text = draft.trim();
-    if (!text) return;
-    const newComment: CaseComment = {
-      author: "You",
-      initials: "YO",
-      role: "Reviewer · L1",
-      time: "Just now",
-      body: text,
-      kind: "comment",
-    };
-    setLocalComments((prev) => [newComment, ...prev]);
-    setLocalActivity((prev) => [{ time: "Just now", text: "You posted a comment" }, ...prev]);
-    setDraft("");
-  };
-
-  const handleReply = (author: string) => {
-    setDraft(`@${author} `);
-    setSub("comments");
-    setTimeout(() => {
-      textareaRef.current?.focus();
-      const len = (`@${author} `).length;
-      textareaRef.current?.setSelectionRange(len, len);
-    }, 0);
-  };
-
-  return (
-    <section>
-      <header className="flex items-center justify-between mb-3">
-        <p className="text-[11px] text-muted-foreground truncate">
-          <span className="font-medium text-foreground/80">{kyc}</span> · {entity}
-        </p>
-      </header>
-
-      <div className="flex items-center gap-1 mb-4 p-1 rounded-lg bg-secondary/60 border border-border">
-        {subTabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSub(t.id)}
-            className={cn(
-              "flex-1 text-[11px] py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5",
-              sub === t.id ? "bg-card shadow-sm font-medium" : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t.label}
-            <span className={cn(
-              "text-[9px] px-1 py-px rounded",
-              sub === t.id ? "bg-secondary text-foreground" : "bg-card/60 text-muted-foreground"
-            )}>{t.count}</span>
-          </button>
-        ))}
-      </div>
-
-      {sub === "comments" && (
-        <>
-          <ul className="space-y-3 max-h-[360px] overflow-y-auto pr-1 -mr-1">
-            {localComments.map((c, i) => (
-              <li key={i} className={cn("flex items-start gap-2.5", i === 0 && c.time === "Just now" && "animate-fade-in")}>
-                <span className={cn("size-7 rounded-full grid place-items-center shrink-0 text-[10px] font-semibold", kindTone[c.kind])}>
-                  {c.kind === "ai" ? <Bot className="size-3.5" /> : c.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[12px] font-medium leading-tight">{c.author}</span>
-                    <span className="text-[10px] text-muted-foreground">{c.role}</span>
-                    {i === 0 && c.time === "Just now" && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-soft text-success border border-success-soft-border">Posted</span>
-                    )}
-                  </div>
-                  <p className="text-[12px] text-foreground/90 mt-0.5 leading-snug">{c.body}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-[10px] text-muted-foreground">{c.time}</p>
-                    {c.kind !== "ai" && (
-                      <button
-                        onClick={() => handleReply(c.author)}
-                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        Reply
-                      </button>
-                    )}
-                    <button className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">Resolve</button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-3 rounded-lg border border-border p-2 focus-within:ring-2 focus-within:ring-ring/30 transition-shadow">
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handlePost(); }}
-              rows={2}
-              placeholder="Write a comment… use @ to mention a teammate"
-              className="w-full bg-transparent text-[12px] outline-none resize-none placeholder:text-muted-foreground"
-            />
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <button className="hover:text-foreground" title="Attach"><Paperclip className="size-3.5" /></button>
-                <button className="text-[11px] hover:text-foreground" title="Mention" onClick={() => setDraft((d) => d + "@")}>@</button>
-                <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">⌘↵ to post</span>
-              </div>
-              <button
-                onClick={handlePost}
-                className="text-[11px] px-3 py-1 rounded-full bg-primary text-primary-foreground font-medium hover:opacity-95 disabled:opacity-40 transition-opacity"
-                disabled={!draft.trim()}
-              >
-                Post
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {sub === "watchers" && (
-        <>
-          <ul className="space-y-2 max-h-[360px] overflow-y-auto pr-1 -mr-1">
-            {watchers.map((w, i) => (
-              <li key={i} className="flex items-center gap-2.5 rounded-lg border border-border p-2">
-                <span className="size-7 rounded-full grid place-items-center bg-info-soft text-primary text-[10px] font-semibold shrink-0">
-                  {w.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-medium leading-tight truncate">{w.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{w.role}</p>
-                </div>
-                <button className="text-[10px] text-muted-foreground hover:text-foreground">Remove</button>
-              </li>
-            ))}
-          </ul>
-          <button className="mt-3 w-full text-[12px] py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-border/70 transition-colors flex items-center justify-center gap-1.5">
-            <Plus className="size-3.5" /> Add watcher
-          </button>
-        </>
-      )}
-
-      {sub === "activity" && (
-        <ul className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1 -mr-1">
-          {localActivity.length === 0 && (
-            <li className="text-[12px] text-muted-foreground italic text-center py-4">No activity yet for this case.</li>
-          )}
-          {localActivity.map((a, i) => (
-            <li key={i} className={cn("flex items-start gap-2.5", i === 0 && a.time === "Just now" && "animate-fade-in")}>
-              <span className={cn("mt-1.5 size-1.5 rounded-full shrink-0", i === 0 && a.time === "Just now" ? "bg-success" : "bg-primary/60")} />
-              <div className="min-w-0">
-                <p className="text-[12px] leading-snug">{a.text}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{a.time}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-};
-
-
-
 

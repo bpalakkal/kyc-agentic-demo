@@ -1,0 +1,18 @@
+/**
+ * Auth-aware wrapper around fetch.
+ * Automatically injects the current Supabase session JWT as a Bearer token
+ * so every call to the Express backend passes the C3 authentication check.
+ */
+import { supabase } from './supabase';
+
+export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers as Record<string, string> | undefined),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+}
