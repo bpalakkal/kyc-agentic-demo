@@ -68,7 +68,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
-import { AttributeDiffModal } from "@/components/kyc/AttributeDiffModal";
+import { AttributeDiffModal, type PendingDiff } from "@/components/kyc/AttributeDiffModal";
 
 // ─── Agent registry ──────────────────────────────────────────────────────────
 // Add a new AgentId value and a corresponding entry in AGENTS[] to introduce
@@ -453,13 +453,7 @@ type AgentRun = {
   result?: unknown;
 };
 
-export type PendingDiff = {
-  runId: string;
-  kycRef: string;
-  agentId: AgentId;
-  onCommit: (result: unknown) => void;
-  onCancel: () => void;
-};
+// PendingDiff is defined in AttributeDiffModal to avoid a circular import.
 
 type AgentContextValue = {
   runs: AgentRun[];

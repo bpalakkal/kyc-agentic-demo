@@ -13,8 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
-import { AGENT_API_BASE } from "@/components/AgentSystem";
-import type { PendingDiff } from "@/components/AgentSystem";
+
+const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
+
+export interface PendingDiff {
+  runId: string;
+  kycRef: string;
+  agentId: string;
+  onCommit: (result: unknown) => void;
+  onCancel: () => void;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
