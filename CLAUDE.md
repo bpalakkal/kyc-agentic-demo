@@ -173,6 +173,15 @@ AgentRunOutput {
 }
 ```
 
+### Attribute group convention — **mandatory for all runners**
+Every `AttributeOutput` must set `attributeGroup` to exactly one of:
+- `'core'` — any factual / regulatory / structural attribute shown in the Attributes tab
+- `'wgq'`  — questionnaire fields shown in the Questionnaire tab
+
+**Never invent new group names.** The frontend (`ExceptionReview` `AttributeFormView`) filters on
+`attribute_group === 'core'` to build the attribute list for entities that have no curated profile.
+A custom group name silently causes all attributes from that runner to be invisible in the UI.
+
 ### Publisher pipeline
 `ApiRunner.run()` calls publishers automatically after `execute()`:
 - `AttributePublisher` — bulk insert into entity_attributes
