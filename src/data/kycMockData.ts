@@ -251,7 +251,7 @@ export const ENTITY_PROFILES: Record<string, EntityProfile> = {
   },
   "Brevan Howard Asset Management LLP": {
     name: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214",
+    kyc: "KYC-30229",
     attrs: [
       { label: "Legal Form", value: "Limited Liability Partnership (LLP)", source: "3rd", status: "ok" },
       { label: "Company Number", value: "OC302636", source: "3rd", status: "ok",
@@ -304,7 +304,7 @@ export const ENTITY_PROFILES: Record<string, EntityProfile> = {
       { label: "Last KYC Refresh", value: "2025-11-02", source: "Forge", status: "ok" },
       { label: "Risk Tier", value: "Elevated (Jersey EDD active)", source: "Forge", status: "alert" },
     ],
-    caseFile: `# Brevan Howard Asset Management LLP\n\n**KYC ID:** KYC-30214  \n**Companies House #:** OC302636  \n**FCA FRN:** 209517\n\n## Entity Summary\nUK-domiciled limited liability partnership and FCA-authorised investment manager. Founded in 2002 as **Rivage Capital Management LLP**; renamed to Brevan Howard Asset Management LLP in 2007. Runs global macro and multi-strategy hedge funds for institutional clients.\n\n## Registered Particulars (Companies House)\n- **Number:** OC302636  \n- **Type:** LLP  \n- **Status:** Active  \n- **Incorporated:** 2002-07-16  \n- **Office:** 4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB, United Kingdom\n\n## Designated Members\n| Name | Domicile | Reg. # |\n|------|----------|--------|\n| BH Partnership Holdings Limited | Jersey | 106333 |\n| Brevan Howard Asset Management Services Limited | United Kingdom | 11117501 |\n\n## Persons of Significant Control\n- **Mr Alan Eldad Howard** — b. 1963-09, British  \n  Voting rights: 75–100% (LLP)  \n  Right to share of surplus assets: 25–50%  \n  Correspondence: 82 Baker Street, London W1U 6AE *(address drift flagged)*\n\n## Active Exceptions\n- **Undisclosed PSC Address Change** — PSC02 correction requested\n- **Cross-Jurisdiction Corporate Member (Jersey)** — EDD pack pending\n- **Previous Company Name Continuity** — CRM backfill recommended\n\n## Next Actions\n1. Run EDD on BH Partnership Holdings Limited (Jersey).\n2. Request PSC02 correction filing from client.\n3. Backfill 'Rivage Capital Management LLP' alias into CRM.`,
+    caseFile: `# Brevan Howard Asset Management LLP\n\n**KYC ID:** KYC-30229  \n**Companies House #:** OC302636  \n**FCA FRN:** 209517\n\n## Entity Summary\nUK-domiciled limited liability partnership and FCA-authorised investment manager. Founded in 2002 as **Rivage Capital Management LLP**; renamed to Brevan Howard Asset Management LLP in 2007. Runs global macro and multi-strategy hedge funds for institutional clients.\n\n## Registered Particulars (Companies House)\n- **Number:** OC302636  \n- **Type:** LLP  \n- **Status:** Active  \n- **Incorporated:** 2002-07-16  \n- **Office:** 4th Floor Phoenix House, 1 Station Hill, Reading, RG1 1NB, United Kingdom\n\n## Designated Members\n| Name | Domicile | Reg. # |\n|------|----------|--------|\n| BH Partnership Holdings Limited | Jersey | 106333 |\n| Brevan Howard Asset Management Services Limited | United Kingdom | 11117501 |\n\n## Persons of Significant Control\n- **Mr Alan Eldad Howard** — b. 1963-09, British  \n  Voting rights: 75–100% (LLP)  \n  Right to share of surplus assets: 25–50%  \n  Correspondence: 82 Baker Street, London W1U 6AE *(address drift flagged)*\n\n## Active Exceptions\n- **Undisclosed PSC Address Change** — PSC02 correction requested\n- **Cross-Jurisdiction Corporate Member (Jersey)** — EDD pack pending\n- **Previous Company Name Continuity** — CRM backfill recommended\n\n## Next Actions\n1. Run EDD on BH Partnership Holdings Limited (Jersey).\n2. Request PSC02 correction filing from client.\n3. Backfill 'Rivage Capital Management LLP' alias into CRM.`,
   },
   "Marshall Wace LLP": {
     name: "Marshall Wace LLP",
@@ -522,9 +522,9 @@ export const NESTED_ATTR_PROFILES: Record<string, NestedEntry[]> = {
 // ─── Case documents ───────────────────────────────────────────────────────────
 
 export const CASE_DOCUMENTS: CaseDoc[] = [
-  { id: "d1", title: "Annual Confirmation Statement (CS01)", entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", source: "Companies House", kind: "filing", date: "2026-03-14", size: "2.5 KB", url: "/sample-docs/cs01-brevan-howard.pdf", linkedAttrs: ["Principal Place of Business", "Registered Office"] },
-  { id: "d2", title: "Persons with Significant Control Register", entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", source: "Companies House", kind: "register", date: "2026-05-12", size: "2.7 KB", url: "/sample-docs/psc-register-brevan-howard.pdf", linkedAttrs: ["Persons with Significant Control", "Controllers"] },
-  { id: "d3", title: "Passport — Alan E. Howard", entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", source: "HMRC GOV.UK Verify", kind: "passport", date: "2024-11-02", size: "2.5 KB", url: "/sample-docs/passport-alan-howard.pdf", linkedAttrs: ["Persons with Significant Control"] },
+  { id: "d1", title: "Annual Confirmation Statement (CS01)", entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", source: "Companies House", kind: "filing", date: "2026-03-14", size: "2.5 KB", url: "/sample-docs/cs01-brevan-howard.pdf", linkedAttrs: ["Principal Place of Business", "Registered Office"] },
+  { id: "d2", title: "Persons with Significant Control Register", entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", source: "Companies House", kind: "register", date: "2026-05-12", size: "2.7 KB", url: "/sample-docs/psc-register-brevan-howard.pdf", linkedAttrs: ["Persons with Significant Control", "Controllers"] },
+  { id: "d3", title: "Passport — Alan E. Howard", entity: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", source: "HMRC GOV.UK Verify", kind: "passport", date: "2024-11-02", size: "2.5 KB", url: "/sample-docs/passport-alan-howard.pdf", linkedAttrs: ["Persons with Significant Control"] },
   { id: "d4", title: "FCA Register Extract — FRN 170583", entity: "Marshall Wace LLP", kyc: "KYC-30188", source: "FCA Register", kind: "register", date: "2026-05-22", size: "2.4 KB", url: "/sample-docs/fca-register-marshall-wace.pdf", linkedAttrs: ["Previous Company Names", "FCA Regulatory Permissions"] },
   { id: "d5", title: "FCA Name Change Notification (2007)", entity: "Marshall Wace LLP", kyc: "KYC-30188", source: "FCA Correspondence", kind: "letter", date: "2007-09-03", size: "2.2 KB", url: "/sample-docs/fca-name-change-letter.pdf", linkedAttrs: ["Previous Company Names"] },
   { id: "d6", title: "CRM Snapshot — Customer 360", entity: "Marshall Wace LLP", kyc: "KYC-30188", source: "Salesforce CRM", kind: "screenshot", date: "2026-02-11", size: "2.5 KB", url: "/sample-docs/crm-snapshot-mw.pdf", linkedAttrs: ["Previous Company Names", "FCA Regulatory Permissions"] },
@@ -558,7 +558,7 @@ export const kindTone: Record<CaseComment["kind"], string> = {
 };
 
 export const COMMENTS_BY_KYC: Record<string, CaseComment[]> = {
-  "KYC-30214": [
+  "KYC-30229": [
     { author: "Quinn Doe", initials: "QD", role: "Reviewer · L2", time: "Today, 7:08 AM", kind: "comment", body: "Drafted outreach to Brevan Howard Compliance for the PSC02 correction. Expecting filing within the 7-day SLA." },
     { author: "Aanya Sharma", initials: "AS", role: "EDD Specialist", time: "Yesterday, 6:03 AM", kind: "comment", body: "BH Partnership Holdings (Jersey) still needs source-of-funds before we can sign off on the Jersey leg." },
     { author: "Identity Agent", initials: "AI", role: "AI · auto-note", time: "Yesterday, 3:12 PM", kind: "ai", body: "Refreshed CS01 and PSC register for OC302636 from Companies House. 1 new diff detected on PSC address." },
@@ -581,7 +581,7 @@ export const COMMENTS_BY_KYC: Record<string, CaseComment[]> = {
 
 export type Watcher = { name: string; initials: string; role: string };
 export const WATCHERS_BY_KYC: Record<string, Watcher[]> = {
-  "KYC-30214": [
+  "KYC-30229": [
     { name: "Quinn Doe", initials: "QD", role: "Reviewer · L2" },
     { name: "Aanya Sharma", initials: "AS", role: "EDD Specialist" },
     { name: "Priya Patel", initials: "PP", role: "Approver · L3" },
@@ -603,7 +603,7 @@ export const WATCHERS_BY_KYC: Record<string, Watcher[]> = {
 
 export type Activity = { time: string; text: string };
 export const ACTIVITY_BY_KYC: Record<string, Activity[]> = {
-  "KYC-30214": [
+  "KYC-30229": [
     { time: "Today, 7:08 AM", text: "Quinn Doe posted a comment" },
     { time: "Today, 6:00 AM", text: "Identity Agent refreshed Companies House data" },
     { time: "Yesterday, 4:40 PM", text: "Form CS01 uploaded to locker" },

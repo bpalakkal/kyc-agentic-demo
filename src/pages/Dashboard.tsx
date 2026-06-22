@@ -59,11 +59,11 @@ function toPriorityCase(e: ApiEntity): PriorityCase {
 type FilterKey = "all" | "high" | "today";
 
 const aiActions: { dot: string; title: string; sub: string; chip?: string; reason: string; entity: CaseRef }[] = [
-  { dot: "alert",   title: "Sign off on KYC-30214",                   sub: "Brevan Howard · PSC filing overdue",       chip: "Recommended", reason: "All exceptions have been resolved.",                                    entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
+  { dot: "alert",   title: "Sign off on KYC-30229",                   sub: "Brevan Howard · PSC filing overdue",       chip: "Recommended", reason: "All exceptions have been resolved.",                                    entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229" } },
   { dot: "alert",   title: "Escalate KYC-30188 FCA scope",            sub: "Marshall Wace · SLA breach today",                              reason: "SLA breaches in <4 hours with no client response.",                    entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
-  { dot: "warning", title: "Run EDD on Jersey corporate member",       sub: "BH Partnership Holdings Limited",                               reason: "Jurisdiction matches EDD policy POL-EDD-23.",                         entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
+  { dot: "warning", title: "Run EDD on Jersey corporate member",       sub: "BH Partnership Holdings Limited",                               reason: "Jurisdiction matches EDD policy POL-EDD-23.",                         entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229" } },
   { dot: "warning", title: "Reconcile Marshall Wace AUM",             sub: "FCA Gabriel vs CRM mismatch",                                    reason: "AUM delta of £180m detected between sources.",                        entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
-  { dot: "muted",   title: "Backfill 'Rivage Capital' name alias",    sub: "Brevan Howard · CRM history sync",                               reason: "Companies House name history not yet in CRM.",                        entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214" } },
+  { dot: "muted",   title: "Backfill 'Rivage Capital' name alias",    sub: "Brevan Howard · CRM history sync",                               reason: "Companies House name history not yet in CRM.",                        entity: { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229" } },
   { dot: "muted",   title: "Request AIFMD Article 23 pack",           sub: "Marshall Wace · client outreach",                                reason: "New 'Managing an AIF' permission added on 02/11/2026.",               entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
   { dot: "muted",   title: "Add cleared name pair to sanctions allowlist", sub: "Marshall Wace PSC · false positive",                        reason: "Identity divergence on DOB and nationality confirmed.",                entity: { name: "Marshall Wace LLP",                   kyc: "KYC-30188" } },
 ];
@@ -185,7 +185,7 @@ const Dashboard = () => {
       name: entityByKyc[kyc]?.entity_name ?? fallback,
       kyc,
     });
-    const BREVAN    = ref("KYC-30214", "Brevan Howard Asset Management LLP");
+    const BREVAN    = ref("KYC-30229", "Brevan Howard Asset Management LLP");
     const MW        = ref("KYC-30188", "Marshall Wace LLP");
     const LONG_FOCUS = ref("KYC-30215", "Long Focus Capital Management, LLC");
     return {
@@ -194,7 +194,7 @@ const Dashboard = () => {
         { type: "ai" as CollabType, title: "AI Agent pulled 3 fresh Companies House filings", time: "Yesterday, 3:12 PM", case: BREVAN, snippet: "Auto-refreshed CS01 + PSC register for OC302636." },
         { type: "action" as CollabType, title: "You confirmed PSC for Marshall Wace LLP", time: "April 22, 2026, 7:18 AM", case: MW },
         { type: "comment" as CollabType, title: "Aanya Sharma flagged a Jersey EDD finding", time: "April 22, 2026, 6:03 AM", case: BREVAN, snippet: "BH Partnership Holdings (Jersey) needs source-of-funds before sign-off." },
-        { type: "document" as CollabType, title: "Form CS01 uploaded to KYC-30214", time: "April 21, 2026, 4:40 PM", case: BREVAN },
+        { type: "document" as CollabType, title: "Form CS01 uploaded to KYC-30229", time: "April 21, 2026, 4:40 PM", case: BREVAN },
         { type: "ai" as CollabType, title: "AI Agent auto-cleared 1 sanctions false positive", time: "April 21, 2026, 2:11 PM", case: MW, snippet: "DOB + nationality divergence confirmed, cleared by sanctions agent." },
         { type: "comment" as CollabType, title: "Marcus Lee left a note on Long Focus Capital", time: "April 21, 2026, 11:02 AM", case: LONG_FOCUS, snippet: "LEI mismatch with GLEIF — need re-issue confirmation from client." },
       ],

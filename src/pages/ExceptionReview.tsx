@@ -111,7 +111,7 @@ const exceptions: Exc[] = [
     confidence: 88,
     status: "Pending",
     entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214",
+    kyc: "KYC-30229",
     flagText: "PSC Mr Alan Eldad Howard's correspondence address on file (82 Baker Street, London) does not match the most recent Form CS01 submission to Companies House.",
     narrative: "Companies House PSC register lists '82 Baker Street, London W1U 6AE' but the firm's latest annual confirmation statement filed on 03/14/2026 references a different correspondence address ('27 Hill Street, London W1J 5LP'). PSCs are required to notify changes within 14 days under Schedule 1A of the Companies Act 2006. No PSC02 amendment has been received.",
     reasoningSteps: [
@@ -163,7 +163,7 @@ const exceptions: Exc[] = [
     confidence: 92,
     status: "Pending",
     entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214",
+    kyc: "KYC-30229",
     flagText: "Designated member 'BH Partnership Holdings Limited' is incorporated in Jersey, Channel Islands — a jurisdiction requiring EDD under FCA SYSC 6.3.",
     narrative: "Per Companies House, BH Partnership Holdings Limited (Jersey reg. 106333) is one of two corporate designated members of Brevan Howard Asset Management LLP. Jersey is on the firm's EDD-required list owing to bank-secrecy heritage, despite being FATF-compliant. EDD requires source-of-funds for the Jersey member and beneficial-owner mapping up to natural persons.",
     reasoningSteps: [
@@ -214,7 +214,7 @@ const exceptions: Exc[] = [
     confidence: 95,
     status: "Pending",
     entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30214",
+    kyc: "KYC-30229",
     flagText: "Entity was previously registered as 'RIVAGE CAPITAL MANAGEMENT LLP' — chain-of-title verification required.",
     narrative: "Companies House shows OC302636 was originally registered as 'Rivage Capital Management LLP' before changing its name to 'Brevan Howard Asset Management LLP'. The internal CRM has only the current name with no prior-name link. KYC policy requires positive identification that the regulated entity is the same legal person across the name change to preserve audit chain.",
     reasoningSteps: [
@@ -903,7 +903,7 @@ const buildHeaderMeta = (addressed: number, total: number) => [
 ];
 
 const DEFAULT_SELECTED_ENTITIES = [
-  { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30214", drg: "London Alternatives DRG" },
+  { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", drg: "London Alternatives DRG" },
   { name: "Marshall Wace LLP", kyc: "KYC-30188", drg: "London Alternatives DRG" },
 ];
 
