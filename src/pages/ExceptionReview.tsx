@@ -2966,9 +2966,10 @@ const AttributeFormView = ({
   const entitiesForTree = selectedEntities.map(e => {
     const profile = ENTITY_PROFILES[e.name];
     const profileLabels = profile?.attrs.map(a => a.label) ?? [];
-    // When no curated profile, use Forge core attribute names as the attribute list
+    // When no curated profile, use all non-WGQ attribute names from the API
+    // (Forge snapshots use 'core'; API runners use groups like 'Entity Information')
     const forgeLabels = profileLabels.length === 0
-      ? Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name)
+      ? Object.values(forgeAttrs).filter(a => a.attribute_group !== 'wgq').map(a => a.attribute_name)
       : [];
     const excTitleLabels = profileLabels.length === 0 && forgeLabels.length === 0
       ? excs.filter(exc => exc.kyc === e.kyc && !exc.id.startsWith("stub-") && !exc.attrLabel).map(exc => exc.title)
