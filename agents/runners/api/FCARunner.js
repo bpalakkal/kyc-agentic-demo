@@ -84,6 +84,7 @@ export class FCARunner extends ApiRunner {
 
     const normalize = s =>
       String(s || '').toLowerCase()
+        .replace(/\s*\([^)]*\)\s*/g, '')
         .replace(/\b(ltd|plc|limited|llp|lp|inc|corp|gmbh|ag|bv|sa|nv|co)\b\.?/g, '')
         .replace(/\s+/g, ' ')
         .trim();
