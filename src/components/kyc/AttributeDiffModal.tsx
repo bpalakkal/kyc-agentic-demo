@@ -62,13 +62,42 @@ interface DiffData {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Matches numbered multi-value attributes: corporate_officer_1, key_controller_2, etc.
+const MULTI_VALUE_RE = /^(.+)_(\d+)$/;
+
 function buildDiffRows(data: DiffData): DiffRow[] {
   const currentMap = new Map(data.currentAttributes.map(a => [a.attribute_name, a.display_value ?? null]));
 
+  // Build a value-set per multi-value group so reordering (officer_2 → officer_3)
+  // is not treated as a change — we compare by value membership, not position.
+  const currentGroupValues = new Map<string, Set<string>>();
+  for (const [name, value] of currentMap) {
+    const m = name.match(MULTI_VALUE_RE);
+    if (m && value) {
+      const base = m[1];
+      if (!currentGroupValues.has(base)) currentGroupValues.set(base, new Set());
+      currentGroupValues.get(base)!.add(value.toLowerCase());
+    }
+  }
+
   return data.newAttributes.map(attr => {
+    const m = attr.attributeName.match(MULTI_VALUE_RE);
+    if (m) {
+      const currentValues = currentGroupValues.get(m[1]);
+      const inGroup = currentValues?.has(attr.displayValue.toLowerCase()) ?? false;
+      return {
+        attributeName:  attr.attributeName,
+        attributeGroup: attr.attributeGroup,
+        currentValue:   inGroup ? attr.displayValue : null,
+        newValue:       attr.displayValue,
+        source:         attr.source,
+        confidence:     attr.confidence,
+        status:         inGroup ? "unchanged" : "new",
+      };
+    }
+
     const current = currentMap.get(attr.attributeName) ?? null;
     const changed  = current !== null && current.toLowerCase() !== attr.displayValue.toLowerCase();
-    const isNew    = current === null;
     return {
       attributeName:  attr.attributeName,
       attributeGroup: attr.attributeGroup,
@@ -76,10 +105,9 @@ function buildDiffRows(data: DiffData): DiffRow[] {
       newValue:       attr.displayValue,
       source:         attr.source,
       confidence:     attr.confidence,
-      status:         isNew ? "new" : changed ? "changed" : "unchanged",
+      status:         current === null ? "new" : changed ? "changed" : "unchanged",
     };
   }).sort((a, b) => {
-    // New and changed first, then unchanged; alpha within each group
     const order = { new: 0, changed: 1, unchanged: 2 };
     return (order[a.status] - order[b.status]) || a.attributeName.localeCompare(b.attributeName);
   });
