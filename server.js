@@ -128,14 +128,13 @@ const app = express();
 
 const ALLOWED_ORIGINS = [
   "https://bpalakkal.github.io",
-  "http://localhost:5173",
-  "http://localhost:8080",
-  "http://localhost:3002",
 ];
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow server-to-server requests (no Origin header) and whitelisted origins
-    if (!origin || ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) return cb(null, true);
+    // Allow server-to-server requests (no Origin header), any localhost port, and whitelisted origins
+    if (!origin) return cb(null, true);
+    if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
+    if (ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
 }));
@@ -249,6 +248,18 @@ async function proxyFetch(url, options = {}, timeoutMs = 25000) {
   }
 }
 
+// ── File MIME helpers (used by snapshot route) ────────────────────────────────
+function isImage(filename) {
+  return /\.(png|jpe?g|gif|webp|svg)$/i.test(filename ?? '');
+}
+function guessMime(filename) {
+  if (/\.pdf$/i.test(filename))   return 'application/pdf';
+  if (/\.docx$/i.test(filename))  return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (/\.xlsx$/i.test(filename))  return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  if (isImage(filename))          return 'image/png';
+  return 'application/octet-stream';
+}
+
 // Invoke an agent.  Body is forwarded as-is from the frontend, including
 // { async: true } when the frontend uses asyncMode.
 app.post("/api/agent/:slug", requireAuth, async (req, res) => {
@@ -346,14 +357,73 @@ app.get('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
 
 // POST /api/entity/:kycRef/snapshot — save a new Forge JSON snapshot
 // Body: { data: <Forge JSON object>, agentId?: string, runId?: string }
+// When runId is provided (autonomous agent run), also creates/updates the agent_runs
+// record and processes any artifact files from the AWS ELB.
 app.post('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
   const { data, agentId, runId } = req.body ?? {};
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ error: 'body.data (object) is required' });
   }
   try {
-    const { saveSnapshot } = getSb();
-    const row = await saveSnapshot(req.params.kycRef, data, { agentId, runId });
+    const sbMod = getSb();
+    const row   = await sbMod.saveSnapshot(req.params.kycRef, data, { agentId, runId });
+
+    // When the frontend signals completion of an autonomous run (runId = AWS runId),
+    // create/update agent_runs and harvest any artifact files. Non-fatal on failure.
+    if (runId) {
+      setImmediate(async () => {
+        try {
+          // Upsert agent_runs so re-saves are idempotent.
+          let agentRunId;
+          const { data: existing } = await sbMod.sb
+            .from('agent_runs')
+            .select('id')
+            .eq('external_run_id', runId)
+            .maybeSingle();
+
+          if (existing) {
+            agentRunId = existing.id;
+            await sbMod.updateAgentRun(agentRunId, { status: 'complete' });
+          } else {
+            const ar = await sbMod.createAgentRun({
+              kycRef:      req.params.kycRef,
+              agentSlug:   agentId ?? 'autonomous',
+              runnerType:  'autonomous',
+              initiatedBy: req.user.id,
+            });
+            agentRunId = ar.id;
+            await sbMod.updateAgentRun(agentRunId, { status: 'complete', externalRunId: runId });
+          }
+
+          // Fetch artifact list from AWS and store files.
+          const artifactsResp = await proxyFetch(`${AWS_AGENT_BASE}/api/runs/${runId}/artifacts`, {}, 20000);
+          if (artifactsResp.ok) {
+            const artifacts = artifactsResp.data?.artifacts ?? artifactsResp.data ?? [];
+            const fileList  = Array.isArray(artifacts) ? artifacts : [];
+            const fileMeta  = fileList
+              .filter(a => a.downloadUrl && a.filename)
+              .map(a => ({
+                filename:     a.filename,
+                mimeType:     a.mimeType ?? guessMime(a.filename),
+                fileCategory: isImage(a.filename) ? 'screenshot' : 'document',
+                title:        a.name ?? a.filename,
+                artifactPath: a.downloadUrl,
+                sourceUrl:    a.sourceUrl ?? null,
+              }));
+
+            if (fileMeta.length > 0) {
+              const { FilePublisher } = await import('./agents/publishers/FilePublisher.js');
+              const pub = new FilePublisher(sbMod.sb);
+              await pub.publish(req.params.kycRef, agentRunId, fileMeta, req.user.id);
+              console.log(`[snapshot] Stored ${fileMeta.length} artifact(s) for ${req.params.kycRef}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[snapshot] agent_runs / file pipeline failed: ${err.message}`);
+        }
+      });
+    }
+
     res.status(201).json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -415,6 +485,138 @@ app.patch('/api/entity/:kycRef/exception/:num/resolve', requireAuth, async (req,
     const resolvedBy = req.user.email ?? req.user.id;
     const row = await resolveException(req.params.kycRef, num, { ...req.body, resolvedBy });
     res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Agent runs ───────────────────────────────────────────────────────────────
+
+// GET /api/entity/:kycRef/runs — list persisted agent runs for an entity
+app.get('/api/entity/:kycRef/runs', requireAuth, async (req, res) => {
+  try {
+    const { getAgentRuns } = getSb();
+    res.json(await getAgentRuns(req.params.kycRef));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/agent-run/api/:slug — invoke a synchronous API runner server-side
+// Body: { kycRef: string, entityName: string }
+// Returns: { runId, outputType, stats: { attrCount, excCount, fileStored, fileErrors } }
+app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
+  const { slug } = req.params;
+  const { kycRef, entityName } = req.body ?? {};
+  if (!kycRef)      return res.status(400).json({ error: 'kycRef is required' });
+  if (!entityName)  return res.status(400).json({ error: 'entityName is required' });
+
+  // Lazy-load runner modules to avoid blocking startup
+  let runners;
+  try {
+    runners = await import('./agents/runners/api/index.js');
+  } catch (e) {
+    return res.status(503).json({ error: `Runner modules unavailable: ${e.message}` });
+  }
+
+  const RunnerMap = {
+    'companies-house': runners.CompaniesHouseRunner,
+    'fca':             runners.FCARunner,
+  };
+
+  const RunnerClass = RunnerMap[slug];
+  if (!RunnerClass) {
+    return res.status(404).json({ error: `No API runner registered for slug "${slug}"` });
+  }
+
+  try {
+    const runner = new RunnerClass(getSb().sb);
+    const result = await runner.run({ kycRef, entityName, initiatedBy: req.user.id });
+    res.json(result);
+  } catch (err) {
+    console.error(`[api-runner] ${slug} failed: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/agent-run/async/:slug — start an autonomous AWS agent and persist the run
+// Body: { kycRef: string, entityName: string }
+// Returns: { agentRunId, externalRunId } — frontend continues to poll externalRunId as before
+app.post('/api/agent-run/async/:slug', requireAuth, async (req, res) => {
+  const { slug } = req.params;
+  const { kycRef, entityName } = req.body ?? {};
+  if (!kycRef)     return res.status(400).json({ error: 'kycRef is required' });
+  if (!entityName) return res.status(400).json({ error: 'entityName is required' });
+
+  let autonomousRunners;
+  try {
+    autonomousRunners = await import('./agents/runners/autonomous/index.js');
+  } catch (e) {
+    return res.status(503).json({ error: `Autonomous runner modules unavailable: ${e.message}` });
+  }
+
+  const RunnerMap = {
+    'uk-parent-flow': autonomousRunners.UKParentFlowRunner,
+  };
+
+  const RunnerClass = RunnerMap[slug];
+  if (!RunnerClass) {
+    return res.status(404).json({ error: `No autonomous runner registered for slug "${slug}"` });
+  }
+
+  try {
+    const runner = new RunnerClass(getSb().sb);
+    const result = await runner.invoke({ kycRef, entityName, initiatedBy: req.user.id });
+    res.json(result);
+  } catch (err) {
+    console.error(`[async-runner] ${slug} failed: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Case files ───────────────────────────────────────────────────────────────
+
+// GET /api/entity/:kycRef/files — list all case files for an entity
+// Query: ?category=document|screenshot  (optional)
+app.get('/api/entity/:kycRef/files', requireAuth, async (req, res) => {
+  try {
+    const { getEntityFiles } = getSb();
+    const category = ['document', 'screenshot'].includes(req.query.category)
+      ? req.query.category : undefined;
+    res.json(await getEntityFiles(req.params.kycRef, { category }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/file/:fileId/url — get a short-lived signed URL for a private file
+// Query: ?expiresIn=3600  (optional, seconds)
+app.get('/api/file/:fileId/url', requireAuth, async (req, res) => {
+  const sbMod = getSb();
+  try {
+    const { data: file, error: fetchErr } = await sbMod.sb
+      .from('case_files')
+      .select('storage_path, filename, mime_type')
+      .eq('id', req.params.fileId)
+      .single();
+    if (fetchErr || !file) return res.status(404).json({ error: 'File not found' });
+
+    const expiresIn = Math.min(parseInt(req.query.expiresIn, 10) || 3600, 86400);
+    const { getSignedFileUrl } = sbMod;
+    const url = await getSignedFileUrl(file.storage_path, { expiresIn });
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    res.json({ url, expiresAt, filename: file.filename, mimeType: file.mime_type });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/file/:fileId — delete a file from storage and DB
+app.delete('/api/file/:fileId', requireAuth, async (req, res) => {
+  try {
+    const { deleteFile } = getSb();
+    await deleteFile(req.params.fileId);
+    res.status(204).end();
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

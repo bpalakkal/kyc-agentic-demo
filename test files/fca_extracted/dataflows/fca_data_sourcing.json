@@ -1,0 +1,165 @@
+{
+  "name": "fca_data_sourcing",
+  "description": "Flow to source data from UK FCA",
+  "nodes": [
+    {
+      "id": "dndnode_2",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "fca_name_match",
+        "description": null,
+        "dataBackbone": null,
+        "personaId": "32de96149a28ef714b93d684caee9ae9",
+        "personaName": "UK FCA - FRN Resolution",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [
+          "entity_name"
+        ],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_1",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "fca_agent1",
+        "description": null,
+        "dataBackbone": null,
+        "personaId": "9754954d3aa01cee5b0b4f8fc27221ac",
+        "personaName": "UK - Financial Conduct Authority",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": null,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_6",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "fca_agent2",
+        "description": null,
+        "dataBackbone": null,
+        "personaId": "d58f6a00a92a20b35b22c00965f6dd4c",
+        "personaName": "UK FCA - Individual Data",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_3",
+      "type": "code",
+      "props": {
+        "name": null,
+        "alias": "merge_API_to_JSON",
+        "description": null,
+        "code": "/**\n * FCA Registry — JS Merge Node v17.1 (Updated)\n *\n * Input:  TWO upstream agent inputs, merged automatically regardless of\n *         their node names — Firm Details (firm_core, firm_address,\n *         firm_permissions, firm_regulators) and Individuals & CF\n *         (firm_individuals, firm_cf_pages). Also still works unchanged\n *         with a single combined upstream agent.\n *\n * Output: Single KYC schema object assigned to outputData.\n *         All enum fields are validated — invalid values are set to null.\n */\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 1. READ & PARSE UPSTREAM INPUT\n// ─────────────────────────────────────────────────────────────────────────────\nvar row = {};\nvar upstreamReasoning = [];\nvar inputKeys = Object.keys(inputs || {});\n\nfor (var ii = 0; ii < inputKeys.length; ii++) {\n  var connectedVal = inputs[inputKeys[ii]];\n  var item = Array.isArray(connectedVal) ? connectedVal[0] : connectedVal;\n  if (!item || typeof item !== \"object\") continue;\n\n  var itemKeys = Object.keys(item);\n  for (var ki = 0; ki < itemKeys.length; ki++) {\n    var key = itemKeys[ki];\n    if (key === \"_reasoning\") {\n      if (item[key]) upstreamReasoning.push(String(item[key] && typeof item[key] === \"object\" && \"value\" in item[key] ? item[key].value : item[key]));\n      continue;\n    }\n    if (key === \"frn\" && row.frn) continue; // first input's frn wins; both agents should agree\n    row[key] = item[key];\n  }\n}\n\n// Every field from the agent is wrapped in a confidence envelope\nfunction unwrap(field) {\n  if (field === null || field === undefined) return null;\n  if (typeof field === \"object\" && \"value\" in field) return field.value;\n  return field;\n}\n\nfunction safeParse(val) {\n  if (val !== null && typeof val === \"object\") return val;\n  if (typeof val === \"string\" && val !== \"\") {\n    try { return JSON.parse(val); } catch(e) { return null; }\n  }\n  return null;\n}\n\nfunction unwrapAndParse(field) {\n  return safeParse(unwrap(field));\n}\n\nvar frn        = String(unwrap(row.frn) || \"\").trim();\nvar coreResp   = unwrapAndParse(row.firm_core);\nvar addrResp   = unwrapAndParse(row.firm_address);\nvar permResp   = unwrapAndParse(row.firm_permissions);\nvar indivsResp = unwrapAndParse(row.firm_individuals);\nvar cfPages    = unwrapAndParse(row.firm_cf_pages);\nvar regResp    = unwrapAndParse(row.firm_regulators); \n\n// ─────────────────────────────────────────────────────────────────────────────\n// 2. FULL ENUM SETS \n// ─────────────────────────────────────────────────────────────────────────────\nvar VALID_STATUSES = { \"active\": 1, \"inactive\": 1 };\n\nvar VALID_OFFICER_TYPES = {\n  \"Chief Executive Officer\": 1, \"President\": 1, \"Chief Financial Officer\": 1,\n  \"Treasurer\": 1, \"Chief Operating Officer\": 1, \"General Partner\": 1,\n  \"Board Director\": 1, \"Board Chairman\": 1, \"Chief Compliance Officer\": 1,\n  \"Chief Investment Officer\": 1, \"Chief Risk Officer\": 1, \"Executive Director\": 1, \n  \"Director\": 1, \"Manager\": 1, \"Managing Director\": 1, \"Managing General Partner\": 1,\n  \"Managing Member\": 1, \"Designated Member\": 1, \"Secretary\": 1,\n  \"Senior Vice President\": 1, \"Vice President\": 1\n};\n\nvar VALID_REGULATORS = {\n  \"Financial Conduct Authority\": 1,\n  \"Prudential Regulation Authority\": 1,\n  \"Australian Securities and Investment Commission (ASIC)\": 1,\n  \"Australian Prudential Regulatory Authority (APRA)\": 1,\n  \"Financial Market Authority\": 1,\n  \"Commission Bancaire, Financière et des Assurances - Banking Finance and Insurance Commission (BFIC)\": 1,\n  \"Comissão do Valores Mobiliários - Securities and Exchange Commission of Brazil (CVM)\": 1,\n  \"Superintendência de Seguros Privados (Susep)\": 1,\n  \"Office of the Superintendent of Financial Institutions Canada\": 1,\n  \"Finanstilsynet - Danish Financial Supervisory Authority\": 1,\n  \"Finnish Financial Supervision Authority (FIN-FSA)\": 1,\n  \"Insurance Supervisory Authority (ISA)\": 1,\n  \"Banque de France/Commision Bancaire\": 1,\n  \"Autorité des Marchés Financiers (AMF)\": 1,\n  \"Autorité de Contrôle des Assurances et des Mutuelles\": 1,\n  \"Bundesanstalt fur Finanzdienstleistungs-aufsicht (BaFin)\": 1,\n  \"Bank of Greece\": 1,\n  \"Hellenic Republic Capital Market Commission\": 1,\n  \"Guernsey Financial Services Commission\": 1,\n  \"Hong Kong Monetary Authority\": 1,\n  \"Securities and Futures Commission\": 1,\n  \"Office of the Commissioner of Insurance\": 1,\n  \"Fjármálaeftirlitiđ - Financial Supervisory Authority, Iceland (FME)\": 1,\n  \"Central Bank and Financial Services Authority of Ireland\": 1,\n  \"Financial Supervision Commission (FSM)\": 1,\n  \"Banca d'Italia Eurosistema\": 1,\n  \"Commissione Nazionale per le Società e la Borsa (Consob)\": 1,\n  \"Istituto per la Vigilanza sulle Assicurazioni Private e di Interesse Collecttivo (ISVAP)\": 1,\n  \"Financial Services Agency\": 1,\n  \"Jersey Financial Services Corp. (JFSC)\": 1,\n  \"Commission de Surveillance du Secteur Financier (CSSF)\": 1,\n  \"Banka Negara Malaysia - Central Bank of Malaysia\": 1,\n  \"De Nederlandsche Bank Eurosysteem\": 1,\n  \"Netherlands Authority for Financial Markets (AFM)\": 1,\n  \"Reserve Bank of New Zealand\": 1,\n  \"Securities Commission of New Zealand\": 1,\n  \"Kredittilsynet - Financial Supervisory Authority of Norway\": 1,\n  \"Banco de Portugal\": 1,\n  \"Comissão do Mercado de Valores Mobiliários - Portugese Securities Market Commission (CMVM)\": 1,\n  \"Instituto de Seguros de Portugal - Portugese Insurance Institute (ISP)\": 1,\n  \"Monetary Authority of Singapore\": 1,\n  \"Banco de España Eurosistema\": 1,\n  \"Comisión Nacional del Mercado de Valores\": 1,\n  \"Dirección General de Seguros y Fondos de Pensiones (DGSFP)\": 1,\n  \"Finansinspektionen - Swedish Financial Supervisory Authority\": 1,\n  \"Commission fédérale des banques - Swiss Federal Banking Commission (SFBC)\": 1,\n  \"Financial Services Authority (FSA)\": 1,\n  \"Federal Reserve Board\": 1,\n  \"Office of the Comptroller of the Currency (OCC)\": 1,\n  \"Office of Thrift Supervision (OTS)\": 1,\n  \"Federal Deposit Insurance Corp. (FDIC)\": 1,\n  \"Federal Housing Finance Board (FHFB)\": 1,\n  \"National Credit Union Administration (NCUA)\": 1,\n  \"Commodity Futures Trading Commission (CFTC)\": 1,\n  \"National Futures Association (NFA)\": 1,\n  \"National Association of Securities Dealers (NASD)\": 1,\n  \"U.S. Securities and Exchange Commission (SEC)\": 1,\n  \"Consumer Financial Protection Bureau (CFPB)\": 1,\n  \"Alabama State Banking Department\": 1, \"Alaska Division of Banking and Securities\": 1,\n  \"Arizona Department of Financial Institutions\": 1, \"Arkansas State Bank Department\": 1,\n  \"California Department of Financial Protection and Innovation (DFPI)\": 1, \"Colorado Division of Banking\": 1,\n  \"Connecticut Department of Banking\": 1, \"Delaware Office of the State Bank Commissioner\": 1,\n  \"Florida Office of Financial Regulation\": 1, \"Georgia Department of Banking and Finance\": 1,\n  \"Hawaii Division of Financial Institutions\": 1, \"Idaho Department of Finance\": 1,\n  \"Illinois Division of Banking\": 1, \"Indiana Department of Financial Institutions\": 1,\n  \"Iowa Division of Banking\": 1, \"Kansas Office of the State Bank Commissioner\": 1,\n  \"Kentucky Department of Financial Institutions\": 1, \"Louisiana Office of Financial Institutions\": 1,\n  \"Maine Bureau of Financial Institutions\": 1, \"Maryland Office of the Commissioner of Financial Regulation\": 1,\n  \"Massachusetts Division of Banks\": 1, \"Michigan Department of Insurance and Financial Services\": 1,\n  \"Minnesota Department of Commerce\": 1, \"Mississippi Department of Banking and Consumer Finance\": 1,\n  \"Missouri Division of Finance\": 1, \"Montana Division of Banking and Financial Institutions\": 1,\n  \"Nebraska Department of Banking and Finance\": 1, \"Nevada Financial Institutions Division\": 1,\n  \"New Hampshire Banking Department\": 1, \"New Jersey Department of Banking and Insurance\": 1,\n  \"New Mexico Financial Institutions Division\": 1, \"New York State Department of Financial Services\": 1,\n  \"North Carolina Office of the Commissioner of Banks\": 1, \"North Dakota Department of Financial Institutions\": 1,\n  \"Ohio Division of Financial Institutions\": 1, \"Oklahoma State Banking Department\": 1,\n  \"Oregon Division of Financial Regulation\": 1, \"Pennsylvania Department of Banking and Securities\": 1,\n  \"Rhode Island Department of Business Regulation\": 1, \"South Carolina State Board of Financial Institutions\": 1,\n  \"South Dakota Division of Banking\": 1, \"Tennessee Department of Financial Institutions\": 1,\n  \"Texas Department of Banking\": 1, \"Utah Department of Financial Institutions\": 1,\n  \"Vermont Department of Financial Regulation\": 1, \"Virginia Bureau of Financial Institutions\": 1,\n  \"Washington Department of Financial Institutions\": 1, \"West Virginia Division of Financial Institutions\": 1,\n  \"Wisconsin Department of Financial Institutions\": 1, \"Wyoming Division of Banking\": 1\n};\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 2b. TOLERANT ENUM MATCHING\n// ─────────────────────────────────────────────────────────────────────────────\nfunction normalizeForMatch(str) {\n  if (!str) return \"\";\n  return String(str)\n    .normalize(\"NFKC\")\n    .replace(/[\\u2018\\u2019\\u02BC]/g, \"'\")\n    .replace(/[\\u201C\\u201D]/g, '\"')\n    .replace(/[\\u2013\\u2014]/g, \"-\")\n    .replace(/[^\\p{L}\\p{N}]+/gu, \" \")\n    .trim()\n    .toLowerCase();\n}\n\nfunction buildNormalizedLookup(enumSet) {\n  var lookup = {};\n  var keys = Object.keys(enumSet);\n  for (var nli = 0; nli < keys.length; nli++) lookup[normalizeForMatch(keys[nli])] = keys[nli];\n  return lookup;\n}\n\nvar NORMALIZED_STATUSES      = buildNormalizedLookup(VALID_STATUSES);\nvar NORMALIZED_OFFICER_TYPES = buildNormalizedLookup(VALID_OFFICER_TYPES);\nvar NORMALIZED_REGULATORS    = buildNormalizedLookup(VALID_REGULATORS);\n\nvar NORMALIZED_LOOKUPS = [\n  { enumSet: VALID_STATUSES,      normalized: NORMALIZED_STATUSES },\n  { enumSet: VALID_OFFICER_TYPES, normalized: NORMALIZED_OFFICER_TYPES },\n  { enumSet: VALID_REGULATORS,    normalized: NORMALIZED_REGULATORS }\n];\n\nfunction validateEnum(value, enumSet) {\n  if (value === null || value === undefined) return null;\n  if (enumSet[value]) return value;\n  var normalizedValue = normalizeForMatch(value);\n  if (!normalizedValue) return null;\n  for (var nlk = 0; nlk < NORMALIZED_LOOKUPS.length; nlk++) {\n    if (NORMALIZED_LOOKUPS[nlk].enumSet === enumSet) {\n      return NORMALIZED_LOOKUPS[nlk].normalized[normalizedValue] || null;\n    }\n  }\n  return null;\n}\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 3. MAPPING TABLES\n// ─────────────────────────────────────────────────────────────────────────────\nvar STATUS_MAP = {\n  \"Authorised\":   \"active\",\n  \"Registered\":   \"active\",\n  \"Unauthorised\": \"inactive\",\n  \"Cancelled\":    \"inactive\",\n  \"See full details\": \"active\",\n  \"No longer authorised\": \"inactive\", // Added Fix\n  \"Lapsed\": \"inactive\"                // Added Fix\n};\n\nvar OFFICER_ROLE_MAP = {\n  \"SMF1\":  \"Chief Executive Officer\",\n  \"SMF9\":  \"Board Chairman\",\n  \"SMF2\":  \"Chief Financial Officer\",\n  \"SMF3\":  \"Executive Director\",\n  \"SMF4\":  \"Chief Risk Officer\",\n  \"SMF24\": \"Chief Operating Officer\",\n  \"SMF16\": \"Chief Compliance Officer\",\n  \"SMF10\": \"Board Director\",\n  \"SMF11\": \"Board Director\",\n  \"SMF12\": \"Board Director\",\n  \"SMF14\": \"Board Director\",\n  \"CF3\":   \"Director\",\n  \"CF1\":   \"Director\",\n  \"CF2\":   \"Board Director\"\n};\n\nvar ROLE_SENIORITY  = [\n  \"SMF1\",\"SMF9\",\"SMF2\",\"SMF3\",\"SMF4\",\"SMF24\",\"SMF16\",\n  \"SMF10\",\"SMF11\",\"SMF12\",\"SMF14\",\"CF3\",\"CF1\",\"CF2\"\n];\n\nvar CONTROLLER_CODE = \"SMF9\";\n\nvar REGULATOR_NAME_MAP = {\n  \"FCA\": \"Financial Conduct Authority\",\n  \"PRA\": \"Prudential Regulation Authority\",\n  \"Financial Services Authority\": \"Financial Services Authority (FSA)\"\n};\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 4. PARSE FIRM CORE\n// ─────────────────────────────────────────────────────────────────────────────\nvar firm;\nif (coreResp && Array.isArray(coreResp.Data) && coreResp.Data.length > 0) {\n  firm = coreResp.Data[0];\n} else if (coreResp && typeof coreResp === \"object\" && (coreResp[\"Organisation Name\"] || coreResp[\"FRN\"])) {\n  firm = coreResp;\n} else {\n  firm = {};\n}\n\nvar entityName = firm[\"Organisation Name\"] || null;\nvar rawStatus  = firm[\"Status\"]            || null;\nvar rawBizType = firm[\"Business Type\"]     || null;\n\nvar entityStatus = validateEnum(STATUS_MAP[rawStatus] || null, VALID_STATUSES);\nvar firmFound = entityName !== null;\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 4b. PARSE REGULATOR(S)\n// ─────────────────────────────────────────────────────────────────────────────\nvar regulatorSet  = {};\nvar regulatorList = [];\n\nfunction addRegulator(rawName) {\n  if (!rawName) return;\n  var mapped    = REGULATOR_NAME_MAP[rawName] || rawName;\n  var validated = validateEnum(mapped, VALID_REGULATORS);\n  if (validated && !regulatorSet[validated]) {\n    regulatorSet[validated] = 1;\n    regulatorList.push(validated);\n  }\n}\n\nvar regulatorRecordsFound = false;\n\n// Updated to handle Agent casing/nesting hallucinations\nfunction extractRegulatorEntries(parsed) {\n  if (!parsed) return [];\n  if (Array.isArray(parsed.Data)) return parsed.Data;\n  if (Array.isArray(parsed.regulators)) return parsed.regulators;\n  if (Array.isArray(parsed.Regulators)) return parsed.Regulators; \n  if (Array.isArray(parsed[\"Current Regulators\"])) return parsed[\"Current Regulators\"];\n  if (Array.isArray(parsed)) return parsed;\n  if (parsed[\"Regulator Name\"] || parsed[\"Name\"]) return [parsed];\n  return [];\n}\n\nvar regulatorEntries = extractRegulatorEntries(regResp);\n\nif (regulatorEntries.length > 0) {\n  regulatorRecordsFound = true;\n  for (var rgi = 0; rgi < regulatorEntries.length; rgi++) {\n    var regEntry  = regulatorEntries[rgi];\n    var hasEnded  = regEntry[\"Termination Date\"] || regEntry[\"End Date\"] || regEntry[\"EndDate\"];\n    if (hasEnded) continue;\n    addRegulator(regEntry[\"Regulator Name\"] || regEntry[\"Name\"]);\n  }\n} else if (firmFound && entityStatus === \"active\") {\n  addRegulator(\"Financial Conduct Authority\");\n}\n\nvar regulatorObjects = [];\nfor (var rli = 0; rli < regulatorList.length; rli++) {\n  regulatorObjects.push({ regulator_name: regulatorList[rli] });\n}\n\nvar entityRegulatorLog = regulatorList.length > 0 ? regulatorList.join(\"; \") : null;\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 5. PARSE ADDRESS\n// ─────────────────────────────────────────────────────────────────────────────\nvar addrRecords = [];\nif (addrResp && Array.isArray(addrResp.Data)) {\n  addrRecords = addrResp.Data;\n} else if (addrResp && typeof addrResp === \"object\") {\n  var addrTypeKeys = Object.keys(addrResp);\n  for (var ati = 0; ati < addrTypeKeys.length; ati++) {\n    var addrTypeKey = addrTypeKeys[ati];\n    var addrVal = addrResp[addrTypeKey];\n    if (addrVal && typeof addrVal === \"object\" && !Array.isArray(addrVal)) {\n      var normalized = {};\n      var avKeys = Object.keys(addrVal);\n      for (var avi = 0; avi < avKeys.length; avi++) normalized[avKeys[avi]] = addrVal[avKeys[avi]];\n      normalized[\"Address Type\"] = addrTypeKey;\n      addrRecords.push(normalized);\n    }\n  }\n}\n\nvar ppob = null;\nfor (var i = 0; i < addrRecords.length; i++) {\n  if (addrRecords[i][\"Address Type\"] === \"Principal Place of Business\") {\n    ppob = addrRecords[i];\n    break;\n  }\n}\nif (!ppob && addrRecords.length > 0) ppob = addrRecords[0];\nppob = ppob || {};\n\nfunction toTitleCase(str) {\n  if (!str) return null;\n  return str.replace(/\\w\\S*/g, function(w) {\n    return w.charAt(0).toUpperCase() + w.substr(1).toLowerCase();\n  });\n}\n\nvar countryRaw    = ppob[\"Country\"] || null;\nvar countryTitled = toTitleCase(countryRaw);\n\nvar addressParts = [\n  ppob[\"Address Line 1\"],\n  ppob[\"Address Line 2\"],\n  ppob[\"Address Line 3\"] || ppob[\"Address LIne 3\"],\n  ppob[\"Address Line 4\"],\n  ppob[\"Town\"],\n  ppob[\"County\"],\n  ppob[\"Postcode\"],\n  countryTitled\n];\n\nvar principalPlaceOfBusiness = addressParts\n  .filter(function(part) { return part && String(part).trim() !== \"\"; })\n  .join(\", \");\nprincipalPlaceOfBusiness = principalPlaceOfBusiness || null;\n\nvar rawSite = ppob[\"Website Address\"] || ppob[\"Website\"] || null;\nvar website = rawSite ? rawSite.replace(/^https?:\\/\\//i, \"\").replace(/\\/$/, \"\") : null;\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 6. PARSE PERMISSIONS\n// ─────────────────────────────────────────────────────────────────────────────\nvar PERM_EXCLUDE = {\n  \"CBTL Status\":          1, \"CBTL Effective Date\":  1, \"PSD Status\":           1,\n  \"PSD Effective Date\":   1, \"EMD Status\":           1, \"EMD Effective Date\":   1,\n  \"MLR Status\":           1, \"MLR Effective Date\":   1, \"CBTL arranger Status\": 1,\n  \"CBTL advisor Status\":  1, \"Acting as a CBTL arranger\": 1, \"Acting as a CBTL advisor\":  1\n};\n\nvar activityType = null;\nvar activityKeys = [];\nif (permResp && permResp.Data && typeof permResp.Data === \"object\" && !Array.isArray(permResp.Data)) {\n  var allPermKeys = Object.keys(permResp.Data);\n  for (var a = 0; a < allPermKeys.length; a++) {\n    if (!PERM_EXCLUDE[allPermKeys[a]]) activityKeys.push(allPermKeys[a]);\n  }\n} else if (permResp && typeof permResp === \"object\" && !Array.isArray(permResp)) {\n  var looksLikeEnvelope = permResp.Status !== undefined || permResp.ResultInfo !== undefined || permResp.Message !== undefined;\n  if (!looksLikeEnvelope) {\n    var topPermKeys = Object.keys(permResp);\n    var permArrayKey = null;\n    for (var pk = 0; pk < topPermKeys.length; pk++) {\n      var pv = permResp[topPermKeys[pk]];\n      if (Array.isArray(pv) && pv.length > 0 && typeof pv[0] === \"string\") {\n        permArrayKey = topPermKeys[pk];\n        break;\n      }\n    }\n    if (permArrayKey) {\n      activityKeys = permResp[permArrayKey].slice();\n    } else {\n      for (var c = 0; c < topPermKeys.length; c++) {\n        if (!PERM_EXCLUDE[topPermKeys[c]]) activityKeys.push(topPermKeys[c]);\n      }\n    }\n  }\n}\n\nif (activityKeys.length > 0) {\n  activityType = activityKeys.join(\"; \");\n}\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 7. PARSE CF INDIVIDUALS\n// ─────────────────────────────────────────────────────────────────────────────\nfunction extractRoleCode(key) {\n  var m = key.match(/\\)\\s*((?:SMF|CF)\\d+)/i);\n  return m ? m[1].toUpperCase() : null;\n}\n\nfunction extractIRN(url) {\n  if (!url) return null;\n  var parts = url.split(\"/\");\n  return parts[parts.length - 1] || null;\n}\n\nfunction extractFlatRoleSample(parsed) {\n  if (!parsed || typeof parsed !== \"object\" || Array.isArray(parsed)) return null;\n  var sampleKeys = [\"current_roles_sample\", \"roles_sample\", \"current_roles\", \"sample\"];\n  for (var sk = 0; sk < sampleKeys.length; sk++) {\n    if (Array.isArray(parsed[sampleKeys[sk]])) return parsed[sampleKeys[sk]];\n  }\n  return null;\n}\n\nfunction extractRoleCodeFlat(roleStr) {\n  if (!roleStr) return null;\n  var m = String(roleStr).match(/^\\s*((?:SMF|CF)\\d+)/i);\n  return m ? m[1].toUpperCase() : null;\n}\n\nfunction extractCurrentRecords(page) {\n  if (!page || typeof page !== \"object\") return null;\n  var merged = null;\n  function merge(obj) {\n    if (!obj || typeof obj !== \"object\") return;\n    if (!merged) merged = {};\n    var ks = Object.keys(obj);\n    for (var i = 0; i < ks.length; i++) merged[ks[i]] = obj[ks[i]];\n  }\n\n  if (page.current_records && typeof page.current_records === \"object\") {\n    merge(page.current_records);\n  }\n  if (Array.isArray(page.Data)) {\n    for (var d = 0; d < page.Data.length; d++) {\n      var entry = page.Data[d];\n      if (entry && typeof entry === \"object\" && entry.Current && typeof entry.Current === \"object\") {\n        merge(entry.Current);\n      }\n    }\n  } else if (page.Data && typeof page.Data === \"object\" && page.Data.Current && typeof page.Data.Current === \"object\") {\n    merge(page.Data.Current);\n  }\n  if (page.Current && typeof page.Current === \"object\") {\n    merge(page.Current);\n  }\n  return merged;\n}\n\nvar byIRN = {};\nvar cfShape = \"none\";\nvar flatSample = extractFlatRoleSample(cfPages);\n\nif (flatSample) {\n  cfShape = \"sample(\" + flatSample.length + \")\";\n  for (var fi = 0; fi < flatSample.length; fi++) {\n    var sampleEntry = flatSample[fi];\n    if (!sampleEntry || typeof sampleEntry !== \"object\") continue;\n    var roleStr  = sampleEntry.role || sampleEntry.Role || sampleEntry[\"Role Name\"] || null;\n    var roleCode = extractRoleCodeFlat(roleStr);\n    var indName  = sampleEntry.individual || sampleEntry.Individual || sampleEntry[\"Individual Name\"] || null;\n    var irn      = sampleEntry.id || sampleEntry.IRN || sampleEntry.irn || indName;\n    \n    if (!indName || !roleCode) continue;\n    if (!byIRN[irn]) { byIRN[irn] = { name: indName, codes: [] }; }\n    if (byIRN[irn].codes.indexOf(roleCode) === -1) { byIRN[irn].codes.push(roleCode); }\n  }\n} else if (Array.isArray(cfPages)) {\n  cfShape = \"pages(\" + cfPages.length + \")\";\n  for (var p = 0; p < cfPages.length; p++) {\n    var page = unwrapAndParse(cfPages[p]);\n    var current = extractCurrentRecords(page);\n    if (!current) continue;\n    var roleKeys = Object.keys(current);\n    for (var k = 0; k < roleKeys.length; k++) {\n      var roleKey   = roleKeys[k];\n      var roleEntry = current[roleKey];\n      var roleCode  = extractRoleCode(roleKey);\n      var indName   = roleEntry[\"Individual Name\"] || null;\n      var irn       = extractIRN(roleEntry[\"URL\"]) || indName;\n      \n      if (!indName || !roleCode) continue;\n      if (!byIRN[irn]) { byIRN[irn] = { name: indName, codes: [] }; }\n      if (byIRN[irn].codes.indexOf(roleCode) === -1) { byIRN[irn].codes.push(roleCode); }\n    }\n  }\n}\n\nvar officers    = [];\nvar controllers = [];\nvar irnKeys     = Object.keys(byIRN);\n\nfor (var j = 0; j < irnKeys.length; j++) {\n  var person  = byIRN[irnKeys[j]];\n  var codes   = person.codes;\n  \n  if (codes.indexOf(CONTROLLER_CODE) !== -1) {\n    controllers.push({ key_controller_name: person.name, key_controller_address: null });\n  }\n\n  var topCode = null;\n  for (var s = 0; s < ROLE_SENIORITY.length; s++) {\n    if (codes.indexOf(ROLE_SENIORITY[s]) !== -1) {\n      topCode = ROLE_SENIORITY[s];\n      break;\n    }\n  }\n  \n  if (topCode) {\n    var mappedType    = OFFICER_ROLE_MAP[topCode] || null;\n    var validatedType = validateEnum(mappedType, VALID_OFFICER_TYPES);\n    if (validatedType) {\n      officers.push({ officer_name: person.name, officer_address: null, officer_type: validatedType });\n    }\n  }\n}\n\n// ─────────────────────────────────────────────────────────────────────────────\n// 8. ASSEMBLE OUTPUT\n// ─────────────────────────────────────────────────────────────────────────────\nvar log = [\n  \"frn=\" + frn,\n  \"upstream_inputs=\" + inputKeys.length,\n  \"firm_found=\" + firmFound,\n  \"status_raw=\" + rawStatus + \" status_mapped=\" + entityStatus,\n  \"biztype_raw=\" + rawBizType,\n  \"country_raw=\" + countryRaw + \" country_titled=\" + countryTitled,\n  \"ppob_address=\" + (principalPlaceOfBusiness || \"null\"),\n  \"regulators=\" + (entityRegulatorLog || \"null\") + \" (source=\" + (regulatorRecordsFound ? \"live\" : \"fallback\") + \")\",\n  \"activities=\" + (activityType || \"null\"),\n  \"indivs_endpoint=\" + (indivsResp ? \"ok\" : \"null\") + \" cf_shape=\" + cfShape,\n  \"individuals=\" + irnKeys.length,\n  \"officers=\" + officers.length + \" controllers=\" + controllers.length,\n  \"upstream_reasoning=[\" + upstreamReasoning.join(\"] [\") + \"]\"\n];\n\noutputData = {\n  entity_name:                        entityName,\n  entity_status:                      firmFound ? entityStatus : null,\n  entity_principal_place_of_business: firmFound ? principalPlaceOfBusiness : null,\n  entity_registration_number:         frn,\n  entity_regulator:                   firmFound ? regulatorObjects : [],\n  entity_source_url:                  firmFound ? \"https://register.fca.org.uk/s/firm?id=\" + frn : null,\n  entity_activity_type:               firmFound ? activityType : null,\n  entity_website_address:             firmFound ? website      : null,\n  corporate_officer:                  officers,\n  key_controller:                     controllers,\n  _reasoning:                         log.join(\" | \")\n};\n",
+        "outputMode": "json_object",
+        "rowLimit": null,
+        "validated": true
+      }
+    },
+    {
+      "id": "dndnode_4",
+      "type": "code",
+      "props": {
+        "name": null,
+        "alias": "FCAData",
+        "description": null,
+        "code": "    /**\n     * The 'inputs' object contains all upstream node outputs, keyed by alias.\n     * The 'env' object contains project environment variables (read-only).\n     *\n     * INPUT FORMATS:\n     *   Tabular nodes  →  inputs['alias'] is an Array of row objects\n     *     Example: inputs['sales_data'] = [{ region: 'US', amount: 100 }, ...]\n     *\n     *   JSON object nodes  →  inputs['alias'] is a parsed JavaScript value\n     *     Example: inputs['api_response'] = { status: 'ok', results: [...] }\n     *\n     * ENVIRONMENT:\n     *   env['VARIABLE_NAME'] — access project environment variables\n     *\n     * OUTPUT FORMAT:\n     *   If output mode is \"tabular\"     —  outputData should be an Array of row objects\n     *   If output mode is \"json_object\" —  outputData can be any JavaScript value\n     */\n\n    // Get the first upstream input (use the alias key for a specific node)\n    const result = Object.values(inputs)[0] ?? [];\n\n    const outputData = {}\n\n    const new_json = {}\n\n    json_data = result[0];\n    \n    key_ = Object.keys(json_data)\n\n    let rationale = \"\"\n\n    if ('_reasoning' in key_){\n        rationale = result[\"_reasoning\"]\n    }\n\n    for (const itr of key_) {\n        new_json[itr] = {\n            \"value\": json_data[itr],\n            \"confidenceScore\": 1,\n            \"rationale\": rationale\n        }\n    }\n\n    outputData[\"FCA\"] = new_json\n\n    // Your transformation logic here\n",
+        "outputMode": "json_object",
+        "rowLimit": null,
+        "validated": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "dndnode_3",
+      "target": "dndnode_4"
+    },
+    {
+      "source": "dndnode_2",
+      "target": "dndnode_1"
+    },
+    {
+      "source": "dndnode_2",
+      "target": "dndnode_6"
+    },
+    {
+      "source": "dndnode_1",
+      "target": "dndnode_3"
+    },
+    {
+      "source": "dndnode_6",
+      "target": "dndnode_3"
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "32de96149a28ef714b93d684caee9ae9",
+      "personaName": "UK FCA - FRN Resolution",
+      "versionNumber": 2
+    },
+    {
+      "personaId": "9754954d3aa01cee5b0b4f8fc27221ac",
+      "personaName": "UK - Financial Conduct Authority - Structured data",
+      "versionNumber": 2
+    },
+    {
+      "personaId": "d58f6a00a92a20b35b22c00965f6dd4c",
+      "personaName": "UK FCA - Individual Data",
+      "versionNumber": 1
+    }
+  ]
+}

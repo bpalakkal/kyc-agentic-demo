@@ -1,0 +1,567 @@
+[
+  {
+    "_id": "69c12df12b520bc61e0f2092",
+    "llmModel": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "selectedGroups": [
+      "default_tools",
+      "capture_screenshot",
+      "firecrawl",
+      "web_search",
+      "call_api"
+    ],
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "personaId": "115d6199f8b183878d9633c66cf5278a",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "UK - Financial Conduct Authority - Structured data",
+    "description": "The agent extracts entity attributes exclusively from the official Financial Conduct Authority (FCA) Register.",
+    "userPrompt": "SYSTEM PROMPT\r\n=============\r\nYou are an expert KYC Data Extraction Agent for the UK FCA Financial Services Register.\r\nYour objective is to use your API tools to retrieve data for a specific Firm Reference Number (FRN) and map it into a strict JSON schema.\n\r\n\r\nCRITICAL GUARDRAILS:\r\n1. You are STRICTLY FORBIDDEN from using general web search or scraping public websites (like a firm's homepage). All data MUST come directly from the official FCA register API endpoints (`https://register.fca.org.uk/services/V0.1/Firm/...`).\n\n\n2. If an FCA API endpoint returns 403, 404, or 500, you will be heavily penalized if you do not set the corresponding JSON fields to `null` and note the failure in the `_reasoning` field. DO NOT attempt to guess the data or find it elsewhere.\n\n3. Copy all values verbatim from the API responses.\n\n\r\nUSER PROMPT\r\n===========\r\n\r\n### PHASE 1: Firm-Level Data Extraction\r\nMake the following API calls to gather the firm's core data.\r\n\r\n1. Master Firm Data: Call `https://register.fca.org.uk/services/V0.1/Firm/{FRN}`\r\n   - `entity_registration_number` → Use the FRN.\r\n   - `entity_classification_type` → Read \"Business Type\".\r\n   - `entity_name` → Read \"Organisation Name\".\r\n\r\n2. Status Data: Call `https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Names`\r\n   - Check the \"Status\" field. \r\n   - If \"Authorised\", \"Registered\", or \"Appointed Representative\" → map to \"Active\". \r\n   - If \"No longer authorised\" or \"Cancelled\" → map to \"No longer active\". \r\n   - Otherwise, copy verbatim to `entity_status`.\r\n\r\n3. Address Data: Call `https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Address`\r\n   - Locate the record where Address Type = \"Principal Place of Business\".\r\n   - Concatenate the address parts into a single string for `entity_principal_place_of_business`.\r\n   - Extract the \"Website Address\" for `entity_website_address`.\r\n\r\n4. Permissions Data: Call `https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Permission`\r\n   - Read the categories present and write a brief, plain-English summary for `entity_activity_type`.\r\n\r\n### PHASE 2: Controlled Functions (CF) BATCH Extraction\r\nYou MUST NOT paginate the CF endpoint one page at a time. This will cause you to time out. \r\nInstead, you must use your tool's batch/parallel execution capability to fetch the first 20 pages of the CF endpoint simultaneously.\r\n\r\n1. Construct 20 distinct URLs using this exact pattern:\r\n   `https://register.fca.org.uk/services/V0.1/Firm/{FRN}/CF?pgnp=1`\r\n   `https://register.fca.org.uk/services/V0.1/Firm/{FRN}/CF?pgnp=2`\r\n   ...up to `pgnp=20`.\r\n2. Execute a single batch scrape/API call providing all 20 URLs at once.\r\n3. Once the batch returns, combine all the \"Current\" arrays from all 20 responses into a single master list in your memory. Ignore \"Previous\" roles entirely.\r\n\r\n### PHASE 3: Individual Filtering & Deduplication\r\nAnalyze your master list of \"Current\" individuals from Phase 2.\r\n\r\nSTRICT FILTERING RULES:\r\n- CORPORATE OFFICERS: Extract the individual ONLY if their current role contains \"SMF24\", \"SMF1\", \"SMF2\", \"SMF3\", \"SMF4\", or \"CF3\". \r\n- KEY CONTROLLERS: Extract the individual ONLY if their current role contains \"SMF9\".\r\n- REJECTED: Ignore any individual whose ONLY role is \"CF1\" or any other unlisted role.\r\n\r\nDEDUPLICATION (CRITICAL):\r\nIdentify individuals by their IRN (Individual Reference Number, usually found in the URL path). If an individual holds multiple allowed roles, merge them into a single record and separate the roles with \" | \" (e.g., \"SMF1 | SMF3\"). Remove the IRN from the final output.\r\n\r\n### PHASE 4: Output Assembly\r\nAssemble your findings into the final JSON output.\r\n- `entity_legal_structure`: Set to `null`.\r\n- `entity_regulator`: Set to \"Financial Conduct Authority\".\r\n- `entity_source_url`: Set to `\"https://register.fca.org.uk/s/firm?id={FRN}\"`\r\n- `officer_address`: Set to `null`.\r\n- `key_controller_address`: Set to `null`.\r\n\r\n# STRICT OUTPUT FORMATTING (CRITICAL)\r\nYou must return ONLY a valid, parseable JSON object matching the required schema. \r\n- NO conversational text.\r\n- NO preamble or postamble.\r\n- NO markdown code blocks.\r\n- ALL of your thoughts, API call summaries, and deduplication logic MUST go strictly inside the \"_reasoning\" string field.",
+    "selectedTools": [],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_status",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_classification_type",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_principal_place_of_business",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_registration_number",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_regulator",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_source_url",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_activity_type",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_website_address",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officer",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "officer_name",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "officer_address",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "officer_type",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "key_controller",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "key_controller_name",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_address",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "_reasoning",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "createdBy": "spidiyath",
+    "lastModifiedBy": "bpalakkal",
+    "createdAt": "2026-03-23T12:11:29.960Z",
+    "updatedAt": "2026-05-06T15:09:19.060Z",
+    "__v": 0,
+    "groupConfigs": {
+      "call_api": {
+        "endpoints": [
+          {
+            "id": "search_firms",
+            "url": "https://register.fca.org.uk/services/V0.1/Search?q={entity_name}&type=firm",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "search_individuals",
+            "url": "https://register.fca.org.uk/services/V0.1/Search?q={entity_name}&type=individual",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "search_funds",
+            "url": "https://register.fca.org.uk/services/V0.1/Search?q={entity_name}&type=fund",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_details",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{frn}",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_permissions",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{frn}/Permissions",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_address",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{frn}/Address",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_address_by_type",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{frn}/Address?Type={type}",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_appointed_representatives",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{frn}/AR",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_controlled_functions",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{frn}/CF",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_individual_details",
+            "url": "https://register.fca.org.uk/services/V0.1/Individuals/{irn}",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_cis_details",
+            "url": "https://register.fca.org.uk/services/V0.1/CIS/{prn}",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          }
+        ]
+      }
+    },
+    "rawJsonSchema": "{\r\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"entity_name\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_status\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_classification_type\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_legal_structure\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_principal_place_of_business\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_registration_number\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_regulator\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_source_url\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_activity_type\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"entity_website_address\": {\r\n      \"type\": [\"string\", \"null\"]\r\n    },\r\n    \"corporate_officer\": {\r\n      \"type\": [\"array\", \"null\"],\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"office_name\": {\r\n            \"type\": [\"string\", \"null\"]\r\n          },\r\n          \"officer_address\": {\r\n            \"type\": [\"string\", \"null\"]\r\n          },\r\n          \"officer_type\": {\r\n            \"type\": [\"string\", \"null\"]\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"office_name\",\r\n          \"officer_address\",\r\n          \"officer_type\"\r\n        ]\r\n      }\r\n    },\r\n    \"key_controller\": {\r\n      \"type\": [\"array\", \"null\"],\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"key_controller_name\": {\r\n            \"type\": [\"string\", \"null\"]\r\n          },\r\n          \"key_controller_address\": {\r\n            \"type\": [\"string\", \"null\"]\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"key_controller_name\",\r\n          \"key_controller_address\"\r\n        ]\r\n      }\r\n    },\r\n    \"_reasoning\": {\r\n      \"type\": \"string\"\r\n    }\r\n  },\r\n  \"required\": [\r\n    \"entity_name\",\r\n    \"entity_status\",\r\n    \"entity_classification_type\",\r\n    \"entity_legal_structure\",\r\n    \"entity_principal_place_of_business\",\r\n    \"entity_registration_number\",\r\n    \"entity_regulator\",\r\n    \"entity_source_url\",\r\n    \"entity_activity_type\",\r\n    \"entity_website_address\",\r\n    \"corporate_officer\",\r\n    \"key_controller\",\r\n    \"_reasoning\"\r\n  ]\r\n}\r\n",
+    "temperature": 0,
+    "addMetadata": true,
+    "inputFields": [
+      {
+        "fieldName": "frn",
+        "fieldType": "text",
+        "fieldDescription": "Company Registration number",
+        "valueSource": "predecessorOutput"
+      },
+      {
+        "fieldName": "auth_email",
+        "fieldType": "text",
+        "fieldDescription": "Value injected into the x-auth-email header at runtime",
+        "valueSource": "predecessorOutput"
+      },
+      {
+        "fieldName": "api_key",
+        "fieldType": "text",
+        "fieldDescription": "Value injected into the x-auth-key header at runtime",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "selectedSkills": [
+      {
+        "skillId": "df74cd81b50fa574f5f3bd9a35cdfb0e",
+        "skillName": "FCA Data Download",
+        "description": "Skill to download attributes from FCA",
+        "content": "# FCA Data Download\n\nDownload attributes and information from the FCA (Financial Conduct Authority) Register using their public API.\n\n---\n\n## Objective\n\nUse this skill to search and retrieve detailed information about firms, individuals, and collective investment schemes registered with the UK Financial Conduct Authority. You can search for entities, retrieve firm details, addresses, permissions, appointed representatives, individuals, passports, requirements, waivers, exclusions, disciplinary history, and other regulatory data.\n\n**When to use this skill:**\n- When you need to verify if a firm or individual is FCA-regulated\n- When you need detailed regulatory information about UK financial services entities\n- When you need to check permissions, activities, or compliance status of firms\n- When you need to retrieve contact details, addresses, or organizational structure of regulated entities\n\n---\n\n## Base URL & Authentication\n\n**Base URL:**\n```\nhttps://register.fca.org.uk/services\n```\n\n**Authentication Method:** Custom headers\n\n**Required Headers:**\n```\nx-auth-email: <your_email_address>\nx-auth-key: <your_api_key>\nContent-Type: application/json\n```\n\nYou must include both `x-auth-email` and `x-auth-key` headers in every request. Without valid credentials, you will receive error code `FSR-API-01-01-11` (Unauthorised).\n\n---\n\n## Key Endpoints\n\n### 1. Common Search API\n\n**Purpose:** Search the FS Register for firms, individuals, or collective investment schemes\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Search`\n\n**Query Parameters:**\n- `q` (required): Search term (e.g., firm name, individual name)\n- `type` (required): Type of search - `firm`, `individual`, or `fund`\n- `page` (optional): Page number for pagination (default: 1)\n- `per_page` (optional): Results per page (default: 20)\n\n**Example Request:**\n```bash\nGET /V0.1/Search?q=Example%20Ltd&type=firm\n```\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-04-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Search successful\",\n    \"Data\": [\n        {\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Firm/12345\",\n            \"Status\": \"See full details\",\n            \"Reference Number\": \"12345\",\n            \"Type of business or Individual\": \"Firm\",\n            \"Name\": \"Example Ltd\"\n        }\n    ]\n}\n```\n\n---\n\n### 2. Firm Details API\n\n**Purpose:** Get comprehensive information about a specific firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Request:**\n```bash\nGET /V0.1/Firm/615820\n```\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"1\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Firm Found\",\n    \"Data\": [\n        {\n            \"FRN\": \"615820\",\n            \"Organisation Name\": \"ABC LTD\",\n            \"Business Type\": \"Regulated\",\n            \"Status\": \"Authorised\",\n            \"Status Effective Date\": \"31/08/2018\",\n            \"Companies House Number\": \"8755483\",\n            \"Address\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Address\",\n            \"Permission\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Permissions\",\n            \"Individuals\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Individuals\"\n        }\n    ]\n}\n```\n\n---\n\n### 3. Firm Address API\n\n**Purpose:** Get address and contact information for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Address`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Query Parameters:**\n- `Type` (optional): Filter by address type (e.g., `PPOB`, `Complaint`)\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-02-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"2\",\n        \"total_count\": \"2\"\n    },\n    \"Message\": \"Ok. Firm Address Found\",\n    \"Data\": [\n        {\n            \"Address Type\": \"Principal Place of Business\",\n            \"Address Line 1\": \"Address Line 1\",\n            \"Town\": \"Town\",\n            \"County\": \"London\",\n            \"Postcode\": \"E20 1JN\",\n            \"Country\": \"UNITED KINGDOM\",\n            \"Phone Number\": \"4470799999999\",\n            \"Website Address\": \"https://www.fca.org.uk/\"\n        }\n    ]\n}\n```\n\n---\n\n### 4. Firm Activities and Permissions API\n\n**Purpose:** Get activities and permissions associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Permissions`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-03-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"10\"\n    },\n    \"Message\": \"Ok. Firm permission found\",\n    \"Data\": {\n        \"Acting as a CBTL advisor\": [\n            {\n                \"Acting as a CBTL advisor\": [\"1\"]\n            }\n        ],\n        \"Agreeing to carry on a regulated activity\": [\n            {\n                \"Limitation\": [\"The firm is limited to...\"]\n            }\n        ]\n    }\n}\n```\n\n---\n\n### 5. Firm Individuals API\n\n**Purpose:** Get individuals associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Individuals`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-05-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"4\"\n    },\n    \"Message\": \"Ok. Firm Individuals found\",\n    \"Data\": [\n        {\n            \"Name\": \"Jessica Davies\",\n            \"IRN\": \"789018\",\n            \"Status\": \"Approved by regulator\",\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Individuals/789018\"\n        }\n    ]\n}\n```\n\n---\n\n### 6. Firm Requirements API\n\n**Purpose:** Get regulatory requirements associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Requirements`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-06-00\",\n    \"Message\": \"Ok. Firm Requirements found\",\n    \"Data\": [\n        {\n            \"Requirement Reference\": \"OP-0123456\",\n            \"Effective Date\": \"23/04/2021\",\n            \"Financial Promotions Requirement\": \"TRUE\",\n            \"Derivatives as incidental services only.\": \"The firm must not carry on...\"\n        }\n    ]\n}\n```\n\n---\n\n### 7. Firm Appointed Representatives API\n\n**Purpose:** Get appointed representatives associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/AR`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-05-04-00\",\n    \"Message\": \"Ok. Appointed Representative Found\",\n    \"Data\": {\n        \"CurrentAppointedRepresentatives\": [\n            {\n                \"FRN\": \"999060\",\n                \"Name\": \"AR Firm 3\",\n                \"Principal FRN\": \"999001\",\n                \"Effective Date\": \"03/03/2015\",\n                \"Tied Agent\": \"false\"\n            }\n        ],\n        \"PreviousAppointedRepresentatives\": []\n    }\n}\n```\n\n---\n\n### 8. Firm Passport API\n\n**Purpose:** Get passport information (EEA passporting rights)\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Passports`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-07-00\",\n    \"Message\": \"Ok. Firm Passport found\",\n    \"Data\": [\n        {\n            \"Passports\": [\n                {\n                    \"Country\": \"GIBRALTAR\",\n                    \"PassportDirection\": \"Passporting Out\",\n                    \"Permissions\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Passports/GIBRALTAR/Permission\"\n                }\n            ]\n        }\n    ]\n}\n```\n\n---\n\n### 9. Firm Passport Permission API\n\n**Purpose:** Get detailed permissions for a specific passport country\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Passports/{Country}/Permission`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n- `Country` (required): Country name (e.g., \"Australia\", \"AUSTRIA\")\n\n---\n\n### 10. Firm Regulators API\n\n**Purpose:** Get regulator history for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Regulators`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 11. Firm Other Names API\n\n**Purpose:** Get trading names and brand names used by a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Names`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 12. Firm Controlled Functions API\n\n**Purpose:** Get controlled functions (senior management roles) for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/CF`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 13. Firm Waivers API\n\n**Purpose:** Get waivers granted to a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Waivers`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 14. Firm Exclusions API\n\n**Purpose:** Get PSD2 exclusions for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Exclusions`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 15. Firm Disciplinary History API\n\n**Purpose:** Get disciplinary actions against a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/DisciplinaryHistory`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 16. Firm Requirements Investment Types API\n\n**Purpose:** Get investment types for a specific requirement\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Requirements/{ReqRef}/InvestmentTypes`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n- `ReqRef` (required): Requirement Reference (e.g., \"OP-0123456\")\n\n---\n\n## Step-by-Step Usage Procedure\n\n### Step 1: Prepare Authentication\nBefore making any request, ensure you have:\n- Your FCA API email address\n- Your FCA API key\n\n### Step 2: Search for an Entity (if you don't have the FRN/IRN)\n1. Use the Common Search API (`/V0.1/Search`) with query parameters\n2. Set `q` to your search term (firm name, individual name, etc.)\n3. Set `type` to `firm`, `individual`, or `fund`\n4. Include authentication headers\n\nExample:\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Search?q=Example%20Ltd&type=firm\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n### Step 3: Extract the Reference Number\nFrom the search response, extract:\n- `Reference Number` (FRN for firms, IRN for individuals)\n- `URL` field which contains the direct API endpoint\n\n### Step 4: Retrieve Detailed Information\nUse the appropriate endpoint based on what information you need:\n- For basic firm info: `/V0.1/Firm/{FRN}`\n- For addresses: `/V0.1/Firm/{FRN}/Address`\n- For permissions: `/V0.1/Firm/{FRN}/Permissions`\n- For individuals: `/V0.1/Firm/{FRN}/Individuals`\n- And so on...\n\n### Step 5: Handle Pagination\nIf `ResultInfo.total_count` is greater than `per_page`:\n1. Check for `Next` URL in `ResultInfo`\n2. Make subsequent requests using the `Next` URL or by incrementing the `pgnp` parameter\n3. Continue until all pages are retrieved\n\n### Step 6: Parse the Response\n1. Check the `Status` field for success codes (e.g., `FSR-API-02-01-00`)\n2. Extract data from the `Data` array or object\n3. Use the `Message` field for human-readable status information\n\n### Step 7: Follow Related URLs\nMany responses include URLs to related data:\n- Use these URLs to fetch additional details\n- These URLs are already properly formatted and authenticated the same way\n\n### Step 8: Handle Errors\nCheck the `Status` code and handle accordingly (see Error Handling section)\n\n---\n\n## Output Format\n\nWhen returning data from this API, structure your output as follows:\n\n### For Search Results:\n```\nFound {total_count} result(s) for \"{search_term}\":\n\n1. Name: {Name}\n   Reference Number: {Reference Number}\n   Type: {Type of business or Individual}\n   Status: {Status}\n   Details URL: {URL}\n```\n\n### For Firm Details:\n```\nFirm Information:\n- FRN: {FRN}\n- Name: {Organisation Name}\n- Status: {Status} (Effective: {Status Effective Date})\n- Business Type: {Business Type}\n- Companies House Number: {Companies House Number}\n\nAvailable Details:\n- Address: {Address URL}\n- Permissions: {Permission URL}\n- Individuals: {Individuals URL}\n- Requirements: {Requirements URL}\n```\n\n### For Addresses:\n```\nAddress Information:\n\n{Address Type}:\n{Address Line 1}\n{Address Line 2}\n{Town}, {County} {Postcode}\n{Country}\nPhone: {Phone Number}\nWebsite: {Website Address}\n```\n\n### For Lists (Individuals, ARs, etc.):\nPresent as numbered or bulleted lists with key fields clearly labeled.\n\n---\n\n## Rate Limits & Constraints\n\n**Pagination:**\n- Default page size: 20 records per page\n- Maximum page size: Not explicitly documented (use default)\n- Use `page` or `pgnp` parameter to navigate pages\n- Check `ResultInfo.Next` for the next page URL\n- Check `ResultInfo.total_count` to determine total results\n\n**Search Recommendations:**\n- The Common Search API is recommended primarily for resolving FRNs, IRNs, and PRNs\n- Not all search results may have a resolvable URL for detailed information\n- This is an early release, so functionality may be limited\n\n**Data Freshness:**\n- Check the `System Timestamp` field in firm details for last update time\n\n---\n\n## Error Handling\n\n### Common Status Codes\n\n| Status Code | Description | Action |\n|------------|-------------|--------|\n| `FSR-API-01-01-11` | Unauthorised: Invalid API key or email | Verify your authentication credentials |\n| `FSR-API-01-01-21` | Forbidden | Check your API access permissions |\n| `FSR-API-04-01-00` | Search successful | Success - process results |\n| `FSR-API-04-01-11` | No search result found | Inform user no results found |\n| `FSR-API-04-01-21` | Bad request: Invalid input | Check query parameters |\n| `FSR-API-02-01-00` | Firm found | Success - process firm data |\n| `FSR-API-02-01-11` | Bad request: Invalid input | Check FRN format |\n| `FSR-API-02-01-21` | Firm not found | Inform user firm doesn't exist |\n| `FSR-API-02-02-00` | Address found | Success - process address data |\n| `FSR-API-02-02-11` | Bad request: Invalid input | Check FRN format |\n| `FSR-API-02-02-21` | Address not found | Inform user no address available |\n| `FSR-API-02-03-00` | Permissions found | Success - process permissions |\n| `FSR-API-02-03-11` | Bad request: Invalid input | Check FRN format |\n| `FSR-API-02-03-21` | Permissions not found | Inform user no permissions available |\n| `FSR-API-02-07-22` | Page not found | Check pagination parameters |\n\n### Error Handling Strategy\n\n1. **Authentication Errors (FSR-API-01-01-xx):**\n   - Verify `x-auth-email` and `x-auth-key` headers are present\n   - Confirm credentials are valid\n   - Do not retry without fixing credentials\n\n2. **Not Found Errors (xx-xx-21):**\n   - Verify the reference number (FRN/IRN) is correct\n   - Inform the user the entity doesn't exist or has no data for that endpoint\n   - Do not retry with the same parameters\n\n3. **Bad Request Errors (xx-xx-11):**\n   - Validate input parameters\n   - Check for proper URL encoding\n   - Verify required parameters are present\n\n4. **Pagination Errors (xx-xx-22):**\n   - Check if page number exceeds available pages\n   - Use `ResultInfo.total_count` and `per_page` to calculate max pages\n\n---\n\n## Examples\n\n### Example 1: Search for a Firm and Get Full Details\n\n**Step 1: Search**\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Search?q=ABC%20Ltd&type=firm\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Response:**\n```json\n{\n    \"Status\": \"FSR-API-04-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Search successful\",\n    \"Data\": [\n        {\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Firm/615820\",\n            \"Status\": \"See full details\",\n            \"Reference Number\": \"615820\",\n            \"Type of business or Individual\": \"Firm\",\n            \"Name\": \"ABC Ltd\"\n        }\n    ]\n}\n```\n\n**Step 2: Get Firm Details**\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/615820\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Step 3: Get Firm Address**\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/615820/Address\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n---\n\n### Example 2: Search for an Individual\n\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Search?q=John%20Doe&type=individual\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Response:**\n```json\n{\n    \"Status\": \"FSR-API-04-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Search successful\",\n    \"Data\": [\n        {\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Individuals/12345\",\n            \"Status\": \"Active\",\n            \"Reference Number\": \"12345\",\n            \"Type of business or Individual\": \"Individual\",\n            \"Name\": \"John Doe\"\n        }\n    ]\n}\n```\n\n---\n\n### Example 3: Get Firm Permissions with Pagination\n\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/123570/Permissions\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\nIf the response includes a `Next` URL in `ResultInfo`, follow it:\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/123570/Permissions?pgnp=2\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n---\n\n### Example 4: Handle \"Not Found\" Error\n\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/999999\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-01-21\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"1\",\n        \"total_count\": \"0\"\n    },\n    \"Message\": \"ERROR : Account Not Found\",\n    \"Data\": []\n}\n```\n\n**Action:** Inform the user that FRN 999999 does not exist in the FCA register.",
+        "category": "KYC data sourcing",
+        "tags": [
+          "'FCA'; 'UK data sourcing'"
+        ],
+        "parameters": []
+      }
+    ],
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "confidenceThreshold": null
+  },
+  {
+    "_id": "69fb951fb331c75a7325131b",
+    "personaId": "9754954d3aa01cee5b0b4f8fc27221ac",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "UK - Financial Conduct Authority - Structured data",
+    "description": "The agent extracts entity attributes exclusively from the official Financial Conduct Authority (FCA) Register.",
+    "userPrompt": "You are a mechanical data fetcher. Do not reason, summarise, or evaluate results between API calls. Call each tool, store the raw response, move immediately to the next call. All reasoning goes in _reasoning at the end only.\n════════════════════════════════════════\nCRITICAL GUARDRAILS\n════════════════════════════════════════\nNO SUMMARISING: Return API responses EXACTLY as received, character for\ncharacter, as a JSON-encoded string. Do not reformat, rename, flatten,\nor interpret any field. Do not map values to enums. Do not drop any\nfield, even ones that look unused.\n\n\nNO RESTRUCTURING — concrete examples of what NOT to do:\n  - Do NOT rename a key. If the raw response has a key called \"Data\",\n    your stored value must also have a key called \"Data\" — never rename\n    it to \"regulators\" or anything else.\n  - Do NOT change capitalization or invent wrappers. Never rename \"regulators\" \n    to \"Regulators\" or nest them under \"Current Regulators\".\n  - Do NOT add metadata wrappers to permissions. Never invent keys like \n    \"total_permissions\" or \"permissions_returned\". Return the raw list.\n  - Do NOT remove a wrapper. If the raw response is\n    {\"Status\":..., \"ResultInfo\":..., \"Message\":..., \"Data\":[...]}, your\n    stored value must keep that exact same four-key structure.\n  - Do NOT collapse an array of objects into a flat array of plain strings.\nNO INFERENCE: Do not use your internal knowledge to fill gaps. If an API\ncall fails, set that key to null and log it in _reasoning.\n════════════════════════════════════════\nCALLS\n════════════════════════════════════════\nCall all four of these tools and store the full raw response for each,\nas a JSON-encoded string:\n\n\n\n\n1. get_firm_details(frn)\n   → store as firm_core\n\n\n2. get_firm_address(frn)\n   → store as firm_address\n\n\n3. get_firm_permissions(frn)\n   → store as firm_permissions\n\n\n4. get_firm_regulators(frn)\n   → store as firm_regulators\n\n\nCall all four before returning output.\n\n\n════════════════════════════════════════\nRETURN RAW OUTPUT\n════════════════════════════════════════\nReturn a single JSON object with exactly these keys:\n{\n  \"frn\": the FRN string you were given,\n  \"firm_core\": full raw response from get_firm_details, as a\nJSON-encoded string,\n  \"firm_address\": full raw response from get_firm_address, as a JSON-encoded string,\n  \"firm_permissions\":  full raw response from get_firm_permissions, as a JSON-encoded string,\n  \"firm_regulators\":   full raw response from get_firm_regulators, as a JSON-encoded string,\n  \"_reasoning\": log of errors encountered, if any\n}\nRULES:\n- Failed endpoint → set its key to null, log HTTP status in _reasoning.\n- Use primitive null (never the string \"null\") for any failed fetch.\n- YOUR FIRST OUTPUT CHARACTER MUST BE { — never [.\n\n\n════════════════════════════════════════\nSTRICT OUTPUT FORMATTING\n════════════════════════════════════════\n\n\nReturn ONLY a valid parseable JSON object.\nNo markdown. No code fences. No conversational text.\nAll reasoning goes inside the _reasoning field only.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0,
+    "selectedGroups": [
+      "default_tools",
+      "firecrawl",
+      "web_search",
+      "call_api"
+    ],
+    "groupConfigs": {
+      "call_api": {
+        "endpoints": [
+          {
+            "id": "get_firm_details",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{FRN}",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_permissions",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Permissions",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_address",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Address",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          },
+          {
+            "id": "get_firm_regulators",
+            "url": "https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Regulators",
+            "method": "GET",
+            "headers": {
+              "x-auth-email": "{{auth_email}}",
+              "x-auth-key": "{{api_key}}",
+              "Content-Type": "application/json"
+            },
+            "body": ""
+          }
+        ]
+      }
+    },
+    "selectedTools": [],
+    "selectedSkills": [
+      {
+        "skillId": "df74cd81b50fa574f5f3bd9a35cdfb0e",
+        "skillName": "FCA Data Download",
+        "description": "Skill to download attributes from FCA",
+        "content": "# FCA Data Download\n\nDownload attributes and information from the FCA (Financial Conduct Authority) Register using their public API.\n\n---\n\n## Objective\n\nUse this skill to search and retrieve detailed information about firms, individuals, and collective investment schemes registered with the UK Financial Conduct Authority. You can search for entities, retrieve firm details, addresses, permissions, appointed representatives, individuals, passports, requirements, waivers, exclusions, disciplinary history, and other regulatory data.\n\n**When to use this skill:**\n- When you need to verify if a firm or individual is FCA-regulated\n- When you need detailed regulatory information about UK financial services entities\n- When you need to check permissions, activities, or compliance status of firms\n- When you need to retrieve contact details, addresses, or organizational structure of regulated entities\n\n---\n\n## Base URL & Authentication\n\n**Base URL:**\n```\nhttps://register.fca.org.uk/services\n```\n\n**Authentication Method:** Custom headers\n\n**Required Headers:**\n```\nx-auth-email: <your_email_address>\nx-auth-key: <your_api_key>\nContent-Type: application/json\n```\n\nYou must include both `x-auth-email` and `x-auth-key` headers in every request. Without valid credentials, you will receive error code `FSR-API-01-01-11` (Unauthorised).\n\n---\n\n## Key Endpoints\n\n### 1. Common Search API\n\n**Purpose:** Search the FS Register for firms, individuals, or collective investment schemes\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Search`\n\n**Query Parameters:**\n- `q` (required): Search term (e.g., firm name, individual name)\n- `type` (required): Type of search - `firm`, `individual`, or `fund`\n- `page` (optional): Page number for pagination (default: 1)\n- `per_page` (optional): Results per page (default: 20)\n\n**Example Request:**\n```bash\nGET /V0.1/Search?q=Example%20Ltd&type=firm\n```\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-04-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Search successful\",\n    \"Data\": [\n        {\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Firm/12345\",\n            \"Status\": \"See full details\",\n            \"Reference Number\": \"12345\",\n            \"Type of business or Individual\": \"Firm\",\n            \"Name\": \"Example Ltd\"\n        }\n    ]\n}\n```\n\n---\n\n### 2. Firm Details API\n\n**Purpose:** Get comprehensive information about a specific firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Request:**\n```bash\nGET /V0.1/Firm/615820\n```\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"1\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Firm Found\",\n    \"Data\": [\n        {\n            \"FRN\": \"615820\",\n            \"Organisation Name\": \"ABC LTD\",\n            \"Business Type\": \"Regulated\",\n            \"Status\": \"Authorised\",\n            \"Status Effective Date\": \"31/08/2018\",\n            \"Companies House Number\": \"8755483\",\n            \"Address\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Address\",\n            \"Permission\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Permissions\",\n            \"Individuals\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Individuals\"\n        }\n    ]\n}\n```\n\n---\n\n### 3. Firm Address API\n\n**Purpose:** Get address and contact information for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Address`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Query Parameters:**\n- `Type` (optional): Filter by address type (e.g., `PPOB`, `Complaint`)\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-02-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"2\",\n        \"total_count\": \"2\"\n    },\n    \"Message\": \"Ok. Firm Address Found\",\n    \"Data\": [\n        {\n            \"Address Type\": \"Principal Place of Business\",\n            \"Address Line 1\": \"Address Line 1\",\n            \"Town\": \"Town\",\n            \"County\": \"London\",\n            \"Postcode\": \"E20 1JN\",\n            \"Country\": \"UNITED KINGDOM\",\n            \"Phone Number\": \"4470799999999\",\n            \"Website Address\": \"https://www.fca.org.uk/\"\n        }\n    ]\n}\n```\n\n---\n\n### 4. Firm Activities and Permissions API\n\n**Purpose:** Get activities and permissions associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Permissions`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-03-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"10\"\n    },\n    \"Message\": \"Ok. Firm permission found\",\n    \"Data\": {\n        \"Acting as a CBTL advisor\": [\n            {\n                \"Acting as a CBTL advisor\": [\"1\"]\n            }\n        ],\n        \"Agreeing to carry on a regulated activity\": [\n            {\n                \"Limitation\": [\"The firm is limited to...\"]\n            }\n        ]\n    }\n}\n```\n\n---\n\n### 5. Firm Individuals API\n\n**Purpose:** Get individuals associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Individuals`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-05-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"4\"\n    },\n    \"Message\": \"Ok. Firm Individuals found\",\n    \"Data\": [\n        {\n            \"Name\": \"Jessica Davies\",\n            \"IRN\": \"789018\",\n            \"Status\": \"Approved by regulator\",\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Individuals/789018\"\n        }\n    ]\n}\n```\n\n---\n\n### 6. Firm Requirements API\n\n**Purpose:** Get regulatory requirements associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Requirements`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-06-00\",\n    \"Message\": \"Ok. Firm Requirements found\",\n    \"Data\": [\n        {\n            \"Requirement Reference\": \"OP-0123456\",\n            \"Effective Date\": \"23/04/2021\",\n            \"Financial Promotions Requirement\": \"TRUE\",\n            \"Derivatives as incidental services only.\": \"The firm must not carry on...\"\n        }\n    ]\n}\n```\n\n---\n\n### 7. Firm Appointed Representatives API\n\n**Purpose:** Get appointed representatives associated with a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/AR`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-05-04-00\",\n    \"Message\": \"Ok. Appointed Representative Found\",\n    \"Data\": {\n        \"CurrentAppointedRepresentatives\": [\n            {\n                \"FRN\": \"999060\",\n                \"Name\": \"AR Firm 3\",\n                \"Principal FRN\": \"999001\",\n                \"Effective Date\": \"03/03/2015\",\n                \"Tied Agent\": \"false\"\n            }\n        ],\n        \"PreviousAppointedRepresentatives\": []\n    }\n}\n```\n\n---\n\n### 8. Firm Passport API\n\n**Purpose:** Get passport information (EEA passporting rights)\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Passports`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n**Example Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-07-00\",\n    \"Message\": \"Ok. Firm Passport found\",\n    \"Data\": [\n        {\n            \"Passports\": [\n                {\n                    \"Country\": \"GIBRALTAR\",\n                    \"PassportDirection\": \"Passporting Out\",\n                    \"Permissions\": \"https://register.fca.org.uk/services/V0.1/Firm/615820/Passports/GIBRALTAR/Permission\"\n                }\n            ]\n        }\n    ]\n}\n```\n\n---\n\n### 9. Firm Passport Permission API\n\n**Purpose:** Get detailed permissions for a specific passport country\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Passports/{Country}/Permission`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n- `Country` (required): Country name (e.g., \"Australia\", \"AUSTRIA\")\n\n---\n\n### 10. Firm Regulators API\n\n**Purpose:** Get regulator history for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Regulators`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 11. Firm Other Names API\n\n**Purpose:** Get trading names and brand names used by a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Names`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 12. Firm Controlled Functions API\n\n**Purpose:** Get controlled functions (senior management roles) for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/CF`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 13. Firm Waivers API\n\n**Purpose:** Get waivers granted to a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Waivers`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 14. Firm Exclusions API\n\n**Purpose:** Get PSD2 exclusions for a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Exclusions`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 15. Firm Disciplinary History API\n\n**Purpose:** Get disciplinary actions against a firm\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/DisciplinaryHistory`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n\n---\n\n### 16. Firm Requirements Investment Types API\n\n**Purpose:** Get investment types for a specific requirement\n\n**HTTP Method:** GET\n\n**Endpoint:** `/V0.1/Firm/{FRN}/Requirements/{ReqRef}/InvestmentTypes`\n\n**Path Parameters:**\n- `FRN` (required): Firm Reference Number\n- `ReqRef` (required): Requirement Reference (e.g., \"OP-0123456\")\n\n---\n\n## Step-by-Step Usage Procedure\n\n### Step 1: Prepare Authentication\nBefore making any request, ensure you have:\n- Your FCA API email address\n- Your FCA API key\n\n### Step 2: Search for an Entity (if you don't have the FRN/IRN)\n1. Use the Common Search API (`/V0.1/Search`) with query parameters\n2. Set `q` to your search term (firm name, individual name, etc.)\n3. Set `type` to `firm`, `individual`, or `fund`\n4. Include authentication headers\n\nExample:\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Search?q=Example%20Ltd&type=firm\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n### Step 3: Extract the Reference Number\nFrom the search response, extract:\n- `Reference Number` (FRN for firms, IRN for individuals)\n- `URL` field which contains the direct API endpoint\n\n### Step 4: Retrieve Detailed Information\nUse the appropriate endpoint based on what information you need:\n- For basic firm info: `/V0.1/Firm/{FRN}`\n- For addresses: `/V0.1/Firm/{FRN}/Address`\n- For permissions: `/V0.1/Firm/{FRN}/Permissions`\n- For individuals: `/V0.1/Firm/{FRN}/Individuals`\n- And so on...\n\n### Step 5: Handle Pagination\nIf `ResultInfo.total_count` is greater than `per_page`:\n1. Check for `Next` URL in `ResultInfo`\n2. Make subsequent requests using the `Next` URL or by incrementing the `pgnp` parameter\n3. Continue until all pages are retrieved\n\n### Step 6: Parse the Response\n1. Check the `Status` field for success codes (e.g., `FSR-API-02-01-00`)\n2. Extract data from the `Data` array or object\n3. Use the `Message` field for human-readable status information\n\n### Step 7: Follow Related URLs\nMany responses include URLs to related data:\n- Use these URLs to fetch additional details\n- These URLs are already properly formatted and authenticated the same way\n\n### Step 8: Handle Errors\nCheck the `Status` code and handle accordingly (see Error Handling section)\n\n---\n\n## Output Format\n\nWhen returning data from this API, structure your output as follows:\n\n### For Search Results:\n```\nFound {total_count} result(s) for \"{search_term}\":\n\n1. Name: {Name}\n   Reference Number: {Reference Number}\n   Type: {Type of business or Individual}\n   Status: {Status}\n   Details URL: {URL}\n```\n\n### For Firm Details:\n```\nFirm Information:\n- FRN: {FRN}\n- Name: {Organisation Name}\n- Status: {Status} (Effective: {Status Effective Date})\n- Business Type: {Business Type}\n- Companies House Number: {Companies House Number}\n\nAvailable Details:\n- Address: {Address URL}\n- Permissions: {Permission URL}\n- Individuals: {Individuals URL}\n- Requirements: {Requirements URL}\n```\n\n### For Addresses:\n```\nAddress Information:\n\n{Address Type}:\n{Address Line 1}\n{Address Line 2}\n{Town}, {County} {Postcode}\n{Country}\nPhone: {Phone Number}\nWebsite: {Website Address}\n```\n\n### For Lists (Individuals, ARs, etc.):\nPresent as numbered or bulleted lists with key fields clearly labeled.\n\n---\n\n## Rate Limits & Constraints\n\n**Pagination:**\n- Default page size: 20 records per page\n- Maximum page size: Not explicitly documented (use default)\n- Use `page` or `pgnp` parameter to navigate pages\n- Check `ResultInfo.Next` for the next page URL\n- Check `ResultInfo.total_count` to determine total results\n\n**Search Recommendations:**\n- The Common Search API is recommended primarily for resolving FRNs, IRNs, and PRNs\n- Not all search results may have a resolvable URL for detailed information\n- This is an early release, so functionality may be limited\n\n**Data Freshness:**\n- Check the `System Timestamp` field in firm details for last update time\n\n---\n\n## Error Handling\n\n### Common Status Codes\n\n| Status Code | Description | Action |\n|------------|-------------|--------|\n| `FSR-API-01-01-11` | Unauthorised: Invalid API key or email | Verify your authentication credentials |\n| `FSR-API-01-01-21` | Forbidden | Check your API access permissions |\n| `FSR-API-04-01-00` | Search successful | Success - process results |\n| `FSR-API-04-01-11` | No search result found | Inform user no results found |\n| `FSR-API-04-01-21` | Bad request: Invalid input | Check query parameters |\n| `FSR-API-02-01-00` | Firm found | Success - process firm data |\n| `FSR-API-02-01-11` | Bad request: Invalid input | Check FRN format |\n| `FSR-API-02-01-21` | Firm not found | Inform user firm doesn't exist |\n| `FSR-API-02-02-00` | Address found | Success - process address data |\n| `FSR-API-02-02-11` | Bad request: Invalid input | Check FRN format |\n| `FSR-API-02-02-21` | Address not found | Inform user no address available |\n| `FSR-API-02-03-00` | Permissions found | Success - process permissions |\n| `FSR-API-02-03-11` | Bad request: Invalid input | Check FRN format |\n| `FSR-API-02-03-21` | Permissions not found | Inform user no permissions available |\n| `FSR-API-02-07-22` | Page not found | Check pagination parameters |\n\n### Error Handling Strategy\n\n1. **Authentication Errors (FSR-API-01-01-xx):**\n   - Verify `x-auth-email` and `x-auth-key` headers are present\n   - Confirm credentials are valid\n   - Do not retry without fixing credentials\n\n2. **Not Found Errors (xx-xx-21):**\n   - Verify the reference number (FRN/IRN) is correct\n   - Inform the user the entity doesn't exist or has no data for that endpoint\n   - Do not retry with the same parameters\n\n3. **Bad Request Errors (xx-xx-11):**\n   - Validate input parameters\n   - Check for proper URL encoding\n   - Verify required parameters are present\n\n4. **Pagination Errors (xx-xx-22):**\n   - Check if page number exceeds available pages\n   - Use `ResultInfo.total_count` and `per_page` to calculate max pages\n\n---\n\n## Examples\n\n### Example 1: Search for a Firm and Get Full Details\n\n**Step 1: Search**\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Search?q=ABC%20Ltd&type=firm\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Response:**\n```json\n{\n    \"Status\": \"FSR-API-04-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Search successful\",\n    \"Data\": [\n        {\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Firm/615820\",\n            \"Status\": \"See full details\",\n            \"Reference Number\": \"615820\",\n            \"Type of business or Individual\": \"Firm\",\n            \"Name\": \"ABC Ltd\"\n        }\n    ]\n}\n```\n\n**Step 2: Get Firm Details**\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/615820\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Step 3: Get Firm Address**\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/615820/Address\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n---\n\n### Example 2: Search for an Individual\n\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Search?q=John%20Doe&type=individual\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Response:**\n```json\n{\n    \"Status\": \"FSR-API-04-01-00\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"20\",\n        \"total_count\": \"1\"\n    },\n    \"Message\": \"Ok. Search successful\",\n    \"Data\": [\n        {\n            \"URL\": \"https://register.fca.org.uk/services/V0.1/Individuals/12345\",\n            \"Status\": \"Active\",\n            \"Reference Number\": \"12345\",\n            \"Type of business or Individual\": \"Individual\",\n            \"Name\": \"John Doe\"\n        }\n    ]\n}\n```\n\n---\n\n### Example 3: Get Firm Permissions with Pagination\n\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/123570/Permissions\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\nIf the response includes a `Next` URL in `ResultInfo`, follow it:\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/123570/Permissions?pgnp=2\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n---\n\n### Example 4: Handle \"Not Found\" Error\n\n```bash\ncurl -X GET \"https://register.fca.org.uk/services/V0.1/Firm/999999\" \\\n  -H \"x-auth-email: user@example.com\" \\\n  -H \"x-auth-key: c2547eb745079dac9320b638f5e225cf483cc5cfdda41\" \\\n  -H \"Content-Type: application/json\"\n```\n\n**Response:**\n```json\n{\n    \"Status\": \"FSR-API-02-01-21\",\n    \"ResultInfo\": {\n        \"page\": \"1\",\n        \"per_page\": \"1\",\n        \"total_count\": \"0\"\n    },\n    \"Message\": \"ERROR : Account Not Found\",\n    \"Data\": []\n}\n```\n\n**Action:** Inform the user that FRN 999999 does not exist in the FCA register.",
+        "category": "KYC data sourcing",
+        "tags": [
+          "'FCA'; 'UK data sourcing'"
+        ],
+        "parameters": []
+      }
+    ],
+    "inputFields": [
+      {
+        "fieldName": "frn",
+        "fieldType": "text",
+        "fieldDescription": "Company Registration number",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "frn",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "firm_core",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "firm_address",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "firm_permissions",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "firm_regulators",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "_reasoning",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": "{\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"frn\":               { \"type\": \"string\" },\r\n    \"firm_core\":         { \"type\": \"string\" },\r\n    \"firm_address\":      { \"type\": \"string\" },\r\n    \"firm_permissions\":  { \"type\": \"string\" },\r\n    \"firm_regulators\":   { \"type\": \"string\" },\r\n    \"_reasoning\":        { \"type\": \"string\" }\r\n  },\r\n  \"required\": [\"frn\", \"firm_core\", \"firm_address\", \"firm_permissions\", \"firm_regulators\", \"_reasoning\"],\r\n  \"additionalProperties\": false\r\n}",
+    "outputMode": "json_object",
+    "addMetadata": true,
+    "confidenceThreshold": null,
+    "downloadFormat": "json",
+    "createdBy": "bpalakkal",
+    "lastModifiedBy": "bpalakkal",
+    "versionNumber": 2,
+    "versionNote": "Changed to add enum",
+    "basePersonaId": "115d6199f8b183878d9633c66cf5278a",
+    "createdAt": "2026-05-06T19:23:11.722Z",
+    "updatedAt": "2026-06-21T00:31:18.211Z",
+    "__v": 0,
+    "memoryEnabled": false,
+    "promptScanResult": {
+      "has_injection": true,
+      "reason": "Detected output manipulation low pattern",
+      "scanner": "Regex",
+      "detected_patterns": [
+        "set that key to null"
+      ],
+      "match_details": [
+        {
+          "match": "set that key to null",
+          "category": "output_manipulation_low",
+          "line": 14,
+          "column": 13,
+          "lineContent": "call fails, set that key to null and log it in _reasoning."
+        }
+      ],
+      "scan_time_ms": 3,
+      "mode": "regex-block",
+      "llm_called": false,
+      "scanner_results": {
+        "InvisibleText": {
+          "isValid": true,
+          "reason": "No invisible characters detected",
+          "detectedPatterns": [],
+          "scanTimeMs": 1
+        },
+        "Regex": {
+          "isValid": false,
+          "reason": "Detected output manipulation low pattern",
+          "detectedPatterns": [
+            "set that key to null"
+          ],
+          "details": [
+            {
+              "category": "output_manipulation_low",
+              "pattern": "/\\bset\\s+(the\\s+)?\\w+(\\s+\\w+)?\\s+(to|as|=)\\s+\\w+/i",
+              "match": "set that key to null",
+              "index": 561,
+              "line": 14,
+              "column": 13,
+              "lineContent": "call fails, set that key to null and log it in _reasoning."
+            }
+          ],
+          "scanTimeMs": 1
+        },
+        "BanSubstrings": {
+          "isValid": true,
+          "reason": "No banned substrings detected",
+          "detectedPatterns": [],
+          "scanTimeMs": 1
+        }
+      }
+    },
+    "promptScanStatus": "skipped"
+  }
+]

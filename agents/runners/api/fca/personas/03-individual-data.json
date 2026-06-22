@@ -1,0 +1,33 @@
+{
+  "personaName": "UK FCA - Individual Data",
+  "personaId": "d58f6a00a92a20b35b22c00965f6dd4c",
+  "versionNumber": 1,
+  "description": "Mechanical data fetcher. Takes a FRN, retrieves firm individuals list and controlled functions (CF) pages. Fetches CF pages 1..cap based on total_count (cap: <=20→1, <=100→5, <=500→10, >500→20). Stops early if a page has zero Current records.",
+  "llmModel": "global.anthropic.claude-sonnet-4-6",
+  "temperature": 0,
+  "inputFields": [
+    { "fieldName": "frn", "fieldType": "text", "valueSource": "predecessorOutput" }
+  ],
+  "outputFields": [
+    { "fieldName": "frn", "fieldType": "text" },
+    { "fieldName": "firm_individuals", "fieldType": "text", "description": "Raw response from GET /Firm/{FRN}/Individuals" },
+    { "fieldName": "firm_cf_pages", "fieldType": "text", "description": "JSON-encoded array of raw CF page responses from GET /Firm/{FRN}/CF?pgnp=N" },
+    { "fieldName": "_reasoning", "fieldType": "text" }
+  ],
+  "endpoints": [
+    {
+      "id": "get_firm_individuals",
+      "url": "https://register.fca.org.uk/services/V0.1/Firm/{FRN}/Individuals",
+      "method": "GET",
+      "headers": { "x-auth-email": "{{fca_auth_email}}", "x-auth-key": "{{fca_api_key}}", "Content-Type": "application/json" }
+    },
+    {
+      "id": "get_firm_controlled_functions",
+      "url": "https://register.fca.org.uk/services/V0.1/Firm/{FRN}/CF",
+      "method": "GET",
+      "headers": { "x-auth-email": "{{fca_auth_email}}", "x-auth-key": "{{fca_api_key}}", "Content-Type": "application/json" }
+    }
+  ],
+  "userPrompt": "You are a mechanical data fetcher. Do not reason, summarise, or evaluate between API calls. All reasoning goes in _reasoning at the end only.\n\nCRITICAL GUARDRAILS:\n- NO SAMPLING OR DROPOUTS: firm_cf_pages MUST contain ALL pages fetched in full.\n- NO LAZY EXECUTION: Call get_firm_controlled_functions for pages 1 through cap.\n- NO INFERENCE: If an API call fails, set that key to null.\n\nPHASE 1 — INDIVIDUALS:\n1. get_firm_individuals(frn) → store as firm_individuals\n\nPHASE 2 — CONTROLLED FUNCTIONS:\nSTEP 1: Fetch page 1, read total_count from ResultInfo.\nSet cap: total_count<=20→1, <=100→5, <=500→10, >500→20\nSTEP 2: Paginate from page 2 to cap. Stop early if a page returns zero Current records.\nSTEP 3: Store each FULL raw page response in firm_cf_pages array (JSON-encoded string).\n\nReturn: { frn, firm_individuals, firm_cf_pages, _reasoning }",
+  "skill": "FCA Data Download (see agents/runners/api/fca/personas/skills/fca-data-download.md)"
+}

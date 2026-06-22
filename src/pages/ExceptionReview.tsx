@@ -37,6 +37,7 @@ import {
   Send, Mail, Plus, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
   ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
   ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap, ClipboardList,
+  Folder,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
@@ -64,6 +65,7 @@ import { ForgeLineagePanel } from "@/components/kyc/ForgeLineagePanel";
 import { ForgePersonCard } from "@/components/kyc/ForgePersonCard";
 import { WgqTabContent } from "@/components/kyc/WgqTabContent";
 import { CollabPanel } from "@/components/kyc/CollabPanel";
+import { EntityFiles } from "@/components/kyc/EntityFiles";
 import { SimpleFieldRow, InlineTraceDrawer, NestedObjectBlock } from "@/components/kyc/SimpleFieldRow";
 
 
@@ -1054,7 +1056,7 @@ const ExceptionReview = () => {
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"locker" | "collab">("locker");
+  const [rightTab, setRightTab] = useState<"locker" | "collab" | "files">("locker");
   const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes">("exception");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
@@ -1770,6 +1772,17 @@ const ExceptionReview = () => {
                   <MessageSquare className="size-3.5" /> Collaboration
                   <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{(COMMENTS_BY_KYC[active.kyc]?.length ?? 0)}</span>
                 </button>
+                <button
+                  onClick={() => setRightTab("files")}
+                  className={cn(
+                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                    rightTab === "files"
+                      ? "font-medium border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Folder className="size-3.5" /> Files
+                </button>
               </div>
               <button
                 onClick={() => setRightPaneOpen(false)}
@@ -1781,6 +1794,7 @@ const ExceptionReview = () => {
             </div>
             {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
             {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
+            {rightTab === "files"  && <div className="h-full overflow-hidden flex flex-col"><EntityFiles kycRef={active.kyc} /></div>}
           </aside>
         ) : (
           <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-4">
@@ -1820,6 +1834,16 @@ const ExceptionReview = () => {
                     {COMMENTS_BY_KYC[active.kyc]?.length}
                   </span>
                 )}
+              </div>
+              <div className="w-5 h-px bg-border/60" />
+              <div className="relative">
+                <button
+                  onClick={() => { setRightPaneOpen(true); setRightTab("files"); }}
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+                  title="Files"
+                >
+                  <Folder className="size-3" /> Files
+                </button>
               </div>
             </div>
           </aside>

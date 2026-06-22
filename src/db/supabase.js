@@ -414,3 +414,124 @@ export async function resolveException(kycRef, exceptionNumber, { resolutionOpti
 
   return data;
 }
+
+// ─── Agent runs ───────────────────────────────────────────────────────────────
+
+/**
+ * Insert a new agent_runs row at the start of a run.
+ * Returns the full row including the generated UUID.
+ */
+export async function createAgentRun({ kycRef, agentSlug, runnerType, initiatedBy }) {
+  const { data, error } = await sb
+    .from('agent_runs')
+    .insert({
+      kyc_ref:      kycRef,
+      agent_slug:   agentSlug,
+      runner_type:  runnerType,
+      initiated_by: initiatedBy ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Update a run's status / result fields.
+ * completed_at is set automatically when status transitions to 'complete' or 'failed'.
+ */
+export async function updateAgentRun(runId, { status, externalRunId, outputType, sourcesConsulted, error: errMsg } = {}) {
+  const patch = {};
+  if (status           !== undefined) patch.status            = status;
+  if (externalRunId    !== undefined) patch.external_run_id   = externalRunId;
+  if (outputType       !== undefined) patch.output_type       = outputType;
+  if (sourcesConsulted !== undefined) patch.sources_consulted = sourcesConsulted;
+  if (errMsg           !== undefined) patch.error             = errMsg;
+  if (status === 'complete' || status === 'failed') patch.completed_at = new Date().toISOString();
+
+  const { data, error } = await sb
+    .from('agent_runs')
+    .update(patch)
+    .eq('id', runId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Return the most recent agent runs for an entity (default: last 20). */
+export async function getAgentRuns(kycRef, { limit = 20 } = {}) {
+  const { data, error } = await sb
+    .from('agent_runs')
+    .select('*')
+    .eq('kyc_ref', kycRef)
+    .order('started_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Return entity_attributes rows written by a specific agent run.
+ * These have snapshot_id=NULL and agent_run_id set.
+ */
+export async function getAttributesByRunId(kycRef, agentRunId) {
+  const { data, error } = await sb
+    .from('entity_attributes')
+    .select('attribute_name, attribute_group, display_value, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
+    .eq('kyc_ref', kycRef)
+    .eq('agent_run_id', agentRunId)
+    .order('attribute_name');
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ─── Case files ───────────────────────────────────────────────────────────────
+
+/**
+ * Return all case_files for an entity, optionally filtered by category.
+ * Joins the originating run's agent_slug and completion time for display.
+ */
+export async function getEntityFiles(kycRef, { category } = {}) {
+  let q = sb
+    .from('case_files')
+    .select('*, agent_runs(agent_slug, completed_at)')
+    .eq('kyc_ref', kycRef)
+    .order('created_at', { ascending: false });
+  if (category) q = q.eq('file_category', category);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Generate a short-lived signed URL for a private storage file.
+ * Default expiry: 1 hour — enough for a analyst review session.
+ */
+export async function getSignedFileUrl(storagePath, { expiresIn = 3600 } = {}) {
+  const { data, error } = await sb.storage
+    .from('kyc-files')
+    .createSignedUrl(storagePath, expiresIn);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+/**
+ * Delete a file from both Supabase Storage and the case_files table.
+ */
+export async function deleteFile(fileId) {
+  const { data: file, error: fetchErr } = await sb
+    .from('case_files')
+    .select('storage_path')
+    .eq('id', fileId)
+    .single();
+  if (fetchErr) throw fetchErr;
+
+  const { error: storageErr } = await sb.storage
+    .from('kyc-files')
+    .remove([file.storage_path]);
+  if (storageErr) throw storageErr;
+
+  const { error: dbErr } = await sb.from('case_files').delete().eq('id', fileId);
+  if (dbErr) throw dbErr;
+}

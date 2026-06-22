@@ -1,70 +1,187 @@
-# Getting Started with Create React App
+# KYC Sentinel
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+AI-powered KYC compliance platform for financial analysts. Surfaces compliance exceptions, lets analysts review and resolve them, and dispatches AI agents to pull due diligence data from external sources.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Quick Start
 
-### `npm start`
+```bash
+# 1. Install dependencies
+npm install
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+# 2. Copy and fill in environment variables
+cp .env.example .env
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+# 3. Run DB migration (paste into Supabase SQL Editor)
+#    scripts/migrations/001_agent_runs_and_case_files.sql
 
-### `npm test`
+# 4. Create the file storage bucket
+node scripts/setup-storage.js
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+# 5. Seed initial entities and exceptions
+node scripts/seed-supabase.js
 
-### `npm run build`
+# 6. Start dev server (Vite on :8080 + Express on :3001)
+npm run start
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+---
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Stack
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 + TypeScript + Vite |
+| UI | shadcn/ui (Radix + Tailwind), Lucide icons |
+| Backend | Express (Node.js ESM, Railway) |
+| Primary DB | Supabase (PostgreSQL) |
+| File Storage | Supabase Storage (`kyc-files` bucket, private) |
+| Graph DB | Neo4j |
+| AI Assistant | Anthropic Claude (claude-sonnet-4-6) |
+| Agent Runtime | AWS ELB (async HTTP, custom agent framework) |
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Features
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Exception Review
+Browse open KYC exceptions per entity. Each exception shows a confidence score, AI-generated narrative, reasoning steps, and supporting evidence. Resolve via QA sign-off, escalation, client outreach, or submission.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Attribute View
+Full attribute grid from the latest KYC Forge snapshot. Toggle between exception-flagged view and full attribute form. Attributes carry lineage (source, confidence, agent actions) and support analyst overrides.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Agent Dispatch
+Run AI agents directly from the review screen. A live dock shows thinking steps as they stream in. On completion, any saved attributes, exceptions, and files are shown inline.
 
-## Learn More
+### Files Tab
+Every document and screenshot produced by an agent run is stored in Supabase Storage and listed in the Files tab on the Exception Review screen. Click to open an inline viewer (PDF iframe, image, or download fallback). Files are served via short-lived signed URLs — never public.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Ownership Graph
+Interactive Neo4j graph showing entity relationships, beneficial owners, and key controllers. Click any node to expand its connections.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### AI Chat
+Floating chat assistant powered by Claude with tool use — can query entity data, list exceptions, search by name, and run Cypher against the graph.
 
-### Code Splitting
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Project Structure
 
-### Analyzing the Bundle Size
+```
+my-app/
+├── agents/                  # Server-side agent ecosystem
+│   ├── types.ts             # Shared output types
+│   ├── registry.ts          # Agent slug → metadata
+│   ├── base/
+│   │   ├── ApiRunner.js     # Base class for synchronous API runners
+│   │   └── AutonomousRunner.js  # Base class for async AWS agents
+│   ├── publishers/          # Write agent output to Supabase
+│   │   ├── AttributePublisher.js
+│   │   ├── ExceptionPublisher.js
+│   │   └── FilePublisher.js
+│   └── runners/
+│       ├── api/             # Direct REST API runners (stubs — impl provided separately)
+│       └── autonomous/      # AWS ELB agent wrappers (stubs)
+├── src/
+│   ├── pages/               # Dashboard, WorkQueue, ExceptionReview, Login
+│   ├── components/
+│   │   ├── AgentSystem.tsx  # Agent orchestration + dock UI
+│   │   ├── GraphView.tsx    # Neo4j graph
+│   │   └── kyc/             # KYC-specific components
+│   │       ├── DocumentViewer.tsx   # PDF / image viewer dialog
+│   │       ├── FileCard.tsx         # Single file card
+│   │       └── EntityFiles.tsx      # File grid with category tabs
+│   └── db/
+│       ├── supabase.js      # Server-side DB helpers
+│       └── neo4j.js         # Graph queries
+├── scripts/
+│   ├── migrations/          # SQL migrations for Supabase
+│   ├── seed-supabase.js     # Seed script
+│   └── setup-storage.js     # Create Supabase Storage bucket
+└── server.js                # All Express routes
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+---
 
-### Making a Progressive Web App
+## Adding a New API Runner
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+1. Create `agents/runners/api/MySourceRunner.js`:
 
-### Advanced Configuration
+```js
+import { ApiRunner } from '../../base/ApiRunner.js';
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+export class MySourceRunner extends ApiRunner {
+  get slug()       { return 'my-source'; }
+  get outputType() { return 'attributes'; }   // or 'exceptions' | 'both'
 
-### Deployment
+  async execute({ kycRef, entityName }) {
+    // Call external API, build AttributeOutput[] / ExceptionOutput[] / FileOutput[]
+    return {
+      agentSlug:  this.slug,
+      kycRef,
+      outputType: this.outputType,
+      attributes: [...],
+      exceptions: [...],
+      files:      [...],
+      metadata:   { completedAt: new Date().toISOString(), durationMs: 0, sourcesConsulted: ['example.com'] },
+    };
+  }
+}
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+2. Export from `agents/runners/api/index.js`
+3. Add to the `RunnerMap` in `server.js` at `POST /api/agent-run/api/:slug`
 
-### `npm run build` fails to minify
+Invoke it:
+```
+POST /api/agent-run/api/my-source
+{ "kycRef": "KYC-30215", "entityName": "Acme Ltd" }
+→ { "runId": "uuid", "stats": { "attrCount": 8, "excCount": 1, "fileStored": 2 } }
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+---
+
+## Database Migration
+
+Run `scripts/migrations/001_agent_runs_and_case_files.sql` in the Supabase SQL Editor once before first use. It:
+- Creates `agent_runs` table (tracks every agent invocation)
+- Creates `case_files` table (metadata for stored documents/screenshots)
+- Makes `entity_attributes.snapshot_id` nullable (agent-run attributes don't need a Forge snapshot)
+- Adds `severity` column to `exceptions`
+- Adds `agent_run_id` FK to `entity_attributes` and `exceptions`
+- Enables RLS on the new tables
+
+---
+
+## Environment Variables
+
+See `.env.example` for the full list. Key variables:
+
+```
+SUPABASE_URL / SUPABASE_SERVICE_KEY    — backend DB access
+VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — frontend auth
+ANTHROPIC_API_KEY                      — Claude chat assistant
+AWS_AGENT_BASE                         — AWS ELB for autonomous agents
+COMPANIES_HOUSE_API_KEY               — Companies House API runner
+VITE_AGENT_API_BASE                    — Express server URL (http://localhost:3001 in dev)
+```
+
+---
+
+## Dev Commands
+
+```bash
+npm run start    # Vite (:8080) + Express (:3001)
+npm run dev      # Vite only
+npm run server   # Express only
+npm run build    # Production build
+npm run deploy   # Build + deploy to GitHub Pages
+```
+
+---
+
+## Deployment
+
+- **Frontend**: GitHub Pages via `npm run deploy`
+- **Backend**: Railway — `Procfile` runs `npm run server`
+- **Migration**: run SQL migration in Supabase dashboard before first deploy

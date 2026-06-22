@@ -166,6 +166,8 @@ type AgentApiConfig = {
   buildBody: (ctx: EntityCtx | null) => Record<string, unknown>;
   fetchSteps: boolean;
   asyncMode?: boolean;
+  endpoint?: string;    // overrides /api/agent/:slug when set
+  skipSnapshot?: boolean; // skip saveSnapshot (API runners publish directly)
 };
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
@@ -193,10 +195,12 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
     asyncMode: true,
   },
   "fca": {
-    slug: "fca-data-sourcing",
-    buildBody: (ctx) => ({ entity_name: ctx?.name ?? "" }),
-    fetchSteps: true,
-    asyncMode: true,
+    slug: "fca",
+    endpoint: "/api/agent-run/api/fca",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: false,
+    asyncMode: false,
+    skipSnapshot: true,
   },
 };
 
@@ -605,7 +609,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                   rd,
                 );
               } catch { markDone(buildThoughtsFromResult(rd, run.agentId), rd); }
-              await saveSnapshot(rd, runId);
+              if (!cfg.skipSnapshot) await saveSnapshot(rd, runId);
               return;
             }
             if (["failed", "error", "cancelled"].includes(status)) {
@@ -632,7 +636,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       // H5: Track cancellation so polling stops if the component unmounts
       const cancelled = { current: false };
 
-      apiFetch(`${AGENT_API_BASE}/api/agent/${cfg.slug}`, {
+      apiFetch(`${AGENT_API_BASE}${cfg.endpoint ?? `/api/agent/${cfg.slug}`}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -670,7 +674,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
               } catch { /* fall through */ }
             }
             markDone(thoughts.length > 0 ? thoughts : buildThoughtsFromResult(data, run.agentId), data);
-            await saveSnapshot(data, String(runId ?? ""));
+            if (!cfg.skipSnapshot) await saveSnapshot(data, String(runId ?? ""));
             return;
           }
 
@@ -960,6 +964,21 @@ const AgentDock = () => {
                           <span className="text-primary/60">›</span> {t}
                         </p>
                       ))}
+                      {r.state === "done" && (() => {
+                        const res = r.result as Record<string, unknown> | undefined;
+                        const stats = res?.stats as Record<string, unknown> | undefined;
+                        if (!stats) return null;
+                        const parts: string[] = [];
+                        if (Number(stats.attrCount)  > 0) parts.push(`${stats.attrCount} attrs`);
+                        if (Number(stats.excCount)   > 0) parts.push(`${stats.excCount} exceptions`);
+                        if (Number(stats.fileStored) > 0) parts.push(`${stats.fileStored} files`);
+                        if (!parts.length) return null;
+                        return (
+                          <p className="text-[11px] text-success font-mono leading-snug mt-0.5">
+                            <span className="text-success/60">✓</span> Saved: {parts.join(" · ")}
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
