@@ -39,6 +39,7 @@ const DRGS = [
   { name: 'UNIFI Mutual Holding Co' },
   { name: 'Brevan Howard Group Holdings Ltd' },
   { name: 'AustralianSuper Pty Ltd - Melbourne' },
+  { name: 'Barclays PLC' },
 ];
 
 // ─── Entities ─────────────────────────────────────────────────────────────────
@@ -148,6 +149,13 @@ const ENTITIES = [
     entity_type: 'LLP', jurisdiction: 'United Kingdom',
     risk_rating: 'High', priority: 'High', status: 'open',
     due_date: '2026-08-12', open_exceptions_count: 1, case_owner: 'Alex',
+  },
+  {
+    kyc_ref: 'KYC-30230', entity_name: 'Barclays Bank PLC',
+    drg_name: 'Barclays PLC',
+    entity_type: 'Bank / Credit Institution', jurisdiction: 'United Kingdom',
+    risk_rating: 'High', priority: 'High', status: 'open',
+    due_date: '2026-09-30', open_exceptions_count: 1, case_owner: 'Alex',
   },
 ];
 
@@ -751,6 +759,27 @@ const EXCEPTIONS = [
     ],
     recommended_actions: [
       { option: 1, description: 'Outreach is required to obtain an updated list of authorized signatories from the client. Rolling Review team should be mindful of tone. Escalate to Compliance immediately to confirm appropriate handling protocol.' },
+    ],
+  },
+
+  // ── KYC-30230 Barclays Bank PLC ────────────────────────────────────────────
+  {
+    kyc_ref: 'KYC-30230', exception_number: 1,
+    field_name: 'entity_registration_number',
+    title: 'FCA Registration — Pending Verification',
+    sources: {
+      source_a: 'Client Onboarding Form',
+      source_b: 'FCA Register',
+      rows: [
+        { field: 'FCA Registration Number', source_a: 'Not provided', source_b: 'Pending agent verification' },
+      ],
+    },
+    reasoning: [
+      'FCA registration number has not been independently verified against the FCA Register.',
+      'Run the FCA agent to retrieve and validate the registration number and authorisation status.',
+    ],
+    recommended_actions: [
+      { option: 1, description: 'Run FCA agent to retrieve registration details and update entity attributes.' },
     ],
   },
 
