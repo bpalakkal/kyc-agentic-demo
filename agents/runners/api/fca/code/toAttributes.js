@@ -34,11 +34,13 @@ export function fcaToAttributes(merged, frn) {
     attrs.push({
       attributeName,
       attributeGroup,
-      displayValue: val,
+      displayValue:     val,
+      source:           SOURCE,
+      confidence:       100,
       idFlag:           extra.idFlag           ?? false,
       verificationFlag: extra.verificationFlag ?? false,
       exceptionFlag:    extra.exceptionFlag    ?? false,
-      lineage: lg,
+      lineage:          lg,
     });
   }
 

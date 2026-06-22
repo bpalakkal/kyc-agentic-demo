@@ -299,7 +299,7 @@ export async function getAttributes(kycRef, { group } = {}) {
 
   let q = sb
     .from('entity_attributes')
-    .select('attribute_name, attribute_group, display_value, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type')
+    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type')
     .eq('kyc_ref', kycRef)
     .eq('snapshot_id', snap.id)
     .order('attribute_name');
@@ -327,7 +327,7 @@ export async function getAttributeTrace(kycRef, attributeName) {
 
   const { data, error } = await sb
     .from('entity_attributes')
-    .select('attribute_name, display_value, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
+    .select('attribute_name, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
     .eq('kyc_ref', kycRef)
     .eq('snapshot_id', snap.id)
     .eq('attribute_name', attributeName)
@@ -483,7 +483,7 @@ export async function getAgentRuns(kycRef, { limit = 20 } = {}) {
 export async function getAttributesByRunId(kycRef, agentRunId) {
   const { data, error } = await sb
     .from('entity_attributes')
-    .select('attribute_name, attribute_group, display_value, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
+    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
     .eq('kyc_ref', kycRef)
     .eq('agent_run_id', agentRunId)
     .order('attribute_name');

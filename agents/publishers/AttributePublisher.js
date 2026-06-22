@@ -35,6 +35,7 @@ export class AttributePublisher {
       attribute_name:       attr.attributeName,
       attribute_group:      attr.attributeGroup,
       display_value:        attr.displayValue ?? null,
+      confidence:           attr.confidence  ?? null,
       id_flag:              attr.idFlag ?? false,
       id_source:            attr.source ?? null,
       verification_flag:    attr.verificationFlag ?? false,
