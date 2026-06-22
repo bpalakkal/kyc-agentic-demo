@@ -67,7 +67,7 @@ function buildDiffRows(data: DiffData): DiffRow[] {
 
   return data.newAttributes.map(attr => {
     const current = currentMap.get(attr.attributeName) ?? null;
-    const changed  = current !== null && current !== attr.displayValue;
+    const changed  = current !== null && current.toLowerCase() !== attr.displayValue.toLowerCase();
     const isNew    = current === null;
     return {
       attributeName:  attr.attributeName,

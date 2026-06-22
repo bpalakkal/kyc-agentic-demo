@@ -837,9 +837,9 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
 
   const bundle = RECOMMENDED_BUNDLES.find((b) => b.route === route) ?? RECOMMENDED_BUNDLES[2];
 
-  // Sync selection with recommended bundle by default
+  // Reset selection whenever the bundle changes (e.g. route navigation)
   useEffect(() => {
-    setSelected(new Set(bundle.agents));
+    setSelected(new Set());
   }, [bundle]);
 
   const toggle = (id: AgentId) => {
@@ -892,7 +892,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
               <div className="absolute right-0 top-full mt-2 w-[340px] rounded-xl border border-border bg-card shadow-xl z-40 animate-fade-in">
                 <div className="p-3 border-b border-border">
                   <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Select agents to run</p>
-                  <p className="text-[11px] text-muted-foreground">Recommended pre-selected · pick any combination</p>
+                  <p className="text-[11px] text-muted-foreground">Pick any combination to run</p>
                 </div>
                 <div className="max-h-[380px] overflow-y-auto py-1">
                   {AGENTS.filter((a) => !!AGENT_API_CONFIGS[a.id]).map((a) => {
