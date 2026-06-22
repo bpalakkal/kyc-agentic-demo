@@ -904,7 +904,6 @@ const buildHeaderMeta = (addressed: number, total: number) => [
 
 const DEFAULT_SELECTED_ENTITIES = [
   { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", drg: "London Alternatives DRG" },
-  { name: "Marshall Wace LLP", kyc: "KYC-30188", drg: "London Alternatives DRG" },
 ];
 
 // KYC refs that have fully-curated hardcoded exceptions (used as fallback only)
