@@ -502,39 +502,171 @@ app.get('/api/entity/:kycRef/runs', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/agent-run/api/:slug — invoke a synchronous API runner server-side
-// Body: { kycRef: string, entityName: string }
-// Returns: { runId, outputType, stats: { attrCount, excCount, fileStored, fileErrors } }
-app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
-  const { slug } = req.params;
-  const { kycRef, entityName } = req.body ?? {};
-  if (!kycRef)      return res.status(400).json({ error: 'kycRef is required' });
-  if (!entityName)  return res.status(400).json({ error: 'entityName is required' });
+// ─── API runner async preview/commit infrastructure ──────────────────────────
+// In-memory stores for the two-phase preview → commit flow.
+// NOTE: These Maps are process-local. A Railway restart clears them; any run
+// whose output was stored here will be stuck in 'pending_review' in the DB.
+// The 30-minute expiry timer (started on execution completion) handles the DB
+// cleanup for the normal expiry case.
+const apiRunnerSteps  = new Map(); // runId → string[]
+const apiRunnerOutput = new Map(); // runId → { output, kycRef, initiatedBy }
 
-  // Lazy-load runner modules to avoid blocking startup
-  let runners;
-  try {
-    runners = await import('./agents/runners/api/index.js');
-  } catch (e) {
-    return res.status(503).json({ error: `Runner modules unavailable: ${e.message}` });
-  }
-
-  const RunnerMap = {
+async function loadRunnerClass(slug) {
+  const runners = await import('./agents/runners/api/index.js');
+  const map = {
     'companies-house': runners.CompaniesHouseRunner,
     'fca':             runners.FCARunner,
   };
+  return map[slug] ?? null;
+}
 
-  const RunnerClass = RunnerMap[slug];
-  if (!RunnerClass) {
-    return res.status(404).json({ error: `No API runner registered for slug "${slug}"` });
+// POST /api/agent-run/api/:slug — start an API runner in the background.
+// Returns { runId, status: 'running' } immediately; frontend polls for progress.
+app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
+  const { slug } = req.params;
+  const { kycRef, entityName } = req.body ?? {};
+  if (!kycRef)     return res.status(400).json({ error: 'kycRef is required' });
+  if (!entityName) return res.status(400).json({ error: 'entityName is required' });
+
+  let RunnerClass;
+  try {
+    RunnerClass = await loadRunnerClass(slug);
+  } catch (e) {
+    return res.status(503).json({ error: `Runner modules unavailable: ${e.message}` });
   }
+  if (!RunnerClass) return res.status(404).json({ error: `No API runner registered for slug "${slug}"` });
+
+  // Capture user id before responding (req may not be safe to read after res.json)
+  const initiatedBy = req.user.id;
 
   try {
     const runner = new RunnerClass(getSb().sb);
-    const result = await runner.run({ kycRef, entityName, initiatedBy: req.user.id });
+    const steps  = [];
+
+    // startPreview awaits only the DB row creation, then returns immediately.
+    const { runId, executionPromise } = await runner.startPreview(
+      { kycRef, entityName, initiatedBy },
+      { onStep: (msg) => steps.push(msg) },
+    );
+
+    apiRunnerSteps.set(runId, steps);
+    res.json({ runId, status: 'running' });
+
+    // Background completion: store output for the commit step.
+    // Start the 30-minute expiry timer from COMPLETION (not from run start),
+    // so the user has the full window for review after the agent finishes.
+    executionPromise
+      .then(({ output }) => {
+        apiRunnerOutput.set(runId, { output, kycRef, initiatedBy });
+        steps.push('✓ Ready for review');
+        // Expire the pending output 30 minutes after it becomes available
+        setTimeout(async () => {
+          if (apiRunnerOutput.has(runId)) {
+            apiRunnerOutput.delete(runId);
+            apiRunnerSteps.delete(runId);
+            await getSb().sb.from('agent_runs')
+              .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+              .eq('id', runId)
+              .catch(() => {});
+          }
+        }, 30 * 60 * 1000);
+      })
+      .catch((err) => {
+        console.error(`[api-runner] ${slug} preview failed: ${err.message}`);
+        steps.push(`⚠ ${err.message}`);
+      });
+  } catch (err) {
+    console.error(`[api-runner] ${slug} failed to start: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/agent-run-api-steps/:runId — live step log for a running API runner
+app.get('/api/agent-run-api-steps/:runId', requireAuth, (req, res) => {
+  const steps = apiRunnerSteps.get(req.params.runId);
+  if (!steps) return res.status(404).json({ error: 'Run not found' });
+  res.json({ steps });
+});
+
+// GET /api/agent-run-api-status/:runId — status from agent_runs table (not AWS ELB)
+app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
+  try {
+    const { sb } = getSb();
+    const { data, error } = await sb
+      .from('agent_runs')
+      .select('id, status, kyc_ref, agent_slug, error, completed_at')
+      .eq('id', req.params.runId)
+      .single();
+    if (error) return res.status(404).json({ error: error.message });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/agent-run-api/:runId/diff — new vs current attributes for review modal
+app.get('/api/agent-run-api/:runId/diff', requireAuth, async (req, res) => {
+  const pending = apiRunnerOutput.get(req.params.runId);
+  if (!pending) return res.status(404).json({ error: 'No pending preview for this run — it may have expired' });
+
+  try {
+    const { getAttributes } = getSb();
+    const currentAttributes = await getAttributes(pending.kycRef);
+    res.json({
+      kycRef:            pending.kycRef,
+      agentSlug:         pending.output.agentSlug,
+      newAttributes:     pending.output.attributes ?? [],
+      currentAttributes,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/agent-run-api/:runId/commit — publish approved attributes, mark complete
+// Body: { approvedNames?: string[] }  — omit/null to accept all; empty array commits nothing
+app.post('/api/agent-run-api/:runId/commit', requireAuth, async (req, res) => {
+  // Delete from Map before committing to prevent concurrent double-commits.
+  // A racing second request will see null and get 404.
+  const pending = apiRunnerOutput.get(req.params.runId);
+  if (!pending) return res.status(404).json({ error: 'No pending preview for this run — it may have expired' });
+  apiRunnerOutput.delete(req.params.runId);
+
+  const { approvedNames } = req.body ?? {};
+
+  try {
+    const RunnerClass = await loadRunnerClass(pending.output.agentSlug).catch(() => null);
+    if (!RunnerClass) return res.status(404).json({ error: `Runner not found for slug "${pending.output.agentSlug}"` });
+
+    // null/undefined → commit all; array (even empty) → filter to exactly those names
+    const output = (approvedNames == null)
+      ? pending.output
+      : { ...pending.output, attributes: pending.output.attributes?.filter(a => approvedNames.includes(a.attributeName)) ?? [] };
+
+    const runner = new RunnerClass(getSb().sb);
+    const result = await runner.commit(req.params.runId, pending.kycRef, output, pending.initiatedBy);
+
+    apiRunnerSteps.delete(req.params.runId);
     res.json(result);
   } catch (err) {
-    console.error(`[api-runner] ${slug} failed: ${err.message}`);
+    // Re-store on failure so the user can retry
+    apiRunnerOutput.set(req.params.runId, pending);
+    console.error(`[api-runner] commit failed: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/agent-run-api/:runId — cancel a pending review
+app.delete('/api/agent-run-api/:runId', requireAuth, async (req, res) => {
+  try {
+    const { sb } = getSb();
+    await sb.from('agent_runs')
+      .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+      .eq('id', req.params.runId);
+    apiRunnerOutput.delete(req.params.runId);
+    apiRunnerSteps.delete(req.params.runId);
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

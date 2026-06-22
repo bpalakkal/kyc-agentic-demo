@@ -68,6 +68,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
+import { AttributeDiffModal } from "@/components/kyc/AttributeDiffModal";
 
 // ─── Agent registry ──────────────────────────────────────────────────────────
 // Add a new AgentId value and a corresponding entry in AGENTS[] to introduce
@@ -160,12 +161,16 @@ type EntityCtx = { name: string; kyc?: string };
 // buildBody   → builds the request body from the current entity context
 // asyncMode   → true: POST returns {runId} immediately; poll for completion
 //               false: POST blocks until done (avoid for long-running flows)
-// fetchSteps  → whether to call /api/execution-logs/:runId/agent-steps
+// fetchSteps  → whether to poll for live step updates
+// apiRunner   → true: uses /api/agent-run-api-* polling endpoints (not AWS ELB)
+//               These runners return steps as plain strings and reach
+//               'pending_review' status before prompting the user to commit.
 type AgentApiConfig = {
   slug: string;
   buildBody: (ctx: EntityCtx | null) => Record<string, unknown>;
   fetchSteps: boolean;
   asyncMode?: boolean;
+  apiRunner?: boolean;
   endpoint?: string;    // overrides /api/agent/:slug when set
   skipSnapshot?: boolean; // skip saveSnapshot (API runners publish directly)
 };
@@ -198,8 +203,9 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
     slug: "fca",
     endpoint: "/api/agent-run/api/fca",
     buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
-    fetchSteps: false,
-    asyncMode: false,
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
     skipSnapshot: true,
   },
 };
@@ -417,6 +423,7 @@ function buildThoughtsFromResult(data: unknown, agentId: AgentId): string[] {
   const thoughts: string[] = [];
   if (d.executionTime != null) thoughts.push(`Completed in ${d.executionTime}ms`);
   if (d.status) thoughts.push(`Agent status: ${String(d.status)}`);
+
   const results = d.results ?? d.output ?? d.data;
   if (results && typeof results === "object") {
     const entries = Object.entries(results as Record<string, unknown>)
@@ -446,6 +453,14 @@ type AgentRun = {
   result?: unknown;
 };
 
+export type PendingDiff = {
+  runId: string;
+  kycRef: string;
+  agentId: AgentId;
+  onCommit: (result: unknown) => void;
+  onCancel: () => void;
+};
+
 type AgentContextValue = {
   runs: AgentRun[];
   isRunning: boolean;
@@ -460,6 +475,8 @@ type AgentContextValue = {
   setEntityContext: (ctx: EntityCtx | null) => void;
   qaReviewCallback: (() => void) | null;
   setQaReviewCallback: (fn: (() => void) | null) => void;
+  pendingDiff: PendingDiff | null;
+  setPendingDiff: (d: PendingDiff | null) => void;
 };
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -481,6 +498,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const [currentLabel, setCurrentLabel] = useState<string | null>(null);
   const [entityContext, setEntityContext] = useState<EntityCtx | null>(null);
   const [qaReviewCallback, setQaReviewCallback] = useState<(() => void) | null>(null);
+  const [pendingDiff, setPendingDiff] = useState<PendingDiff | null>(null);
   // Ref so runAgents (stable useCallback) always reads the latest entity context
   const entityContextRef = useRef<EntityCtx | null>(null);
   entityContextRef.current = entityContext;
@@ -633,6 +651,82 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(poll, 1500); // first poll after 1.5 s
       };
 
+      // Poll for API runner steps (plain string array) and status (from agent_runs table).
+      // When status reaches 'pending_review', open the diff modal instead of marking done.
+      const startApiRunnerPolling = (runId: string, kycRef: string, cancelled: { current: boolean }) => {
+        let latestSteps: string[] = [];
+        let polls = 0;
+        const poll = async () => {
+          if (cancelled.current) return;
+          polls++;
+          if (polls > 900) { markDone(["⚠ Agent run timed out after 30 minutes"]); return; }
+
+          // Fetch plain-string steps and update dock thoughts live
+          try {
+            const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-run-api-steps/${runId}`);
+            const sd = await sr.json() as { steps: string[] };
+            const steps = sd.steps ?? [];
+            if (steps.length > latestSteps.length) {
+              latestSteps = steps;
+              if (!cancelled.current) {
+                setRuns(prev => {
+                  const idx = prev.findIndex(r => r.id === run.id);
+                  if (idx === -1 || prev[idx].state !== "running") return prev;
+                  const next = [...prev];
+                  next[idx] = { ...next[idx], thoughts: steps, currentThought: steps.length - 1 };
+                  return next;
+                });
+              }
+            }
+          } catch { /* non-fatal */ }
+
+          // Check status from agent_runs table
+          try {
+            const rr = await apiFetch(`${AGENT_API_BASE}/api/agent-run-api-status/${runId}`);
+            const rd = await rr.json() as Record<string, unknown>;
+            const status = String(rd.status ?? "");
+
+            if (status === "pending_review") {
+              cancelled.current = true; // stop polling — modal takes over
+              setPendingDiff({
+                runId,
+                kycRef,
+                agentId: run.agentId,
+                onCommit: (result) => {
+                  const stats = (result as Record<string, unknown>)?.stats as Record<string, unknown> | undefined;
+                  const parts: string[] = [];
+                  if (Number(stats?.attrCount)  > 0) parts.push(`${stats!.attrCount} attrs`);
+                  if (Number(stats?.excCount)   > 0) parts.push(`${stats!.excCount} exceptions`);
+                  if (Number(stats?.fileStored) > 0) parts.push(`${stats!.fileStored} files`);
+                  markDone(
+                    [...latestSteps, `✓ Accepted — saved: ${parts.join(" · ") || "no data"}`],
+                    result,
+                  );
+                  setPendingDiff(null);
+                },
+                onCancel: () => {
+                  markDone([...latestSteps, "✗ Review cancelled — no changes saved"], null);
+                  setPendingDiff(null);
+                },
+              });
+              return;
+            }
+
+            if (["complete", "completed", "done"].includes(status)) {
+              markDone([...latestSteps, "✓ Complete"], rd);
+              return;
+            }
+            if (["failed", "error", "cancelled"].includes(status)) {
+              markDone([...latestSteps, `⚠ Run ${status}: ${String(rd.error ?? "unknown error")}`], rd);
+              return;
+            }
+          } catch { /* non-fatal */ }
+
+          setTimeout(poll, 2000);
+        };
+        setTimeout(poll, 1500);
+      };
+
       // H5: Track cancellation so polling stops if the component unmounts
       const cancelled = { current: false };
 
@@ -678,8 +772,13 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
             return;
           }
 
-          // Async: start live polling
-          startPolling(String(runId), cancelled);
+          // Async: route to the appropriate polling function
+          if (cfg.apiRunner) {
+            const kycRef = ctx?.kyc ?? "";
+            startApiRunnerPolling(String(runId), kycRef, cancelled);
+          } else {
+            startPolling(String(runId), cancelled);
+          }
         })
         .catch((err: Error) => {
           if (!cancelled.current) markDone([`⚠ API error: ${err.message}`]);
@@ -723,12 +822,14 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
     runs, isRunning, dockOpen, dockMinimized, setDockOpen, setDockMinimized,
     runAgents, clearRuns, currentLabel, entityContext, setEntityContext,
     qaReviewCallback, setQaReviewCallback,
-  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel, entityContext, setEntityContext, qaReviewCallback]);
+    pendingDiff, setPendingDiff,
+  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel, entityContext, setEntityContext, qaReviewCallback, pendingDiff]);
 
   return (
     <AgentContext.Provider value={value}>
       {children}
       <AgentDock />
+      <AgentDiffPortal />
     </AgentContext.Provider>
   );
 };
@@ -880,6 +981,15 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
       </div>
     </div>
   );
+};
+
+// =========== Attribute Diff Modal Portal ===========
+// Renders the diff review modal whenever an API runner reaches 'pending_review'.
+
+const AgentDiffPortal = () => {
+  const { pendingDiff } = useAgents();
+  if (!pendingDiff) return null;
+  return <AttributeDiffModal pending={pendingDiff} />;
 };
 
 // =========== Bottom-right Agent Console Dock ===========

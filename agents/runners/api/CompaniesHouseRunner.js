@@ -9,7 +9,8 @@ export class CompaniesHouseRunner extends ApiRunner {
   get slug()       { return 'companies-house'; }
   get outputType() { return 'attributes'; }
 
-  async execute(_ctx) {
+  async execute(ctx) {
+    this.step(`Searching Companies House for "${ctx.entityName}"…`);
     throw new Error('CompaniesHouseRunner: implementation not yet provided');
   }
 }

@@ -5,9 +5,14 @@
  *   - Override `get slug()` with the agent's identifier string
  *   - Override `get outputType()` if not 'attributes'
  *   - Implement `execute(ctx)` → Promise<AgentRunOutput>
+ *   - Call `this.step(msg)` at key phases so the dock can animate progress
  *
- * Calling `run(ctx)` handles the full lifecycle:
- *   create agent_runs row → execute → publish attrs/exceptions/files → finalize row
+ * Two execution modes:
+ *   startPreview(ctx, { onStep })  — creates DB row, executes in background,
+ *                                    returns { runId, executionPromise } immediately.
+ *                                    Does NOT publish. Sets status → 'pending_review'.
+ *   commit(runId, kycRef, output)  — publishes a previewed output, sets status → 'complete'.
+ *   run(ctx)                       — preview + immediate commit (backward-compat).
  */
 
 import { AttributePublisher } from '../publishers/AttributePublisher.js';
@@ -19,13 +24,14 @@ export class ApiRunner {
   constructor(sb) {
     if (!sb) throw new Error('ApiRunner requires a Supabase client (sb)');
     this.sb = sb;
+    this._onStep = null;
   }
 
   get slug()       { throw new Error(`${this.constructor.name} must implement get slug()`); }
   get outputType() { return 'attributes'; }
 
   /**
-   * Override in subclass.
+   * Override in subclass. Call this.step(msg) at each phase.
    * @param {{ kycRef: string, entityName: string, initiatedBy?: string }} ctx
    * @returns {Promise<import('../types.js').AgentRunOutput>}
    */
@@ -33,6 +39,70 @@ export class ApiRunner {
     throw new Error(`${this.constructor.name}.execute() is not implemented`);
   }
 
+  /**
+   * Emit a progress step. Subclasses call this at each meaningful phase.
+   * @param {string} msg
+   */
+  step(msg) {
+    console.log(`[${this.slug}] ${msg}`);
+    if (this._onStep) this._onStep(msg);
+  }
+
+  /**
+   * Start a preview run: creates the agent_runs DB row synchronously,
+   * then kicks off execute() in the background without publishing.
+   * Returns { runId, executionPromise } immediately after the DB row is created.
+   *
+   * @param {{ kycRef: string, entityName: string, initiatedBy?: string }} ctx
+   * @param {{ onStep?: (msg: string) => void }} callbacks
+   * @returns {Promise<{ runId: string, executionPromise: Promise<{ runId: string, output: object }> }>}
+   */
+  async startPreview(ctx, { onStep } = {}) {
+    this._onStep = onStep ?? null;
+
+    const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy);
+    const runId = agentRun.id;
+
+    const executionPromise = (async () => {
+      try {
+        const output = await this.execute(ctx);
+        await this.sb
+          .from('agent_runs')
+          .update({ status: 'pending_review' })
+          .eq('id', runId);
+        return { runId, output };
+      } catch (err) {
+        await this._finalizeRun(runId, { status: 'failed', error: err.message });
+        throw err;
+      }
+    })();
+
+    return { runId, executionPromise };
+  }
+
+  /**
+   * Publish a previewed output that is waiting in 'pending_review'.
+   * Optionally pass a filtered output (subset of attributes the user accepted).
+   *
+   * @param {string} runId
+   * @param {string} kycRef
+   * @param {object} output  — AgentRunOutput (possibly filtered)
+   * @param {string} [initiatedBy]
+   */
+  async commit(runId, kycRef, output, initiatedBy) {
+    const stats = await this._publish(kycRef, runId, output, initiatedBy);
+    await this._finalizeRun(runId, {
+      status:           'complete',
+      outputType:       output.outputType,
+      sourcesConsulted: output.metadata?.sourcesConsulted ?? [],
+    });
+    return { runId, outputType: output.outputType, stats };
+  }
+
+  /**
+   * Backward-compatible synchronous mode: preview + immediate commit.
+   * Used when callers don't need the review step.
+   */
   async run(ctx) {
     const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy);
     try {
@@ -60,6 +130,7 @@ export class ApiRunner {
         agent_slug:   this.slug,
         runner_type:  'api',
         initiated_by: initiatedBy ?? null,
+        status:       'running',
       })
       .select()
       .single();

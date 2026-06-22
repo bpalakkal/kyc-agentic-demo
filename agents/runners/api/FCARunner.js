@@ -32,21 +32,28 @@ export class FCARunner extends ApiRunner {
     };
 
     // Phase 1: Resolve FRN from entity name
+    this.step(`Searching FCA register for "${entityName}"…`);
     const frn = await this._resolveFrn(entityName, headers);
     if (!frn) throw new Error(`FCA: FRN not found for entity "${entityName}"`);
+    this.step(`FRN resolved: ${frn}`);
 
     // Phase 2: Fetch firm-level data in parallel (mirrors persona 02)
+    this.step('Fetching firm data (core, address, permissions, regulators)…');
     const [firmCore, firmAddress, firmPermissions, firmRegulators] = await Promise.all([
       this._get(`/Firm/${frn}`,             headers),
       this._get(`/Firm/${frn}/Address`,     headers),
       this._get(`/Firm/${frn}/Permissions`, headers),
       this._get(`/Firm/${frn}/Regulators`,  headers),
     ]);
+    this.step('Firm data retrieved');
 
     // Phase 3: Fetch individuals + controlled-function pages (mirrors persona 03)
+    this.step('Fetching individuals and controlled-function pages…');
     const { firmIndividuals, firmCfPages } = await this._fetchIndividuals(frn, headers);
+    this.step(`Individuals retrieved — ${firmCfPages.length} CF page(s)`);
 
     // Phase 4: Merge using the ported code node
+    this.step('Merging data sources…');
     const merged = mergeFcaData({
       frn,
       firm_core:        firmCore,
@@ -58,7 +65,9 @@ export class FCARunner extends ApiRunner {
     });
 
     // Phase 5: Convert to AttributeOutput[]
+    this.step('Extracting attributes…');
     const attributes = fcaToAttributes(merged, frn);
+    this.step(`Found ${attributes.length} attribute(s) — ready for review`);
 
     return {
       agentSlug:  this.slug,
@@ -123,11 +132,17 @@ export class FCARunner extends ApiRunner {
 
   // ─── HTTP helper ──────────────────────────────────────────────────────────
   async _get(path, headers) {
+    const url = `${FCA_BASE}${path}`;
     try {
-      const resp = await fetch(`${FCA_BASE}${path}`, { headers });
-      if (!resp.ok) return null;
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        console.error(`[FCA] HTTP ${resp.status} ${resp.statusText} for ${path} — ${body.slice(0, 300)}`);
+        return null;
+      }
       return await resp.json();
-    } catch {
+    } catch (err) {
+      console.error(`[FCA] Network error for ${path}: ${err.message}`);
       return null;
     }
   }
