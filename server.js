@@ -581,14 +581,17 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/agent-run-api-steps/:runId — live step log for a running API runner
+// GET /api/agent-run-api-steps/:runId — live step log for a running API runner.
+// Returns [] when the run isn't in the in-memory Map (e.g. after a server restart);
+// the status endpoint (DB-backed) is the authoritative completion signal.
 app.get('/api/agent-run-api-steps/:runId', requireAuth, (req, res) => {
-  const steps = apiRunnerSteps.get(req.params.runId);
-  if (!steps) return res.status(404).json({ error: 'Run not found' });
+  const steps = apiRunnerSteps.get(req.params.runId) ?? [];
   res.json({ steps });
 });
 
-// GET /api/agent-run-api-status/:runId — status from agent_runs table (not AWS ELB)
+// GET /api/agent-run-api-status/:runId — status from agent_runs table (not AWS ELB).
+// If a run is still 'running' but has no in-memory Map entry (server restart mid-run),
+// mark it failed so the frontend doesn't wait forever.
 app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
   try {
     const { sb } = getSb();
@@ -598,6 +601,16 @@ app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
       .eq('id', req.params.runId)
       .single();
     if (error) return res.status(404).json({ error: error.message });
+
+    // Detect orphaned run: status is 'running' but the process that started it is gone.
+    if (data.status === 'running' && !apiRunnerSteps.has(req.params.runId)) {
+      await sb.from('agent_runs')
+        .update({ status: 'failed', error: 'Server restarted while run was in progress' })
+        .eq('id', req.params.runId)
+        .catch(() => {});
+      return res.json({ ...data, status: 'failed', error: 'Server restarted while run was in progress' });
+    }
+
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
