@@ -66,10 +66,11 @@ export class ApiRunner {
     const executionPromise = (async () => {
       try {
         const output = await this.execute(ctx);
-        await this.sb
+        const { error: statusErr } = await this.sb
           .from('agent_runs')
           .update({ status: 'pending_review' })
           .eq('id', runId);
+        if (statusErr) throw new Error(`Failed to set pending_review status: ${statusErr.message}`);
         return { runId, output };
       } catch (err) {
         await this._finalizeRun(runId, { status: 'failed', error: err.message });
