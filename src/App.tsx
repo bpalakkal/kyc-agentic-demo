@@ -44,7 +44,8 @@ function AppRoutes() {
         <Route element={user ? <AppLayout /> : <Navigate to="/login" replace />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/work-queue" element={<WorkQueue />} />
-          <Route path="/work-queue/review" element={<ExceptionReview />} />
+          <Route path="/work-queue/review/:kycRef" element={<ExceptionReview />} />
+          <Route path="/work-queue/review" element={<Navigate to="/work-queue" replace />} />
           <Route path="/reports" element={<Reports />} />
         </Route>
         <Route path="*" element={<NotFound />} />

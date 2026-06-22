@@ -31,7 +31,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
@@ -972,11 +972,25 @@ type ResolvedInfo = { resolutionId: string; resolutionTitle: string; agentLabel:
 
 const ExceptionReview = () => {
   const location = useLocation();
+  const { kycRef: urlKycRef } = useParams<{ kycRef: string }>();
   const navState = location.state as { entities?: { name: string; kyc: string; drg?: string }[] } | null;
-  const selectedEntities = useMemo(
-    () => (navState?.entities && navState.entities.length > 0 ? navState.entities : DEFAULT_SELECTED_ENTITIES),
-    [navState],
-  );
+
+  const [fetchedEntities, setFetchedEntities] = useState<{ name: string; kyc: string; drg?: string }[] | null>(null);
+  useEffect(() => {
+    if (navState?.entities?.length || !urlKycRef) { setFetchedEntities(null); return; }
+    apiFetch(`${AGENT_API_BASE}/api/entity/${urlKycRef}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((ent) => ent && setFetchedEntities([{ name: ent.entity_name, kyc: ent.kyc_ref, drg: ent.drgs?.name }]))
+      .catch(() => {});
+  }, [urlKycRef, navState]);
+
+  const selectedEntities = useMemo(() => {
+    if (navState?.entities?.length) return navState.entities;
+    if (fetchedEntities) return fetchedEntities;
+    // Use URL kycRef as a placeholder to prevent fallback to hardcoded Brevan Howard exceptions
+    if (urlKycRef) return [{ name: '…', kyc: urlKycRef }];
+    return DEFAULT_SELECTED_ENTITIES;
+  }, [navState, fetchedEntities, urlKycRef]);
   const selectedKycSet = useMemo(() => new Set(selectedEntities.map((e) => e.kyc)), [selectedEntities]);
   const selectedNameSet = useMemo(() => new Set(selectedEntities.map((e) => e.name)), [selectedEntities]);
   const filteredExceptions = useMemo(

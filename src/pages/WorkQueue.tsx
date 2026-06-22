@@ -202,7 +202,7 @@ const EntityRow = ({
       )}
     </span>
     <Link
-      to="/work-queue/review"
+      to={`/work-queue/review/${r.kyc ?? r.id}`}
       state={{ entities: [{ name: r.name, kyc: r.kyc ?? r.id, drg: r.drg }] }}
       className={cn(
         "text-[13px] hover:underline hover:text-primary transition-colors truncate",
@@ -343,7 +343,7 @@ const WorkQueue = () => {
         </div>
 
         <Link
-          to="/work-queue/review"
+          to={`/work-queue/review/${selectedEntities[0]?.kyc ?? ''}`}
           state={{ entities: selectedEntities }}
           onClick={(e) => { if (selectedCount === 0) e.preventDefault(); }}
           className={cn(
