@@ -226,6 +226,41 @@ node scripts/setup-storage.js   # Create kyc-files bucket (run once)
 node scripts/seed-supabase.js   # Seed entities/DRGs/exceptions
 ```
 
+## API Authentication & Connectivity
+
+### Critical: All API calls must use `apiFetch()`
+Every call to `AGENT_API_BASE/api/*` routes **must** use the `apiFetch()` wrapper from `src/lib/apiFetch.ts`, not direct `fetch()`. This is non-negotiable:
+- `apiFetch()` injects the Supabase session Bearer token automatically
+- Direct `fetch()` will get 401 Unauthorized
+- **Files affected**: Dashboard.tsx, WorkQueue.tsx, GraphView.tsx, ExceptionReview.tsx, and any new pages making API calls
+
+### Supabase Configuration
+**Frontend client** (`src/lib/supabase.ts`):
+- Must point to the **current** Supabase project (currently `xnixtxpftxcehlbmgsga`)
+- Uses anon key for auth flow
+- Configured with `persistSession: true`, `autoRefreshToken: true`, `detectSessionInUrl: true`
+
+**Backend** (`server.js`, `src/db/supabase.js`):
+- Uses service key (has full database access)
+- **Node 20+ required**: Must configure WebSocket transport via `ws` package
+- See `src/db/supabase.js` for example: `realtime: { transport: ws }`
+
+**Session tracking** (do NOT use `getSession()`):
+- Frontend uses `onAuthStateChange()` to track session in-memory (see `src/lib/apiFetch.ts`)
+- `supabase.auth.getSession()` fails to persist/retrieve sessions reliably (was root cause of 401 errors in June 2026 deployment)
+- Always read from the in-memory session updated by `onAuthStateChange()`
+
+### External API Credentials
+Set these in Railway dashboard variables (not `.env`):
+- `FCA_AUTH_EMAIL` — FCA Register API auth header
+- `FCA_API_KEY` — FCA Register API auth header
+- `FCA_BASE` — hardcoded to `https://register.fca.org.uk/services/V0.1` in FCARunner
+
+### Node Version
+- **Local**: `.nvmrc` = 20 (required for Supabase WebSocket support)
+- **Railway**: Automatically detected from `.nvmrc` or package.json `engines` field
+- If you see "Node.js 18 detected without native WebSocket support" error, redeploy to pick up `.nvmrc` change
+
 ## CSS / Styling Note
 
 Tailwind is compiled into `dist/assets/index-*.css`. If the UI looks unstyled, check that file is ~96 kB. A ~0.3 kB file means `index.css` was clobbered. Custom Tailwind colors: `alert`, `warning`, `success`, `info`, `risk-rating` variants (all with `.soft` and `.soft-border` sub-tokens).

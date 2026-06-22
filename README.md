@@ -168,6 +168,39 @@ VITE_AGENT_API_BASE                    — Express server URL (http://localhost:
 
 ---
 
+## API Connectivity & Authentication
+
+### All API calls must use `apiFetch()`
+Every frontend call to `AGENT_API_BASE/api/*` must go through the `apiFetch()` wrapper:
+```js
+// ✅ Correct
+import { apiFetch } from '@/lib/apiFetch';
+const res = await apiFetch(`${AGENT_API_BASE}/api/entities`);
+
+// ❌ Wrong — will get 401
+const res = await fetch(`${AGENT_API_BASE}/api/entities`);
+```
+
+`apiFetch()` automatically injects the Supabase session Bearer token. Direct `fetch()` calls will fail with 401 Unauthorized.
+
+### Session Management
+- **Frontend**: Uses `supabase.auth.onAuthStateChange()` to track session in-memory (not `getSession()`)
+- See `src/lib/apiFetch.ts` for implementation
+- Never rely on localStorage/IndexedDB for session — use the in-memory state from `onAuthStateChange()`
+
+### Supabase Backend
+- **Node version**: Must be 20+ (required for WebSocket transport with `ws` package)
+- **Configuration**: `src/db/supabase.js` imports `ws` and passes `transport: ws` to Supabase client
+- If you see "Node.js 18 detected without native WebSocket support", redeploy after updating `.nvmrc` to `20`
+
+### External API Credentials (Railway only)
+Set these in Railway Variables dashboard, not `.env`:
+- `FCA_AUTH_EMAIL` — FCA Register API header `x-auth-email`
+- `FCA_API_KEY` — FCA Register API header `x-auth-key`
+- After adding variables, manually trigger a redeploy for them to take effect
+
+---
+
 ## Dev Commands
 
 ```bash
