@@ -282,32 +282,80 @@ export async function saveSnapshot(kycRef, data, { agentId, runId } = {}) {
 // ─── Attribute queries ────────────────────────────────────────────────────────
 
 /**
- * Return all attribute rows for the latest snapshot of an entity.
+ * Return all attribute rows for an entity, merging:
+ *   1. Latest Forge snapshot attributes (base layer)
+ *   2. Completed agent-run attributes (override layer — most recent run wins per attribute)
  * Optionally filter by group ('core', 'wgq').
  */
 export async function getAttributes(kycRef, { group } = {}) {
-  // Find the latest snapshot id first.
-  const { data: snap, error: snapErr } = await sb
-    .from('entity_snapshots')
-    .select('id')
-    .eq('kyc_ref', kycRef)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (snapErr) throw snapErr;
-  if (!snap) return [];
+  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type';
 
-  let q = sb
-    .from('entity_attributes')
-    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type')
-    .eq('kyc_ref', kycRef)
-    .eq('snapshot_id', snap.id)
-    .order('attribute_name');
+  // ── Layer 1: latest Forge snapshot ──────────────────────────────────────────
+  let snapshotAttrs = [];
+  {
+    const { data: snap } = await sb
+      .from('entity_snapshots')
+      .select('id')
+      .eq('kyc_ref', kycRef)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (group) q = q.eq('attribute_group', group);
-  const { data, error } = await q;
-  if (error) throw error;
-  return data ?? [];
+    if (snap) {
+      let q = sb.from('entity_attributes')
+        .select(ATTR_SELECT)
+        .eq('kyc_ref', kycRef)
+        .eq('snapshot_id', snap.id)
+        .order('attribute_name');
+      if (group) q = q.eq('attribute_group', group);
+      const { data, error } = await q;
+      if (error) throw error;
+      snapshotAttrs = data ?? [];
+    }
+  }
+
+  // ── Layer 2: completed agent-run attributes ──────────────────────────────────
+  // Fetch all completed runs ordered most-recent-first, then deduplicate by
+  // attribute_name keeping the value from the most recent run.
+  let agentRunAttrs = [];
+  {
+    const { data: runs } = await sb
+      .from('agent_runs')
+      .select('id')
+      .eq('kyc_ref', kycRef)
+      .eq('status', 'complete')
+      .order('completed_at', { ascending: false });
+
+    if (runs?.length) {
+      const runIds = runs.map(r => r.id);
+      let q = sb.from('entity_attributes')
+        .select(ATTR_SELECT + ', agent_run_id')
+        .eq('kyc_ref', kycRef)
+        .in('agent_run_id', runIds);
+      if (group) q = q.eq('attribute_group', group);
+      const { data, error } = await q;
+      if (error) throw error;
+
+      // Keep the value from the most-recent run for each attribute_name
+      const runRank = new Map(runIds.map((id, i) => [id, i]));
+      const best = new Map();
+      for (const attr of (data ?? [])) {
+        const existing = best.get(attr.attribute_name);
+        const rank = runRank.get(attr.agent_run_id) ?? Infinity;
+        if (!existing || rank < (runRank.get(existing.agent_run_id) ?? Infinity)) {
+          best.set(attr.attribute_name, attr);
+        }
+      }
+      agentRunAttrs = Array.from(best.values());
+    }
+  }
+
+  // ── Merge: snapshot as base, agent-run overrides same-named attrs ────────────
+  const merged = new Map(snapshotAttrs.map(a => [a.attribute_name, a]));
+  for (const attr of agentRunAttrs) merged.set(attr.attribute_name, attr);
+
+  return Array.from(merged.values())
+    .sort((a, b) => a.attribute_name.localeCompare(b.attribute_name));
 }
 
 /**
