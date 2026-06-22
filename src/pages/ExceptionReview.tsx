@@ -1042,7 +1042,7 @@ const ExceptionReview = () => {
     if (all.length > 0) return all;
     return selectedEntities.map(buildStubException);
   }, [filteredExceptions, dbExceptions, selectedEntities]);
-  const initialActiveId = effectiveExceptions[0]?.id ?? exceptions[0].id;
+  const initialActiveId = effectiveExceptions[0]?.id;
 
   const [activeId, setActiveId] = useState(initialActiveId);
   const [openAgent, setOpenAgent] = useState(false);
