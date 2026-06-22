@@ -2409,8 +2409,99 @@ const ATTR_CATEGORY_MAP: Record<string, AttrCategory> = {
   "Trustee": "Ownership & Control",
 };
 
-const categoryOf = (label: string): AttrCategory =>
-  ATTR_CATEGORY_MAP[label] ?? "Entity Identification";
+// Snake_case attribute names from the master schema, grouped by category.
+// Used as the baseline for entities that have no curated ENTITY_PROFILES entry,
+// so all expected attributes are visible even before any agent run has populated them.
+const MASTER_CORE_ATTRS: string[] = [
+  // Entity Identification
+  'entity_name', 'entity_status', 'entity_registration_number',
+  'country_of_incorporation', 'registration_country', 'date_of_incorporation',
+  'lei_code', 'entity_giin', 'entity_jurisdiction',
+  'previous_names', 'trading_names', 'verification_of_existence',
+  'uk_registration_number', 'us_registration_number',
+  'uk_entity_tax_id_number', 'us_entity_tax_id_number',
+  // Registration & Regulatory
+  'regulator', 'entity_regulator', 'entity_activity_type',
+  'listed_exchange', 'listing_status',
+  'commodities_future_trading_commission_registered_indicator',
+  'securities_exchange_act_of_1934_section_13_or_15d_indicator',
+  'compliance_officer_signatures_name', 'mlro_or_equivalent_signatures_name',
+  // Address & Operations
+  'principal_place_of_business', 'entity_principal_place_of_business',
+  'legal_registered_address', 'foreign_branches_details',
+  'entity_nature_of_business', 'other_business_activity',
+  'list_of_subsidiaries', 'sole_proprietorship_indicator',
+  'parent_public_ally_listed_on_us_exchange_indicator',
+  'sub_advisor_name', 'sub_advisor_address',
+  'website_address', 'entity_website_address', 'entity_source_url',
+  // Classification & Risk
+  'entity_classification', 'entity_risk_rating', 'cip_classification',
+  'transacting_with_own_or_third_party_funds_indicator',
+  // Financial Profile
+  'assets_under_management_aum', 'source_of_funds', 'source_of_wealth',
+  // Ownership & Control — multi-value officer/controller rows (corporate_officer_N,
+  // key_controller_N) are added at runtime from DB forgeAttrs
+];
+
+const SCHEMA_ATTR_CATEGORY: Record<string, AttrCategory> = {
+  'entity_name': "Entity Identification",
+  'entity_status': "Entity Identification",
+  'entity_registration_number': "Entity Identification",
+  'country_of_incorporation': "Entity Identification",
+  'registration_country': "Entity Identification",
+  'date_of_incorporation': "Entity Identification",
+  'lei_code': "Entity Identification",
+  'entity_giin': "Entity Identification",
+  'entity_jurisdiction': "Entity Identification",
+  'previous_names': "Entity Identification",
+  'trading_names': "Entity Identification",
+  'verification_of_existence': "Entity Identification",
+  'uk_registration_number': "Entity Identification",
+  'us_registration_number': "Entity Identification",
+  'uk_entity_tax_id_number': "Entity Identification",
+  'us_entity_tax_id_number': "Entity Identification",
+  'regulator': "Registration & Regulatory",
+  'entity_regulator': "Registration & Regulatory",
+  'entity_activity_type': "Registration & Regulatory",
+  'listed_exchange': "Registration & Regulatory",
+  'listing_status': "Registration & Regulatory",
+  'commodities_future_trading_commission_registered_indicator': "Registration & Regulatory",
+  'securities_exchange_act_of_1934_section_13_or_15d_indicator': "Registration & Regulatory",
+  'compliance_officer_signatures_name': "Registration & Regulatory",
+  'mlro_or_equivalent_signatures_name': "Registration & Regulatory",
+  'principal_place_of_business': "Address & Operations",
+  'entity_principal_place_of_business': "Address & Operations",
+  'legal_registered_address': "Address & Operations",
+  'foreign_branches_details': "Address & Operations",
+  'entity_nature_of_business': "Address & Operations",
+  'other_business_activity': "Address & Operations",
+  'list_of_subsidiaries': "Address & Operations",
+  'sole_proprietorship_indicator': "Address & Operations",
+  'parent_public_ally_listed_on_us_exchange_indicator': "Address & Operations",
+  'sub_advisor_name': "Address & Operations",
+  'sub_advisor_address': "Address & Operations",
+  'website_address': "Address & Operations",
+  'entity_website_address': "Address & Operations",
+  'entity_source_url': "Address & Operations",
+  'entity_classification': "Classification & Risk",
+  'entity_risk_rating': "Classification & Risk",
+  'cip_classification': "Classification & Risk",
+  'transacting_with_own_or_third_party_funds_indicator': "Classification & Risk",
+  'assets_under_management_aum': "Financial Profile",
+  'source_of_funds': "Financial Profile",
+  'source_of_wealth': "Financial Profile",
+  'corporate_officer': "Officers & Signatories",
+  'key_controller': "Ownership & Control",
+};
+
+const categoryOf = (label: string): AttrCategory => {
+  if (ATTR_CATEGORY_MAP[label]) return ATTR_CATEGORY_MAP[label];
+  if (SCHEMA_ATTR_CATEGORY[label]) return SCHEMA_ATTR_CATEGORY[label];
+  // Handle multi-value attrs: corporate_officer_1, key_controller_2, etc.
+  const base = label.replace(/_\d+$/, '');
+  if (base !== label && SCHEMA_ATTR_CATEGORY[base]) return SCHEMA_ATTR_CATEGORY[base];
+  return "Entity Identification";
+};
 
 // M3: Shared categorization helper — replaces the duplicate implementations in
 // AttributeTree and AttributeFormView.  Pass pendingOnly=true to filter unflagged attrs.
@@ -2966,10 +3057,15 @@ const AttributeFormView = ({
   const entitiesForTree = selectedEntities.map(e => {
     const profile = ENTITY_PROFILES[e.name];
     const profileLabels = profile?.attrs.map(a => a.label) ?? [];
-    // When no curated profile, use all 'core' attribute names from the API.
-    // All runners must use 'core' or 'wgq' as attribute_group — see CLAUDE.md.
+    // When no curated profile, use the master schema as the baseline so all expected
+    // attributes are visible even before any agent run has populated them.
+    // DB attributes (forgeAttrs) are merged in to capture any runner-specific names
+    // not in the schema (e.g. entity_principal_place_of_business from FCA runner).
     const forgeLabels = profileLabels.length === 0
-      ? Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name)
+      ? Array.from(new Set([
+          ...MASTER_CORE_ATTRS,
+          ...Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name),
+        ]))
       : [];
     const excTitleLabels = profileLabels.length === 0 && forgeLabels.length === 0
       ? excs.filter(exc => exc.kyc === e.kyc && !exc.id.startsWith("stub-") && !exc.attrLabel).map(exc => exc.title)
