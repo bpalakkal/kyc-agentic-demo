@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, ChevronRight, ChevronDown, Sparkles, Maximize2, M
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -167,7 +168,7 @@ const Dashboard = () => {
   const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
 
   useEffect(() => {
-    fetch(`${AGENT_API_BASE}/api/entities`)
+    apiFetch(`${AGENT_API_BASE}/api/entities`)
       .then(async r => { if (r.ok) return r.json() as Promise<ApiEntity[]>; })
       .then(data => { if (data) setApiEntities(data); })
       .catch(() => {});

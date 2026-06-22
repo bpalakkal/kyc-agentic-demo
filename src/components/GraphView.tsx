@@ -3,6 +3,7 @@ import cytoscape from "cytoscape";
 // @ts-ignore — no types shipped with cytoscape-dagre
 import dagre from "cytoscape-dagre";
 import { X, ZoomIn, ZoomOut, Maximize2, RefreshCw, Expand, GitMerge } from "lucide-react";
+import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { cn } from "@/lib/utils";
 
@@ -143,7 +144,7 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
     if (!cy || expandedRef.current.has(elementId)) return 0;
     expandedRef.current.add(elementId);
 
-    const res = await fetch(`${AGENT_API_BASE}/api/neo4j/expand`, {
+    const res = await apiFetch(`${AGENT_API_BASE}/api/neo4j/expand`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ elementId }),
@@ -180,7 +181,7 @@ export function GraphView({ kycId, entityName, onClose }: Props) {
     setAtLimit(false);
     expandedRef.current.clear();
     try {
-      const res = await fetch(`${AGENT_API_BASE}/api/neo4j/entity/${encodeURIComponent(kycId)}/graph`);
+      const res = await apiFetch(`${AGENT_API_BASE}/api/neo4j/entity/${encodeURIComponent(kycId)}/graph`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       const nodes = (body.nodes ?? []) as CyNode[];
