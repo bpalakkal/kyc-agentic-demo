@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
 
@@ -11,7 +12,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
 }
 
-export const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+export const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  realtime: {
+    transport: ws,
+  },
+});
 
 // ─── Work queue ───────────────────────────────────────────────────────────────
 
