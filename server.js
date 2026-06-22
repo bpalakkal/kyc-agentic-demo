@@ -929,7 +929,7 @@ Always use tools to retrieve live data before answering. Then respond with analy
       }
       const stream = await getAnthropic().messages.stream({
         model:      "claude-sonnet-4-6",
-        max_tokens: 1024,
+        max_tokens: 4096,
         system:     systemPrompt,
         tools:      KYC_TOOLS,
         messages:   currentMessages,
