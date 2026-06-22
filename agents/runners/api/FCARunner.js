@@ -1,12 +1,12 @@
 /**
  * FCA Register runner — direct REST API implementation.
  *
- * Flow (mirrors fca_data_sourcing.json dataflow):
- *   1. Resolve FRN from entity name  (persona: 01-frn-resolution)
- *   2. Fetch firm data in parallel   (persona: 02-firm-data)
- *   3. Fetch individuals + CF pages  (persona: 03-individual-data)
- *   4. Merge raw data                (code node: fca/code/merge.js)
- *   5. Convert to AttributeOutput[]  (fca/code/toAttributes.js)
+ * Flow:
+ *   1. Resolve FRN from entity name
+ *   2. Fetch firm data in parallel (core, address, permissions, regulators)
+ *   3. Fetch individuals + controlled-function pages
+ *   4. Merge raw data   → fca/code/merge.js
+ *   5. Map to attrs     → fca/code/toAttributes.js
  *
  * Required env vars: FCA_AUTH_EMAIL, FCA_API_KEY
  */
