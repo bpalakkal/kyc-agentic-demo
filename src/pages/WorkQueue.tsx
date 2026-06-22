@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2 } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -244,7 +245,7 @@ const WorkQueue = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${AGENT_API_BASE}/api/entities`)
+    apiFetch(`${AGENT_API_BASE}/api/entities`)
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));

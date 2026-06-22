@@ -5,9 +5,15 @@
  */
 import { supabase } from './supabase';
 
+let currentSession: any = null;
+
+// Initialize session tracking on module load
+supabase.auth.onAuthStateChange((_event, session) => {
+  currentSession = session;
+});
+
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
+  const token = currentSession?.access_token;
   return fetch(url, {
     ...options,
     headers: {
