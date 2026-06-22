@@ -902,9 +902,7 @@ const buildHeaderMeta = (addressed: number, total: number) => [
   { label: "Priority", value: "High" },
 ];
 
-const DEFAULT_SELECTED_ENTITIES = [
-  { name: "Brevan Howard Asset Management LLP", kyc: "KYC-30229", drg: "London Alternatives DRG" },
-];
+const DEFAULT_SELECTED_ENTITIES: { name: string; kyc: string; drg?: string }[] = [];
 
 // KYC refs that have fully-curated hardcoded exceptions (used as fallback only)
 const HARDCODED_KYCS = new Set(exceptions.map((e) => e.kyc));
