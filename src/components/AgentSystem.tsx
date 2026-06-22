@@ -139,11 +139,11 @@ const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<
 // the last entry.  TODO: drive this from a backend config (per-user, per-case).
 export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string; agents: AgentId[] }[] = [
   { route: "/work-queue/review", label: "Resolve Title Discrepancy", reason: "Recommended for this exception · UK registry + FCA check",
-    agents: ["uk-parent-flow"] },
+    agents: ["companies-house", "fca"] },
   { route: "/work-queue", label: "Bulk Triage Selected Cases", reason: "Best for UK-registered entities in queue",
     agents: ["companies-house", "fca", "jersey-fsc"] },
   { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · full UK entity orchestration",
-    agents: ["uk-parent-flow"] },
+    agents: ["companies-house", "fca"] },
 ];
 
 // VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
