@@ -313,7 +313,8 @@ export class CompaniesHouseRunner extends ApiRunner {
       }
     });
 
-    // PSCs — as both key_controller and beneficial_owner
+    // PSCs (Persons with Significant Control) — mapped to key_controller only.
+    // CH does not provide verified beneficial ownership data; PSCs ≠ beneficial owners.
     pscs.forEach((psc, i) => {
       const name = psc.name;
       const kind = psc.kind; // 'individual-person-with-significant-control' | 'corporate-entity-...' etc.
@@ -322,7 +323,6 @@ export class CompaniesHouseRunner extends ApiRunner {
       if (name) {
         const displayName = isCorporate ? `${name} (corporate)` : name;
         push(`key_controller_${i + 1}`, displayName);
-        push(`beneficial_owner_${i + 1}`, displayName);
       }
     });
 
@@ -435,7 +435,7 @@ export class CompaniesHouseRunner extends ApiRunner {
 
   async _digitizeDocument(anthropic, pdfBuffer, filing, companyNumber) {
     const base64 = pdfBuffer.toString('base64');
-    const SOURCE = 'Companies House (document)';
+    const SOURCE = 'Companies House';
     const fetchedAt = new Date().toISOString();
     const sourceUrl = `https://find-and-update.company-information.service.gov.uk/company/${companyNumber}`;
 
@@ -450,8 +450,7 @@ Please extract the following fields if present (return as JSON object with snake
 - registration_number: Company/registration number
 - legal_structure: Type of legal entity (e.g., Private Limited Company, LLP, etc.)
 - registered_office_address: Full registered office address
-- directors: Array of director names
-- shareholders: Array of shareholder names with shareholding details if available
+- directors: Array of director names as plain strings (e.g. ["John Smith", "Jane Doe"])
 - share_capital: Authorized or issued share capital
 - objects_clause: Company's objects or purpose clause (brief summary)
 
@@ -502,9 +501,16 @@ Return ONLY a JSON object with the fields you found. Use null for fields not pre
 
     const push = (attributeName, displayValue) => {
       if (displayValue === null || displayValue === undefined) return;
+      // Coerce objects and object arrays to strings — Claude sometimes returns structured
+      // objects instead of plain strings for directors/shareholders fields.
+      const coerce = v => {
+        if (v === null || v === undefined) return '';
+        if (typeof v === 'object') return v.name ?? v.officer_name ?? v.company_name ?? JSON.stringify(v);
+        return String(v).trim();
+      };
       const val = Array.isArray(displayValue)
-        ? displayValue.filter(Boolean).join('; ')
-        : String(displayValue).trim();
+        ? displayValue.map(coerce).filter(Boolean).join('; ')
+        : coerce(displayValue);
       if (!val || val === 'null') return;
 
       attrs.push({
@@ -541,12 +547,8 @@ Return ONLY a JSON object with the fields you found. Use null for fields not pre
         if (director) push(`corporate_officer_${i + 1}`, director);
       });
     }
-
-    if (Array.isArray(extracted.shareholders) && extracted.shareholders.length > 0) {
-      extracted.shareholders.forEach((shareholder, i) => {
-        if (shareholder) push(`beneficial_owner_${i + 1}`, shareholder);
-      });
-    }
+    // Shareholders from incorporation documents are original subscribers, not current
+    // beneficial owners — CH does not provide verified beneficial ownership data.
 
     return attrs;
   }
