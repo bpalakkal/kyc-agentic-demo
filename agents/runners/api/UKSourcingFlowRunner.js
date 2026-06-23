@@ -94,8 +94,22 @@ export class UKSourcingFlowRunner extends ApiRunner {
       this.step('Phase 3/3 — Polling Jersey FSC (this may take several minutes)…');
       try {
         const jerseyData = await this._pollForge(jerseyRunId, 'Jersey FSC');
+
+        // Diagnostic: show raw top-level keys so mismatched response shapes are visible.
+        const topKeys = Object.keys(jerseyData ?? {}).join(', ') || '(empty)';
+        this.step(`  Jersey FSC ▸ raw response keys: ${topKeys}`);
+
+        // Show what extractOutput() resolves to.
+        const extracted = jerseyData?.output ?? jerseyData?.data ?? jerseyData?.result ?? jerseyData ?? {};
+        const extKeys = Object.keys(extracted).join(', ') || '(empty)';
+        this.step(`  Jersey FSC ▸ extracted payload keys: ${extKeys}`);
+
         jerseyAttrs = jerseyToAttributes(jerseyData, jerseyRunId);
-        this.step(`  Jersey FSC ▸ ${jerseyAttrs.length} attribute(s)`);
+        if (jerseyAttrs.length === 0) {
+          this.step(`  Jersey FSC ▸ 0 attributes extracted — check payload keys above vs jerseyToAttributes expectations`);
+        } else {
+          this.step(`  Jersey FSC ▸ ${jerseyAttrs.length} attribute(s)`);
+        }
       } catch (err) {
         this.step(`  Jersey FSC ▸ ${err.message} (continuing without Jersey data)`);
       }
@@ -115,7 +129,8 @@ export class UKSourcingFlowRunner extends ApiRunner {
       { source: 'Jersey FSC',      attrs: jerseyAttrs },
     ]);
 
-    this.step(`Merged ${merged.length} unique attribute(s) across 3 sources — ready for review`);
+    const multiSource = merged.filter(a => (a.lineage ?? []).length >= 2).length;
+    this.step(`Merged ${merged.length} unique attribute(s) across 3 sources — ${multiSource} with multi-source lineage — ready for review`);
 
     return {
       agentSlug:  this.slug,
