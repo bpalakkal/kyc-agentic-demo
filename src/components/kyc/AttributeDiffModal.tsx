@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
+import type { ForgeLineageEntry } from "@/types/forgeTypes";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
@@ -35,6 +36,7 @@ interface NewAttribute {
   idFlag: boolean;
   verificationFlag: boolean;
   exceptionFlag: boolean;
+  lineage?: ForgeLineageEntry[];
 }
 
 interface CurrentAttribute {
@@ -51,6 +53,8 @@ interface DiffRow {
   source: string;
   confidence: number;
   status: "new" | "changed" | "unchanged";
+  // Per-source breakdown when multiple data sources contributed (e.g. UK Sourcing Flow).
+  sources: { source: string; value: string }[];
 }
 
 interface DiffData {
@@ -81,6 +85,14 @@ function buildDiffRows(data: DiffData): DiffRow[] {
   }
 
   return data.newAttributes.map(attr => {
+    // Deduplicate lineage entries by source name for the per-source strip.
+    const sources: { source: string; value: string }[] = [];
+    for (const entry of (attr.lineage ?? [])) {
+      if (entry.source && !sources.find(s => s.source === entry.source)) {
+        sources.push({ source: entry.source, value: String(entry.value ?? "") });
+      }
+    }
+
     const m = attr.attributeName.match(MULTI_VALUE_RE);
     if (m) {
       const currentValues = currentGroupValues.get(m[1]);
@@ -93,6 +105,7 @@ function buildDiffRows(data: DiffData): DiffRow[] {
         source:         attr.source,
         confidence:     attr.confidence,
         status:         inGroup ? "unchanged" : "new",
+        sources,
       };
     }
 
@@ -106,6 +119,7 @@ function buildDiffRows(data: DiffData): DiffRow[] {
       source:         attr.source,
       confidence:     attr.confidence,
       status:         current === null ? "new" : changed ? "changed" : "unchanged",
+      sources,
     };
   }).sort((a, b) => {
     const order = { new: 0, changed: 1, unchanged: 2 };
@@ -369,6 +383,36 @@ function DiffTable({ rows, checked, onToggle, showCurrent = false, dimmed = fals
               )}
               <td className={cn("py-1.5 px-2", row.status === "new" ? "text-success font-medium" : row.status === "changed" ? "text-warning font-medium" : "text-foreground")}>
                 {row.newValue || <span className="italic text-muted-foreground">empty</span>}
+                {/* Per-source breakdown — shown when 2+ sources contributed */}
+                {row.sources.length >= 2 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {row.sources.map(s => {
+                      const agrees = s.value.toLowerCase() === row.newValue.toLowerCase();
+                      return (
+                        <span
+                          key={s.source}
+                          className={cn(
+                            "inline-flex items-center gap-1 text-[9px] rounded-full px-1.5 py-0.5 font-normal whitespace-nowrap",
+                            agrees
+                              ? "bg-success/10 text-success border border-success/20"
+                              : "bg-warning/10 text-warning border border-warning/20",
+                          )}
+                        >
+                          <span className="font-semibold">{s.source}</span>
+                          {!agrees && (
+                            <><span className="opacity-50">·</span><span>{s.value}</span></>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Single-source: show as a quiet inline badge */}
+                {row.sources.length === 1 && (
+                  <span className="ml-1.5 text-[9px] text-muted-foreground font-normal align-middle">
+                    {row.sources[0].source}
+                  </span>
+                )}
               </td>
               <td className="py-1.5 px-2 text-right text-muted-foreground">{row.confidence}%</td>
             </tr>
