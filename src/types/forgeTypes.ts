@@ -9,6 +9,7 @@ export type ForgeAttrRow = {
   verification_source: string[] | null;
   exception_flag: boolean;
   exception_type: string | null;
+  lineage?: ForgeLineageEntry[] | null;
 };
 
 export type ForgeLineageEntry = {

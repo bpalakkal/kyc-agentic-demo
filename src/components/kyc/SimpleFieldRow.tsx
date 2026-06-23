@@ -1,8 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import {
   Bot, Play, Zap, Sparkles, ClipboardList, Database, ShieldCheck,
-  ChevronRight, FileText, Paperclip,
+  ChevronRight, FileText, Paperclip, GitMerge,
 } from "lucide-react";
+import type { ForgeLineageEntry } from "@/types/forgeTypes";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +14,65 @@ import {
   ENTITY_PROFILES, ATTRIBUTE_TRACES, SOURCE_STYLE, DOT_STYLE,
   DOC_KIND_META, ATTR_AUDIT_LOG, NESTED_ATTR_PROFILES,
 } from "@/data/kycMockData";
+
+// ─── SourceStrip ─────────────────────────────────────────────────────────────
+// Shows per-source values below an attribute when lineage has multiple sources.
+// Green pill = source agrees with display_value; amber = different value.
+
+type SourceStripProps = {
+  lineage?: ForgeLineageEntry[] | null;
+  displayValue?: string | null;
+};
+
+const SourceStrip = ({ lineage, displayValue }: SourceStripProps) => {
+  if (!lineage || lineage.length < 2) return null;
+
+  // Dedupe by source — keep first occurrence (highest priority wins in merge)
+  const sources = lineage
+    .filter(e => e.source)
+    .reduce<{ source: string; value: string }[]>((acc, e) => {
+      if (!acc.find(a => a.source === e.source)) {
+        acc.push({ source: e.source!, value: String(e.value ?? "").trim() });
+      }
+      return acc;
+    }, []);
+
+  if (sources.length < 2) return null;
+
+  const primary = (displayValue ?? "").toLowerCase().trim();
+  const allAgree = sources.every(s => s.value.toLowerCase().trim() === primary);
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+      <GitMerge className="size-2.5 text-muted-foreground/40 shrink-0" />
+      {allAgree ? (
+        <>
+          {sources.map((s, i) => (
+            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-soft text-success border border-success/20 font-medium">
+              {s.source}
+            </span>
+          ))}
+          <span className="text-[9px] text-muted-foreground/50 italic">agree</span>
+        </>
+      ) : (
+        sources.map((s, i) => {
+          const matches = s.value.toLowerCase().trim() === primary;
+          const label = s.value.length > 28 ? s.value.slice(0, 28) + "…" : s.value;
+          return (
+            <span key={i} className={cn(
+              "text-[9px] px-1.5 py-0.5 rounded-full border font-medium",
+              matches
+                ? "bg-success-soft text-success border-success/20"
+                : "bg-warning-soft text-warning border-warning/30"
+            )}>
+              {s.source}: {label}
+            </span>
+          );
+        })
+      )}
+    </div>
+  );
+};
 
 // ─── SimpleFieldRow ───────────────────────────────────────────────────────────
 
@@ -132,6 +192,7 @@ export const SimpleFieldRow = ({
             </button>
           )}
         </div>
+        <SourceStrip lineage={forgeAttr?.lineage} displayValue={forgeAttr?.display_value} />
       </div>
       {isOverrideOpen && (
         <div className="col-span-2 px-4 py-3 border-l-2 border-warning bg-warning-soft/20 border-b border-border/60">

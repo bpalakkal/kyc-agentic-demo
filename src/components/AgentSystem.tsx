@@ -538,7 +538,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       return {
         id: `${Date.now()}-${i}`,
         agentId: id,
-        state: (i === 0 ? "running" : "pending") as StepState,
+        state: (hasReal || i === 0 ? "running" : "pending") as StepState,
         thoughts: hasReal
           ? ["Connecting to live API…"]
           : AGENTS_BY_ID[id].defaultThoughts,

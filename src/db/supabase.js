@@ -288,7 +288,7 @@ export async function saveSnapshot(kycRef, data, { agentId, runId } = {}) {
  * Optionally filter by group ('core', 'wgq').
  */
 export async function getAttributes(kycRef, { group } = {}) {
-  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type';
+  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage';
 
   // ── Layer 1: latest Forge snapshot ──────────────────────────────────────────
   let snapshotAttrs = [];
