@@ -336,7 +336,8 @@ export async function getAttributes(kycRef, { group } = {}) {
       const { data, error } = await q;
       if (error) throw error;
 
-      // Keep the value from the most-recent run for each attribute_name
+      // Keep the value from the most-recent run for each attribute_name.
+      // Also aggregate lineage from ALL runs so SourceStrip can compare sources.
       const runRank = new Map(runIds.map((id, i) => [id, i]));
       const best = new Map();
       for (const attr of (data ?? [])) {
@@ -346,7 +347,28 @@ export async function getAttributes(kycRef, { group } = {}) {
           best.set(attr.attribute_name, attr);
         }
       }
-      agentRunAttrs = Array.from(best.values());
+
+      // Aggregate lineage across all runs, deduplicating by source.
+      // Process most-recent-first so the latest value per source wins.
+      const allData = (data ?? []).slice().sort(
+        (a, b) => (runRank.get(a.agent_run_id) ?? Infinity) - (runRank.get(b.agent_run_id) ?? Infinity)
+      );
+      const lineageByName = new Map();
+      for (const attr of allData) {
+        if (!lineageByName.has(attr.attribute_name)) lineageByName.set(attr.attribute_name, []);
+        const list = lineageByName.get(attr.attribute_name);
+        for (const entry of (attr.lineage ?? [])) {
+          if (!entry.source || list.find(e => e.source === entry.source)) continue;
+          list.push(entry);
+        }
+      }
+
+      agentRunAttrs = Array.from(best.values()).map(attr => ({
+        ...attr,
+        lineage: lineageByName.get(attr.attribute_name)?.length
+          ? lineageByName.get(attr.attribute_name)
+          : (attr.lineage ?? null),
+      }));
     }
   }
 
