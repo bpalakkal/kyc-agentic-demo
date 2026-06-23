@@ -1,0 +1,289 @@
+{
+  "name": "UK - Companies House",
+  "description": "An intelligent workflow designed to parse and analyze structured data and unstructured documents from UK Companies House.",
+  "nodes": [
+    {
+      "id": "dndnode_11",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "UKCompaniesHouse",
+        "description": "The agent is responsible for retrieving set of information for UK‑registered companies by relying exclusively on the UK Companies House MCP as its authoritative data source.",
+        "dataBackbone": null,
+        "personaId": "8200bef844f401f7deb1b3a2b2cd6e48",
+        "personaName": "UK - SD - Companies House",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": [
+          "entity_name"
+        ]
+      }
+    },
+    {
+      "id": "dndnode_12",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "IncorporationDocuments",
+        "description": "Agent tasked with sourcing of official UK company filings using only the UK Companies House MCP tool.",
+        "dataBackbone": null,
+        "personaId": "60b496e26be3486e34da01862cec083f",
+        "personaName": "UK - UD - Companies House - Incorporation Document",
+        "outputMode": "tabular",
+        "downloadFormat": "csv",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [
+          "entity_name",
+          "out_document_store"
+        ],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_24",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "NameChangeDocuments",
+        "description": "Agent tasked with sourcing of official UK company filings using only the UK Companies House MCP tool.",
+        "dataBackbone": null,
+        "personaId": "f91e121ebe978238dac128a50b582ff0",
+        "personaName": "UK - UD - Companies House - Name Change Document",
+        "outputMode": "tabular",
+        "downloadFormat": "csv",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": [
+          "entity_name",
+          "out_document_store"
+        ]
+      }
+    },
+    {
+      "id": "dndnode_18",
+      "type": "sql-union",
+      "props": {
+        "name": null,
+        "alias": "CompaniesHouseDocuments",
+        "description": "Group all retrieved documents.",
+        "queryText": null,
+        "validated": true,
+        "cacheDF": null,
+        "dataFileLocation": null,
+        "unionType": "UNION ALL"
+      }
+    },
+    {
+      "id": "dndnode_28",
+      "type": "data-transform",
+      "props": {
+        "name": null,
+        "alias": "ExtractFileNames",
+        "description": "Extract the file names form the result.",
+        "sourceName": {
+          "id": "dndnode_18",
+          "alias": "CompaniesHouseDocuments",
+          "type": "sql-union"
+        },
+        "columnMapping": [
+          {
+            "include": false,
+            "source": "filing_type",
+            "target": "filing_type",
+            "dataType": null,
+            "dataLength": "",
+            "dataPrecision": "",
+            "transform": "",
+            "existing": true
+          },
+          {
+            "include": false,
+            "source": "filing_date",
+            "target": "filing_date",
+            "dataType": null,
+            "dataLength": "",
+            "dataPrecision": "",
+            "transform": "",
+            "existing": true
+          },
+          {
+            "include": false,
+            "source": "storage_path",
+            "target": "storage_path",
+            "dataType": null,
+            "dataLength": "",
+            "dataPrecision": "",
+            "transform": "",
+            "existing": true
+          },
+          {
+            "include": true,
+            "source": "file_name",
+            "target": "file_name",
+            "dataType": null,
+            "dataLength": "",
+            "dataPrecision": "",
+            "transform": "",
+            "existing": true
+          },
+          {
+            "include": false,
+            "source": "download_status",
+            "target": "download_status",
+            "dataType": null,
+            "dataLength": "",
+            "dataPrecision": "",
+            "transform": "",
+            "existing": true
+          }
+        ],
+        "validated": true
+      }
+    },
+    {
+      "id": "dndnode_14",
+      "type": "invoke-service",
+      "props": {
+        "name": null,
+        "alias": "InvokeDigitizationFlow",
+        "description": "Invoke Digitization Flow",
+        "serviceType": "dataflow",
+        "dataFlowName": "Document Digitization",
+        "dataFlowS3BucketName": null,
+        "dataFlowS3FilePath": null,
+        "functionType": null,
+        "functionName": null,
+        "endpoint": null,
+        "requestType": null,
+        "requestBody": null,
+        "requestHeaders": null,
+        "contentType": "JSON",
+        "responsePath": null,
+        "validated": true
+      }
+    },
+    {
+      "id": "dndnode_27",
+      "type": "code",
+      "props": {
+        "name": null,
+        "alias": "PacketCompaniesHouse",
+        "description": "The case packet for UK Companies House.",
+        "code": "    /**\n     * The 'inputs' object contains all upstream node outputs, keyed by alias.\n     * The 'env' object contains project environment variables (read-only).\n     *\n     * INPUT FORMATS:\n     *   Tabular nodes  →  inputs['alias'] is an Array of row objects\n     *     Example: inputs['sales_data'] = [{ region: 'US', amount: 100 }, ...]\n     *\n     *   JSON object nodes  →  inputs['alias'] is a parsed JavaScript value\n     *     Example: inputs['api_response'] = { status: 'ok', results: [...] }\n     *\n     * ENVIRONMENT:\n     *   env['VARIABLE_NAME'] — access project environment variables\n     *\n     * OUTPUT FORMAT:\n     *   If output mode is \"tabular\"     —  outputData should be an Array of row objects\n     *   If output mode is \"json_object\" —  outputData can be any JavaScript value\n     */\n\n    // Get the first upstream input (use the alias key for a specific node)\n    \n\n    // Your transformation logic here\n    const document_data = inputs[\"InvokeDigitizationFlow\"]\n\n    const outputData = document_data[0] ?? {}\n    \n    outputData[\"UK Companies House\"] = inputs[\"UKCompaniesHouse\"]\n    ",
+        "outputMode": "json_object",
+        "rowLimit": null,
+        "validated": true
+      }
+    },
+    {
+      "id": "dndnode_29",
+      "type": "invoke-service",
+      "props": {
+        "name": null,
+        "alias": "InvokeDataTransform",
+        "description": null,
+        "serviceType": "dataflow",
+        "dataFlowName": "Data Transform",
+        "dataFlowS3BucketName": null,
+        "dataFlowS3FilePath": null,
+        "functionType": null,
+        "functionName": null,
+        "endpoint": null,
+        "requestType": null,
+        "requestBody": null,
+        "requestHeaders": null,
+        "contentType": "JSON",
+        "responsePath": null,
+        "validated": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "dndnode_12",
+      "target": "dndnode_18"
+    },
+    {
+      "source": "dndnode_24",
+      "target": "dndnode_18"
+    },
+    {
+      "source": "dndnode_14",
+      "target": "dndnode_27"
+    },
+    {
+      "source": "dndnode_11",
+      "target": "dndnode_27"
+    },
+    {
+      "source": "dndnode_18",
+      "target": "dndnode_28"
+    },
+    {
+      "source": "dndnode_28",
+      "target": "dndnode_14"
+    },
+    {
+      "source": "dndnode_27",
+      "target": "dndnode_29"
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "8200bef844f401f7deb1b3a2b2cd6e48",
+      "personaName": "UK - SD - Companies House",
+      "versionNumber": 5
+    },
+    {
+      "personaId": "60b496e26be3486e34da01862cec083f",
+      "personaName": "UK - UD - Companies House - Incorporation Document",
+      "versionNumber": 2
+    },
+    {
+      "personaId": "f91e121ebe978238dac128a50b582ff0",
+      "personaName": "UK - UD - Companies House - Name Change Document",
+      "versionNumber": 2
+    }
+  ]
+}

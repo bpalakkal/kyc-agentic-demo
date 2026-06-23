@@ -1,0 +1,254 @@
+[
+  {
+    "_id": "69d6ba8db8df1a00ca5a31a4",
+    "personaId": "03288d827579ed99ea5286ebc13754cf",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitization - Articles of Organization",
+    "description": "The agent leverages intelligent document processing to extract all required attributes from Articles of Organization Document.",
+    "userPrompt": "Role:\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the Articles of Organization document retrieved from the designated data store.\n\nObjective: \n - Use the following file name - {{file_name}} in data store as the authoritative reference to retrieve the document.\n- Systematically review the document and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\n\nSource:\n - Source of truth: Articles of Organization document retrieved.\n - Do not infer, assume, fabricate, or supplement values from any external or secondary source.\n\nExtraction Rules:\n - Always preserve original document text exactly (characters, spelling, accents, abbreviations, punctuation, spacing, casing). Accurately convert the all the date listed in the document into MM/DD/YYYY format while preserving the original date’s meaning.\n - Do not infer, assume, normalize, fabricate, or supplement values.\n - If information appears across multiple pages, explicitly reference all relevant pages.\n - If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\n - Populate all fields defined in the output schema and return the results in the exact JSON format only. The schema field descriptions specify  exactly what to extract.\n - If a document or data store attribute is not found, return 'null' in the relevant column.\n- Also ensure comprehensive tracking of all internal thoughts, input parameters, intermediate steps, and summarized outcomes for every action, maintaining full traceability throughout execution.\n- Enforce that all thoughts, intermediate inputs, and call summaries are strictly confined within the '_reasoning' field, with no leakage outside it under any circumstances.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0,
+    "selectedGroups": [
+      "default_tools",
+      "documents"
+    ],
+    "selectedTools": [],
+    "selectedSkills": [],
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "Full Legal name for which the document is issued, usually found within the first page of the document",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "text",
+        "fieldDescription": "Government issued unique identification number, usually found within the first page of the document. Often referred to as Company Number, Registered Number, Registration Number, EIN, ITIN or an LEI",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "date_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The date when a Customer would have come into existence. This should be the full date (including year) when the organisation would have come into existence as it appears on government and legal forms. Usually found within the first page of the document",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The country in which the company is incorporated or legally registered. Often referred to as Incorporation, registartion, establishment, legal domicile. Sometimes issued by a state agency,Country will need to be derived on the basis of the state in this case.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "Based on interpretation of business activities, categorize as one of: Sole Proprietorship An unincorporated business with a single owner. The business has no separate legal identity from its owner. General Partnership (GP) A business owned by two or more individuals who share in the profits and are personally responsible for the business's debts. Limited Partnership (LP) A partnership with at least one general partner (who has unlimited liability) and one or more limited partners (who have limited liability). Limited Liability Partnership (LLP) A partnership where all partners have limited liability, protecting them from the debts and liabilities of the business. Limited Liability Company (LLC) A flexible business structure that combines the pass-through taxation of a partnership or sole proprietorship with the limited liability of a corporation. C Corporation (C Corp) A legal entity that is separate from its owners (shareholders). It can be taxed separately from its owners. S Corporation (S Corp) A special type of corporation that allows profits and losses to be passed through directly to the owners' personal income without being subject to corporate tax rates. Bank (Depository) Accepts deposits and performs banking activities, such as making loans. Custodian Holds financial assets for the benefit of one or more persons as a substantial part of its business. Investment Entity Primarily conducts trading, portfolio management, or investing on behalf of its customers. Specified Insurance Company An insurance company that issues cash value policies or annuities. Trust A legal arrangement where a trustee holds assets for the benefit of others. Complex trust structures can sometimes be a red flag in KYC as they can obscure ultimate beneficial ownership. Holding Company A company that owns the outstanding stock of other companies. It usually does not produce goods or services itself. Operating Company A subsidiary of a holding company that is responsible for the day-to-day operations of the business.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_registered_address",
+        "fieldType": "text",
+        "fieldDescription": "The official address of an incorporated legal entity. Stated as legal address, registered address, full legal address, registered office address, company address, statutory address, head office address, domicile address. Often contains Street Address, City, State, ZIP and country. When country is not available, could be derived from state. Only state and country are not considered a full Legal/Registered Address.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "principal_place_of_business",
+        "fieldType": "text",
+        "fieldDescription": "The official address of an incorporated legal entity. Stated as Operating Address, mailing Address, Main Business Address, Primary Business Location. Often contains Street Address, City, State, ZIP and country. When country is not available, could be derived from state. Only state and country are not considered a full Address.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_certification_indicator",
+        "fieldType": "boolean",
+        "fieldDescription": "Certification language should be similar to \"I hearby certify to the accuracy of the information in this document\" or \" attested as accurate",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "previous_names",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officer_type",
+        "fieldType": "text",
+        "fieldDescription": "Return the Designation of the Corporate Officer - CEO, CFO, COO etc.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officer_name",
+        "fieldType": "text",
+        "fieldDescription": "Return name for a Corporate Officer who is an individual appointed by the entity (e.g., CEO, CFO, Director) who: (a) is responsible for the day-to-day management and strategic direction of the entity; (b) has authority to make operational or financial decisions on behalf of the entity; or (c) exercises significant executive control over the entity’s affairs.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officer_nationality",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officer_address",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officer_date_of_birth",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller_entity_type",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller_nationality",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller_address",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller_date_of_birth",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller_country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": null,
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "createdBy": "69c3ee32c4f6fe3d0b5d5bce",
+    "lastModifiedBy": "spidiyath",
+    "createdAt": "2026-04-08T20:29:01.292Z",
+    "updatedAt": "2026-06-15T07:13:28.923Z",
+    "__v": 0,
+    "groupConfigs": {
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "addMetadata": true,
+    "confidenceThreshold": null,
+    "memoryEnabled": false,
+    "promptScanStatus": "skipped"
+  }
+]

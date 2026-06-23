@@ -1,0 +1,275 @@
+[
+  {
+    "_id": "69ca56374b7115b5aaf7e486",
+    "personaId": "ab22c3639b5c385195beae35a34af91c",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitization - Memorandum of Association",
+    "description": "The agent leverages intelligent document processing to extract all required attributes from Memorandum of Association Document.",
+    "userPrompt": "Role:\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the Memorandum of Association document retrieved from the designated data store.\n\nObjective: \n - Use the following file name - {{file_name}} in data store as the authoritative reference to retrieve the document.\n- Systematically review the document and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\n\nSource:\n - Source of truth: Memorandum of Association document retrieved.\n - Do not infer, assume, fabricate, or supplement values from any external or secondary source.\n\nExtraction Rules:\n - Always preserve original document text exactly (characters, spelling, accents, abbreviations, punctuation, spacing, casing). Accurately convert the all the date listed in the document into MM/DD/YYYY format while preserving the original date’s meaning.\n - Do not infer, assume, normalize, fabricate, or supplement values.\n - If information appears across multiple pages, explicitly reference all relevant pages.\n - If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\n - Populate all fields defined in the output schema and return the results in the exact JSON format only. The schema field descriptions specify  exactly what to extract.\n - If a document or data store attribute is not found, return 'null' in the relevant column.\n- Also ensure comprehensive tracking of all internal thoughts, input parameters, intermediate steps, and summarized outcomes for every action, maintaining full traceability throughout execution.\n- Enforce that all thoughts, intermediate inputs, and call summaries are strictly confined within the '_reasoning' field, with no leakage outside it under any circumstances.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0.30000000000000004,
+    "selectedGroups": [
+      "default_tools",
+      "documents"
+    ],
+    "groupConfigs": {
+      "document_storage": {
+        "toggleSelect": "save_documentation"
+      },
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "selectedTools": [],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "The full and officially registered legal name of the entity to which the document pertains, including all legal suffixes.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_registered_address",
+        "fieldType": "text",
+        "fieldDescription": "The complete official address of the incorporated legal entity (e.g., registered address, registered office, statutory address, head office), including street address, city, state, ZIP/postal code, and country; country may be inferred from state if omitted.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The country where the entity is legally incorporated or registered, explicitly stated or derived from the issuing jurisdiction.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "text",
+        "fieldDescription": "The unique identification number officially assigned to the entity by a regulatory or registration authority.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "Classify the entity based on its legal structure and business activities into one of the predefined categories, using incorporation details, regulatory status, and operational disclosures to determine the most accurate classification.  Sole Proprietorship: An unincorporated business owned and controlled by a single individual, with no legal separation between the owner and the business, typically indicated by the absence of incorporation and full personal liability.  General Partnership (GP): A business owned by two or more individuals who jointly manage operations, share profits, and are personally liable for the partnership’s debts, usually governed by a partnership agreement without liability limits.  Limited Partnership (LP): A partnership with at least one general partner responsible for management and unlimited liability, and one or more limited partners with limited liability and typically no active management role.      Limited Liability Partnership (LLP): A partnership structure where all partners have limited liability protection, commonly used by professional firms and explicitly designated as an LLP in legal or regulatory filings.      Limited Liability Company (LLC): A legally incorporated entity providing limited liability to its owners (members) with flexible management and pass‑through taxation, typically identified by ‘LLC’ or equivalent in official documents.  C Corporation (C Corp): A corporation that is a separate legal entity from its shareholders, subject to corporate‑level taxation, and identified by standard incorporation without S‑Corporation election.  S Corporation (S Corp): A corporation that has elected pass‑through tax treatment under applicable tax laws, usually explicitly disclosed in tax filings or shareholder information.     Bank (Depository): A regulated financial institution authorized to accept deposits, make loans, and provide banking services, typically licensed and supervised by a banking regulator.     Custodian: An entity whose primary business is holding, safeguarding, or administering financial assets or securities on behalf of clients, often regulated as a custodian or trust company.      Investment Entity: An entity primarily engaged in investing, trading, asset management, or portfolio management activities on behalf of clients or investors, such as funds or investment managers      Specified Insurance Company: An insurance company that issues cash‑value insurance policies or annuity contracts and is regulated under applicable insurance laws.  Trust: A legal arrangement where a trustee holds and manages assets for beneficiaries under the terms of a trust deed, often requiring enhanced KYC review due to complex ownership or control structures",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "date_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The official date on which the legal entity (customer/organization) was formally registered and came into legal existence. Convert the date accurately to MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "beneficial_owner",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "beneficial_owner_name",
+            "fieldType": "text",
+            "fieldDescription": "The full legal name of any individual or legal entity that ultimately owns or controls the customer entity. A beneficial owner is one who meets any of the following criteria: Directly or indirectly owns or controls shares, capital, or ownership interests, including via trusts, nominees, or bearer shareholdings. Directly or indirectly exercises voting rights at general meetings. Exercises ultimate effective control over the management or strategic decisions of the entity",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "corporate_officer",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "corporate_officer_name",
+            "fieldType": "text",
+            "fieldDescription": "The full name(s) of individual corporate officers (e.g., CEO, CFO, Managing Director, Director, Member, Managing Member, Managers, Founder, President) who exercise executive authority, oversee daily management, or make significant operational or financial decisions on behalf of the entity. Ensure that the extraction strictly includes only the names of all corporate officers; no corporate officer should be omitted, and no titles, roles, affiliations, or non‑officer individuals should be included in the output.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_type",
+            "fieldType": "text",
+            "fieldDescription": "The official job title or designation of a senior management member or authorized officer of the entity.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_nationality",
+            "fieldType": "text",
+            "fieldDescription": "The country of citizenship or legally recognized nationality of the corporate officer.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_address",
+            "fieldType": "text",
+            "fieldDescription": "The residential or official address of the corporate officer as documented for compliance purposes.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_date_of_birth",
+            "fieldType": "text",
+            "fieldDescription": "The official birth date of the identified corporate officer.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "document_certification_indicator",
+        "fieldType": "boolean",
+        "fieldDescription": "Indicates whether the document includes an explicit statement certifying the accuracy or correctness of its contents.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "The formal classification of the financial or legal document based on its purpose and content.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "The official date on which the document was issued, filed, signed, or became legally effective. Convert the date accurately to MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "previous_names",
+        "fieldType": "array",
+        "fieldDescription": "Any historical legal or operating names of the entity, typically disclosed as “formerly known as”, “changed its name to”, “previously known as”, “also known as” or similar language.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": "text",
+        "children": []
+      },
+      {
+        "fieldName": "key_controller",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "key_controller_name",
+            "fieldType": "text",
+            "fieldDescription": "The full legal name of an individual or legal entity that exercises significant control or influence over the customer entity’s operations, governance, or decision‑making. A Key Controller is one who meets any of the following criteria: Holds a senior management position with substantial authority (e.g., Director, Managing Director, Partner, Senior Executive). Has responsibility for oversight of operations, risk management, compliance, or internal controls. Is able to significantly influence or determine policies, strategies, or major activities of the entity, even without ownership. Accept both individual persons and legal entities, if explicitly identified as a controller.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_entity_type",
+            "fieldType": "text",
+            "fieldDescription": "How the Key Controller is described in the document: “Individual” - if the controller is a natural person and “Entity” if the controller is a company, trust, partnership, foundation, or other legal arrangement.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_country_of_incorporation",
+            "fieldType": "text",
+            "fieldDescription": "The country in which the Key Controller is legally registered",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_nationality",
+            "fieldType": "text",
+            "fieldDescription": "The legally recognized nationality or citizenship of the Key Controller when the controller is an individual.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_address",
+            "fieldType": "text",
+            "fieldDescription": "The official residential or registered address of the Key Controller used for compliance and identification purposes.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_date_of_birth",
+            "fieldType": "text",
+            "fieldDescription": "The official birth date of the Key Controller when the controller is an individual.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      }
+    ],
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "createdBy": "Sharan",
+    "lastModifiedBy": "spidiyath",
+    "createdAt": "2026-03-30T10:53:43.757Z",
+    "updatedAt": "2026-06-22T16:53:35.659Z",
+    "__v": 0,
+    "rawJsonSchema": null,
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "Repository maintaining the file to be analyzed.",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "selectedSkills": [],
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "addMetadata": true,
+    "confidenceThreshold": null,
+    "memoryEnabled": false,
+    "promptScanStatus": "skipped"
+  }
+]

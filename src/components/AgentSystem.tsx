@@ -77,7 +77,7 @@ import { AttributeDiffModal, type PendingDiff } from "@/components/kyc/Attribute
 export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
   | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
-  | "companies-house" | "uk-parent-flow" | "jersey-fsc" | "fca";
+  | "companies-house" | "uk-parent-flow" | "jersey-fsc" | "fca" | "uk-sourcing-flow";
 
 export type Agent = {
   id: AgentId;
@@ -131,6 +131,9 @@ export const AGENTS: Agent[] = [
   { id: "fca", name: "FCA Data Sourcing Agent", short: "FCA", icon: Scale,
     description: "Sources regulatory data from the UK Financial Conduct Authority register.",
     defaultThoughts: ["Connecting to FCA register…", "Searching entity name…", "Awaiting API response…"] },
+  { id: "uk-sourcing-flow", name: "UK Data Sourcing Flow", short: "UK Sourcing", icon: Database,
+    description: "Orchestrates FCA, Companies House, and Jersey FSC in parallel — merges all sources with full multi-lineage tracking.",
+    defaultThoughts: ["Querying FCA Register directly…", "Invoking Companies House on Forge…", "Invoking Jersey FSC on Forge…", "Polling Forge agents…", "Merging attributes across 3 sources…"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -139,12 +142,12 @@ const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<
 // One bundle per route.  The strip picks the matching route; falls back to
 // the last entry.  TODO: drive this from a backend config (per-user, per-case).
 export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string; agents: AgentId[] }[] = [
-  { route: "/work-queue/review", label: "Resolve Title Discrepancy", reason: "Recommended for this exception · UK registry + FCA check",
-    agents: ["companies-house", "fca"] },
+  { route: "/work-queue/review", label: "Full UK Data Sourcing", reason: "Recommended · FCA + Companies House + Jersey FSC in one run",
+    agents: ["uk-sourcing-flow"] },
   { route: "/work-queue", label: "Bulk Triage Selected Cases", reason: "Best for UK-registered entities in queue",
-    agents: ["companies-house", "fca", "jersey-fsc"] },
+    agents: ["uk-sourcing-flow"] },
   { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · full UK entity orchestration",
-    agents: ["companies-house", "fca"] },
+    agents: ["uk-sourcing-flow"] },
 ];
 
 // VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
@@ -177,31 +180,37 @@ type AgentApiConfig = {
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
     slug: "uk-companies-house",
-    buildBody: (ctx) => ({
-      entity_name: ctx?.name ?? "",
-      out_document_store: "all_unstructured_docs",
-    }),
+    endpoint: "/api/agent-run/async/uk-companies-house",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,
   },
   "uk-parent-flow": {
     slug: "uk-parent-flow",
-    buildBody: (ctx) => ({
-      entity_name: ctx?.name ?? "",
-      out_document_store: "all_unstructured_docs",
-    }),
+    endpoint: "/api/agent-run/async/uk-parent-flow",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,
   },
   "jersey-fsc": {
     slug: "uk-jersey-financial-services-commission",
-    buildBody: (ctx) => ({ entity_name: ctx?.name ?? "" }),
+    endpoint: "/api/agent-run/async/uk-jersey-financial-services-commission",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,
   },
   "fca": {
     slug: "fca",
     endpoint: "/api/agent-run/api/fca",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
+  },
+  "uk-sourcing-flow": {
+    slug: "uk-sourcing-flow",
+    endpoint: "/api/agent-run/api/uk-sourcing-flow",
     buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,

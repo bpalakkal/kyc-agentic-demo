@@ -13,13 +13,6 @@ import type { AgentRegistryEntry } from './types.js';
 export const AGENT_REGISTRY: AgentRegistryEntry[] = [
   // ── API runners (direct REST pulls, synchronous) ──────────────────────────
   {
-    slug: 'companies-house',
-    displayName: 'Companies House',
-    description: 'UK Companies House registry — company overview, filings, officers',
-    runnerType: 'api',
-    outputType: 'attributes',
-  },
-  {
     slug: 'fca',
     displayName: 'FCA Register',
     description: 'UK Financial Conduct Authority register',
@@ -27,14 +20,28 @@ export const AGENT_REGISTRY: AgentRegistryEntry[] = [
     outputType: 'attributes',
   },
   {
-    slug: 'jersey-fsc',
-    displayName: 'Jersey FSC',
-    description: 'Jersey Financial Services Commission registry',
+    slug: 'uk-sourcing-flow',
+    displayName: 'UK Data Sourcing',
+    description: 'Orchestrates FCA, Companies House, and Jersey FSC — merges all sources with multi-lineage tracking',
     runnerType: 'api',
     outputType: 'attributes',
   },
 
   // ── Autonomous runners (AWS ELB agents, async + polling) ──────────────────
+  {
+    slug: 'uk-companies-house',
+    displayName: 'Companies House',
+    description: 'UK Companies House registry — company overview, filings, officers',
+    runnerType: 'autonomous',
+    outputType: 'attributes',
+  },
+  {
+    slug: 'uk-jersey-financial-services-commission',
+    displayName: 'Jersey FSC',
+    description: 'Jersey Financial Services Commission registry',
+    runnerType: 'autonomous',
+    outputType: 'attributes',
+  },
   {
     slug: 'uk-parent-flow',
     displayName: 'UK Orchestration Flow',

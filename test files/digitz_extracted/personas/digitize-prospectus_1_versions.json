@@ -1,0 +1,219 @@
+[
+  {
+    "_id": "69cced44f90e3a64841a3669",
+    "personaId": "dd3f1ae4699969ac3108abdba464613b",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitize - Prospectus",
+    "description": "The agent leverages intelligent document processing to extract all required attributes from Prospectus.",
+    "userPrompt": "Role:\r\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the Prospectus document retrieved from the designated data store.\r\n\r\nObjective: \r\n - Use the following file name - {{file_name}}  in data store {{entity_id}}_{{case_id}} as the authoritative reference to retrieve the document.\r\n- Systematically review the document and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\r\n\r\nSource:\r\n - Source of truth: Prospectus document retrieved.\r\n - Do not infer, assume, fabricate, or supplement values from any external or secondary source.\r\n\r\nExtraction Rules:\r\n - Always preserve original document text exactly (characters, spelling, accents, abbreviations, punctuation, spacing, casing). Accurately convert the all the date listed in the document into MM/DD/YYYY format while preserving the original date’s meaning.\r\n - Do not infer, assume, normalize, fabricate, or supplement values.\r\n - If information appears across multiple pages, explicitly reference all relevant pages.\r\n - If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\r\n - Populate all fields defined in the output schema and return the results in the exact JSON format only. The schema field descriptions specify  exactly what to extract.\r\n - If a document or data store attribute is not found, return 'N/A' in the relevant column.\r\n- Also ensure comprehensive tracking of all internal thoughts, input parameters, intermediate steps, and summarized outcomes for every action, maintaining full traceability throughout execution.\r\n- Enforce that all thoughts, intermediate inputs, and call summaries are strictly confined within the '_reasoning' field, with no leakage outside it under any circumstances.",
+    "llmModel": "us.anthropic.claude-sonnet-4-6",
+    "temperature": 0.3,
+    "selectedGroups": [
+      "default_tools",
+      "documents",
+      "upstream_artifacts"
+    ],
+    "selectedTools": [],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "The full and officially registered legal name of the entity to which the document pertains, including all legal suffixes.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "previous_names",
+        "fieldType": "array",
+        "fieldDescription": "Any historical legal or operating names of the entity, typically disclosed as “formerly known as”, “changed its name to”, “previously known as”, “also known as” or similar language.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": "text",
+        "children": []
+      },
+      {
+        "fieldName": "legal_registered_address",
+        "fieldType": "text",
+        "fieldDescription": "The complete official address of the incorporated legal entity (e.g., registered address, registered office, statutory address, head office), including street address, city, state, ZIP/postal code, and country; country may be inferred from state if omitted.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "Classify the entity based on its legal structure and business activities into one of the predefined categories, using incorporation details, regulatory status, and operational disclosures to determine the most accurate classification.  Sole Proprietorship: An unincorporated business owned and controlled by a single individual, with no legal separation between the owner and the business, typically indicated by the absence of incorporation and full personal liability.  General Partnership (GP): A business owned by two or more individuals who jointly manage operations, share profits, and are personally liable for the partnership’s debts, usually governed by a partnership agreement without liability limits.  Limited Partnership (LP): A partnership with at least one general partner responsible for management and unlimited liability, and one or more limited partners with limited liability and typically no active management role.      Limited Liability Partnership (LLP): A partnership structure where all partners have limited liability protection, commonly used by professional firms and explicitly designated as an LLP in legal or regulatory filings.      Limited Liability Company (LLC): A legally incorporated entity providing limited liability to its owners (members) with flexible management and pass‑through taxation, typically identified by ‘LLC’ or equivalent in official documents.  C Corporation (C Corp): A corporation that is a separate legal entity from its shareholders, subject to corporate‑level taxation, and identified by standard incorporation without S‑Corporation election.  S Corporation (S Corp): A corporation that has elected pass‑through tax treatment under applicable tax laws, usually explicitly disclosed in tax filings or shareholder information.     Bank (Depository): A regulated financial institution authorized to accept deposits, make loans, and provide banking services, typically licensed and supervised by a banking regulator.     Custodian: An entity whose primary business is holding, safeguarding, or administering financial assets or securities on behalf of clients, often regulated as a custodian or trust company.      Investment Entity: An entity primarily engaged in investing, trading, asset management, or portfolio management activities on behalf of clients or investors, such as funds or investment managers      Specified Insurance Company: An insurance company that issues cash‑value insurance policies or annuity contracts and is regulated under applicable insurance laws.  Trust: A legal arrangement where a trustee holds and manages assets for beneficiaries under the terms of a trust deed, often requiring enhanced KYC review due to complex ownership or control structures",
+        "expectedValues": "Bank (Depository),C Corporation (C Corp),Custodian,General Partnership (GP),Holding Company,Investment Entity,Limited Liability Company (LLC),Limited Liability Partnership (LLP),Limited Partnership (LP),Operating Company,S Corporation (S Corp),Sole Proprietorship,Specified Insurance Company,Trust,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "Identify the country of incorporation of the entity and map it strictly to the predefined enum data store. If the value cannot be matched, return N/A.",
+        "expectedValues": "Afghanistan,Albania,Algeria,Andorra,Angola,Antigua and Barbuda,Argentina,Armenia,Aruba,Australia,Austria,Azerbaijan,Bahamas,Bahrain,Bangladesh,Barbados,Belarus,Belgium,Belize,Benin,Bhutan,Bolivia,Bosnia and Herzegovina,Botswana,Brazil,Brunei,Brunei Darussalam,Bulgaria,Burkina Faso,Burma,Burundi,Cambodia,Cameroon,Canada,Cape Verde,Central African Republic,Chad,Chile,China,Colombia,Comoros,Congo,The Democratic Republic of the Congo,Costa Rica,Cote D'Ivoire,Croatia,Cuba,Curacao,Cyprus,Czech Republic,Denmark,Djibouti,Dominica,Dominican Republic,Ecuador,Egypt,El Salvador,Equatorial Guinea,Eritrea,Estonia,Ethiopia,Fiji,Finland,France,Gabon,Gambia,Georgia,Germany,Ghana,Greece,Grenada,Guatemala,Guinea,Guinea-Bissau,Guyana,Haiti,Honduras,Hong Kong,Hungary,Iceland,India,Indonesia,Iran,Iraq,Ireland,Israel,Italy,Jamaica,Japan,Jordan,Kazakhstan,Kenya,Kiribati,Kosovo,Kuwait,Kyrgyzstan,Laos (Lao People's Democratic Republic),Latvia,Lebanon,Lesotho,Liberia,Libya,Liechtenstein,Lithuania,Luxembourg,Macao,Macedonia,The Former Yugoslav Republic of Macedonia,Madagascar,Malawi,Malaysia,Maldives,Mali,Malta,Marshall Islands,Mauritania,Mauritius,Mexico,Federated States of Micronesia,Moldova,Republic of Moldova,Monaco,Mongolia,Montenegro,Morocco,Mozambique,Myanmar,Namibia,Nauru,Nepal,Netherlands,New Zealand,Nicaragua,Niger,Nigeria,North Korea,Norway,Oman,Pakistan,Palau,Panama,Papua New Guinea,Paraguay,Peru,Philippines,Poland,Portugal,Qatar,Romania,Russia,Russian Federation,Rwanda,Saint Kitts and Nevis,Saint Lucia,Saint Vincent and the Grenadines,Samoa,San Marino,Sao Tome and Principe,Saudi Arabia,Senegal,Serbia,Seychelles,Sierra Leone,Singapore,Slovakia,Slovenia,Solomon Islands,Somalia,South Africa,South Korea,South Sudan,Spain,Sri Lanka,St. Lucia,Sudan,Suriname,Suriname,Swaziland,Sweden,Switzerland,Syria,Syrian Arab Republic,Taiwan,Tajikistan,Tanzania,United Republic of Tanzania,Thailand,Timor-Leste,Togo,Tonga,Trinidad and Tobago,Tunisia,Turkey,Turkmenistan,Tuvalu,Uganda,Ukraine,United Arab Emirates,United Kingdom,United States,Uruguay,Uzbekistan,Vanuatu,Vatican City,Venezuela,Vietnam,Virgin Islands,Yemen,Zambia,Zimbabwe,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "principal_place_of_business",
+        "fieldType": "text",
+        "fieldDescription": "The primary mailing address where the entity conducts day-to-day business (e.g., main business address, operating address), distinct from the legal address if disclosed, and typically identified by a full address including street, city, state, ZIP, and country.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "investment_advisor",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "investment_advisor_name",
+            "fieldType": "text",
+            "fieldDescription": "The name of the individual or entity designated as the Investment Advisor or Advisor, responsible for providing professional investment advice, portfolio strategy recommendations, or influencing investment decisions, even if they do not execute trades directly.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "investment_advisor_address",
+            "fieldType": "text",
+            "fieldDescription": "The official business or incorporation address of the Investment Advisor, as disclosed in advisor agreements, regulatory filings, or advisory disclosures.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "sub_advisor",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "sub_advisor_name",
+            "fieldType": "text",
+            "fieldDescription": "The name of any individual or entity appointed by the primary investment advisor or fund manager to provide specialized or delegated investment advice for all or part of the portfolio under a defined mandate. If multiple sub‑advisors are appointed, only the primary sub‑advisor should be identified and extracted.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "sub_advisor_address",
+            "fieldType": "text",
+            "fieldDescription": "The business or incorporation address of the Sub-Advisor, as stated in sub-advisory agreements or regulatory disclosures.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "corporate_officer",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "corporate_officer_name",
+            "fieldType": "text",
+            "fieldDescription": "The full name(s) of individual corporate officers (e.g., CEO, CFO, Managing Director, Director, Member, Managing Member, Managers, Founder, President) who exercise executive authority, oversee daily management, or make significant operational or financial decisions on behalf of the entity. Ensure that the extraction strictly includes only the names of all corporate officers; no corporate officer should be omitted, and no titles, roles, affiliations, or non‑officer individuals should be included in the output.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "investment_objectives",
+        "fieldType": "text",
+        "fieldDescription": "Summarize the stated investment goals and strategy by identifying the investment style (e.g., growth, value, income, capital preservation, speculative) and explicitly noting the recommended holding period (short-, medium-, or long-term) to reflect liquidity expectations and alignment with investor financial objectives.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "The formal classification of the financial or legal document based on its purpose and content.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "The official date on which the document was issued, filed, signed, or became legally effective. Convert the date accurately to MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "createdBy": "anuvabc",
+    "lastModifiedBy": "bpalakkal",
+    "createdAt": "2026-04-01T10:02:44.507Z",
+    "updatedAt": "2026-06-04T14:24:46.532Z",
+    "__v": 0,
+    "groupConfigs": {
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "rawJsonSchema": "{\r\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"entity_name\": {\r\n      \"description\": \"The full and officially registered legal name of the entity to which the document pertains, including all legal suffixes.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"previous_names\": {\r\n      \"description\": \"Any historical legal or operating names of the entity, typically disclosed as “formerly known as”, “changed its name to”, “previously known as”, “also known as” or similar language.\",\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"string\"\r\n      }\r\n    },\r\n    \"legal_registered_address\": {\r\n      \"description\": \"The complete official address of the incorporated legal entity (e.g., registered address, registered office, statutory address, head office), including street address, city, state, ZIP/postal code, and country; country may be inferred from state if omitted.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"legal_structure\": {\r\n      \"description\": \"Classify the entity based on its legal structure and business activities into one of the predefined categories, using incorporation details, regulatory status, and operational disclosures to determine the most accurate classification.  Sole Proprietorship: An unincorporated business owned and controlled by a single individual, with no legal separation between the owner and the business, typically indicated by the absence of incorporation and full personal liability.  General Partnership (GP): A business owned by two or more individuals who jointly manage operations, share profits, and are personally liable for the partnership’s debts, usually governed by a partnership agreement without liability limits.  Limited Partnership (LP): A partnership with at least one general partner responsible for management and unlimited liability, and one or more limited partners with limited liability and typically no active management role.      Limited Liability Partnership (LLP): A partnership structure where all partners have limited liability protection, commonly used by professional firms and explicitly designated as an LLP in legal or regulatory filings.      Limited Liability Company (LLC): A legally incorporated entity providing limited liability to its owners (members) with flexible management and pass‑through taxation, typically identified by ‘LLC’ or equivalent in official documents.  C Corporation (C Corp): A corporation that is a separate legal entity from its shareholders, subject to corporate‑level taxation, and identified by standard incorporation without S‑Corporation election.  S Corporation (S Corp): A corporation that has elected pass‑through tax treatment under applicable tax laws, usually explicitly disclosed in tax filings or shareholder information.     Bank (Depository): A regulated financial institution authorized to accept deposits, make loans, and provide banking services, typically licensed and supervised by a banking regulator.     Custodian: An entity whose primary business is holding, safeguarding, or administering financial assets or securities on behalf of clients, often regulated as a custodian or trust company.      Investment Entity: An entity primarily engaged in investing, trading, asset management, or portfolio management activities on behalf of clients or investors, such as funds or investment managers      Specified Insurance Company: An insurance company that issues cash‑value insurance policies or annuity contracts and is regulated under applicable insurance laws.  Trust: A legal arrangement where a trustee holds and manages assets for beneficiaries under the terms of a trust deed, often requiring enhanced KYC review due to complex ownership or control structures\",\r\n      \"enum\": [\r\n        \"Bank (Depository)\",\r\n        \"C Corporation (C Corp)\",\r\n        \"Custodian\",\r\n        \"General Partnership (GP)\",\r\n        \"Holding Company\",\r\n        \"Investment Entity\",\r\n        \"Limited Liability Company (LLC)\",\r\n        \"Limited Liability Partnership (LLP)\",\r\n        \"Limited Partnership (LP)\",\r\n        \"Operating Company\",\r\n        \"S Corporation (S Corp)\",\r\n        \"Sole Proprietorship\",\r\n        \"Specified Insurance Company\",\r\n        \"Trust\",\r\n        \"N/A\"\r\n    ],\r\n      \"type\": \"string\"\r\n    },\r\n    \"country_of_incorporation\": {\r\n      \"description\": \"Identify the country of incorporation of the entity and map it strictly to the predefined enum data store. If the value cannot be matched, return N/A.\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"Afghanistan\",\r\n        \"Albania\",\r\n        \"Algeria\",\r\n        \"Andorra\",\r\n        \"Angola\",\r\n        \"Antigua and Barbuda\",\r\n        \"Argentina\",\r\n        \"Armenia\",\r\n        \"Aruba\",\r\n        \"Australia\",\r\n        \"Austria\",\r\n        \"Azerbaijan\",\r\n        \"Bahamas\",\r\n        \"Bahrain\",\r\n        \"Bangladesh\",\r\n        \"Barbados\",\r\n        \"Belarus\",\r\n        \"Belgium\",\r\n        \"Belize\",\r\n        \"Benin\",\r\n        \"Bhutan\",\r\n        \"Bolivia\",\r\n        \"Bosnia and Herzegovina\",\r\n        \"Botswana\",\r\n        \"Brazil\",\r\n        \"Brunei\",\r\n        \"Brunei Darussalam\",\r\n        \"Bulgaria\",\r\n        \"Burkina Faso\",\r\n        \"Burma\",\r\n        \"Burundi\",\r\n        \"Cambodia\",\r\n        \"Cameroon\",\r\n        \"Canada\",\r\n        \"Cape Verde\",\r\n        \"Central African Republic\",\r\n        \"Chad\",\r\n        \"Chile\",\r\n        \"China\",\r\n        \"Colombia\",\r\n        \"Comoros\",\r\n        \"Congo\",\r\n        \"The Democratic Republic of the Congo\",\r\n        \"Costa Rica\",\r\n        \"Cote D'Ivoire\",\r\n        \"Croatia\",\r\n        \"Cuba\",\r\n        \"Curacao\",\r\n        \"Cyprus\",\r\n        \"Czech Republic\",\r\n        \"Denmark\",\r\n        \"Djibouti\",\r\n        \"Dominica\",\r\n        \"Dominican Republic\",\r\n        \"Ecuador\",\r\n        \"Egypt\",\r\n        \"El Salvador\",\r\n        \"Equatorial Guinea\",\r\n        \"Eritrea\",\r\n        \"Estonia\",\r\n        \"Ethiopia\",\r\n        \"Fiji\",\r\n        \"Finland\",\r\n        \"France\",\r\n        \"Gabon\",\r\n        \"Gambia\",\r\n        \"Georgia\",\r\n        \"Germany\",\r\n        \"Ghana\",\r\n        \"Greece\",\r\n        \"Grenada\",\r\n        \"Guatemala\",\r\n        \"Guinea\",\r\n        \"Guinea-Bissau\",\r\n        \"Guyana\",\r\n        \"Haiti\",\r\n        \"Honduras\",\r\n        \"Hong Kong\",\r\n        \"Hungary\",\r\n        \"Iceland\",\r\n        \"India\",\r\n        \"Indonesia\",\r\n        \"Iran\",\r\n        \"Iraq\",\r\n        \"Ireland\",\r\n        \"Israel\",\r\n        \"Italy\",\r\n        \"Jamaica\",\r\n        \"Japan\",\r\n        \"Jordan\",\r\n        \"Kazakhstan\",\r\n        \"Kenya\",\r\n        \"Kiribati\",\r\n        \"Kosovo\",\r\n        \"Kuwait\",\r\n        \"Kyrgyzstan\",\r\n        \"Laos (Lao People's Democratic Republic)\",\r\n        \"Latvia\",\r\n        \"Lebanon\",\r\n        \"Lesotho\",\r\n        \"Liberia\",\r\n        \"Libya\",\r\n        \"Liechtenstein\",\r\n        \"Lithuania\",\r\n        \"Luxembourg\",\r\n        \"Macao\",\r\n        \"Macedonia\",\r\n        \"The Former Yugoslav Republic of Macedonia\",\r\n        \"Madagascar\",\r\n        \"Malawi\",\r\n        \"Malaysia\",\r\n        \"Maldives\",\r\n        \"Mali\",\r\n        \"Malta\",\r\n        \"Marshall Islands\",\r\n        \"Mauritania\",\r\n        \"Mauritius\",\r\n        \"Mexico\",\r\n        \"Federated States of Micronesia\",\r\n        \"Moldova\",\r\n        \"Republic of Moldova\",\r\n        \"Monaco\",\r\n        \"Mongolia\",\r\n        \"Montenegro\",\r\n        \"Morocco\",\r\n        \"Mozambique\",\r\n        \"Myanmar\",\r\n        \"Namibia\",\r\n        \"Nauru\",\r\n        \"Nepal\",\r\n        \"Netherlands\",\r\n        \"New Zealand\",\r\n        \"Nicaragua\",\r\n        \"Niger\",\r\n        \"Nigeria\",\r\n        \"North Korea\",\r\n        \"Norway\",\r\n        \"Oman\",\r\n        \"Pakistan\",\r\n        \"Palau\",\r\n        \"Panama\",\r\n        \"Papua New Guinea\",\r\n        \"Paraguay\",\r\n        \"Peru\",\r\n        \"Philippines\",\r\n        \"Poland\",\r\n        \"Portugal\",\r\n        \"Qatar\",\r\n        \"Romania\",\r\n        \"Russia\",\r\n        \"Russian Federation\",\r\n        \"Rwanda\",\r\n        \"Saint Kitts and Nevis\",\r\n        \"Saint Lucia\",\r\n        \"Saint Vincent and the Grenadines\",\r\n        \"Samoa\",\r\n        \"San Marino\",\r\n        \"Sao Tome and Principe\",\r\n        \"Saudi Arabia\",\r\n        \"Senegal\",\r\n        \"Serbia\",\r\n        \"Seychelles\",\r\n        \"Sierra Leone\",\r\n        \"Singapore\",\r\n        \"Slovakia\",\r\n        \"Slovenia\",\r\n        \"Solomon Islands\",\r\n        \"Somalia\",\r\n        \"South Africa\",\r\n        \"South Korea\",\r\n        \"South Sudan\",\r\n        \"Spain\",\r\n        \"Sri Lanka\",\r\n        \"St. Lucia\",\r\n        \"Sudan\",\r\n        \"Suriname\",\r\n        \"Suriname\",\r\n        \"Swaziland\",\r\n        \"Sweden\",\r\n        \"Switzerland\",\r\n        \"Syria\",\r\n        \"Syrian Arab Republic\",\r\n        \"Taiwan\",\r\n        \"Tajikistan\",\r\n        \"Tanzania\",\r\n        \"United Republic of Tanzania\",\r\n        \"Thailand\",\r\n        \"Timor-Leste\",\r\n        \"Togo\",\r\n        \"Tonga\",\r\n        \"Trinidad and Tobago\",\r\n        \"Tunisia\",\r\n        \"Turkey\",\r\n        \"Turkmenistan\",\r\n        \"Tuvalu\",\r\n        \"Uganda\",\r\n        \"Ukraine\",\r\n        \"United Arab Emirates\",\r\n        \"United Kingdom\",\r\n        \"United States\",\r\n        \"Uruguay\",\r\n        \"Uzbekistan\",\r\n        \"Vanuatu\",\r\n        \"Vatican City\",\r\n        \"Venezuela\",\r\n        \"Vietnam\",\r\n        \"Virgin Islands\",\r\n        \"Yemen\",\r\n        \"Zambia\",\r\n        \"Zimbabwe\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"principal_place_of_business\": {\r\n      \"description\": \"The primary mailing address where the entity conducts day-to-day business (e.g., main business address, operating address), distinct from the legal address if disclosed, and typically identified by a full address including street, city, state, ZIP, and country.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"investment_advisor\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"investment_advisor_name\": {\r\n            \"description\": \"The name of the individual or entity designated as the Investment Advisor or Advisor, responsible for providing professional investment advice, portfolio strategy recommendations, or influencing investment decisions, even if they do not execute trades directly.\",\r\n            \"type\": \"string\"\r\n          },\r\n          \"investment_advisor_address\": {\r\n            \"description\": \"The official business or incorporation address of the Investment Advisor, as disclosed in advisor agreements, regulatory filings, or advisory disclosures.\",\r\n            \"type\": \"string\"\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"investment_advisor_name\",\r\n          \"investment_advisor_address\"\r\n        ]\r\n      }\r\n    },\r\n    \"sub_advisor\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"sub_advisor_name\": {\r\n            \"description\": \"The name of any individual or entity appointed by the primary investment advisor or fund manager to provide specialized or delegated investment advice for all or part of the portfolio under a defined mandate. If multiple sub‑advisors are appointed, only the primary sub‑advisor should be identified and extracted.\",\r\n            \"type\": \"string\"\r\n          },\r\n          \"sub_advisor_address\": {\r\n            \"description\": \"The business or incorporation address of the Sub-Advisor, as stated in sub-advisory agreements or regulatory disclosures.\",\r\n            \"type\": \"string\"\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"sub_advisor_name\",\r\n          \"sub_advisor_address\"\r\n        ]\r\n      }\r\n    },\r\n    \"corporate_officer\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"corporate_officer_name\": {\r\n            \"description\": \"The full name(s) of individual corporate officers (e.g., CEO, CFO, Managing Director, Director, Member, Managing Member, Managers, Founder, President) who exercise executive authority, oversee daily management, or make significant operational or financial decisions on behalf of the entity. Ensure that the extraction strictly includes only the names of all corporate officers; no corporate officer should be omitted, and no titles, roles, affiliations, or non‑officer individuals should be included in the output.\",\r\n            \"type\": \"string\"\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"corporate_officer_name\"\r\n        ]\r\n      }\r\n    },\r\n    \"investment_objectives\": {\r\n      \"description\": \"Summarize the stated investment goals and strategy by identifying the investment style (e.g., growth, value, income, capital preservation, speculative) and explicitly noting the recommended holding period (short-, medium-, or long-term) to reflect liquidity expectations and alignment with investor financial objectives.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"document_type\": {\r\n      \"description\": \"The formal classification of the financial or legal document based on its purpose and content.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"document_date\": {\r\n      \"description\": \"The official date on which the document was issued, filed, signed, or became legally effective. Convert the date accurately to MM/DD/YYYY format.\",\r\n      \"type\": \"string\"\r\n    }\r\n  },\r\n  \"required\": [\r\n    \"entity_name\",\r\n    \"previous_names\",\r\n    \"legal_registered_address\",\r\n    \"legal_structure\",\r\n    \"country_of_incorporation\",\r\n    \"principal_place_of_business\",\r\n    \"investment_advisor\",\r\n    \"sub_advisor\",\r\n    \"corporate_officer\",\r\n    \"investment_objectives\",\r\n    \"document_type\",\r\n    \"document_date\"\r\n  ]\r\n}",
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "predecessorOutput"
+      },
+      {
+        "fieldName": "entity_id",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "predecessorOutput"
+      },
+      {
+        "fieldName": "case_id",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "selectedSkills": [],
+    "addMetadata": true,
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "confidenceThreshold": null,
+    "memoryEnabled": true
+  }
+]

@@ -1,0 +1,164 @@
+[
+  {
+    "_id": "69f9b02b5d0ab1141bc3f2dd",
+    "personaId": "ff2083e7b17ce8a4d186134a6892afa6",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "UK - Jersey Financial Services Commission",
+    "description": "UK - Jersey Financial Services Commission",
+    "userPrompt": "Role:\r\nYou are an expert in KYC data extraction for entities. You perform authoritative attribute extraction for the specified entity using the Jersey Financial Services Commission as the source of truth.\n\r\n\r\n\rObjective: \r\nExtract authoritative entity attributes for entity name from the Jersey Financial Services Commission and return verified entity data as structured JSON. Capture screenshots and annotate pages consulted to create an auditable trail.\r\n\r\n\r\nSource:\r\n∙ Source of truth: Jersey Financial Services Commission. Do NOT search any other source. \r\n∙ Primary domain: https://www.jerseyfsc.org/registry/registry-entities/\r\n\r\n\r\n\rField Matching Logic:\r\nThe registry uses labels that differ from the required output field names. Do not rely on exact label matching. Use your semantic understanding to identify which registry field best corresponds to each required output attribute based on meaning and context. When multiple similar fields exist on the page (e.g., “Entity Kind” vs “Entity Type” vs “Residency”), carefully distinguish between them and select only the one that best matches the intent of the required attribute.\r\n\r\n\r\n\rExtraction Rule\r\n\r-Strict name matching: Select only records whose legal name is an exact or near-exact match to  {{entity_name}} (ignoring case, punctuation, and trailing legal suffixes like “Inc.”, “Ltd.”, “PLC”). Do not select records with additional qualifiers, geographic modifiers, or parent/subsidiary descriptors (e.g., for “ABC Bank”, reject “ABC International Bank PLC”, “ABC Bank USA”, “ABC Bank Holdings”). If no strict match exists, return “N/A” rather than the closest approximation and return the Source_URL for the searched results. If no entity is found in the source, stop the agent and output the results. \n- Save a screenshot for all attributes extraction for audit trail purposes\r\n\r\n\rGeneral Rules:\r\n∙ You MUST attempt to extract EVERY required output field. Do not skip fields without confirming the data is genuinely absent.\r\n∙ Extract data values verbatim from the source. Do not infer, estimate, normalize, or supplement from any sources other than the Jersey Financial Services Commission\r\n∙ For address-related attributes, identify all relevant address components on the page and combine them into a single formatted string.\r\n∙ If a required field genuinely cannot be found, return “N/A” for that field.\r\n- Capture screenshot and annotate the Nasdaq pages consulted to create an auditable trail. It is mandatory to capture the screen-shot whenever the entity details are available.\r\n∙ Ensure all extracted data is current, accurate, and directly traceable to the source documentation.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0,
+    "selectedGroups": [
+      "default_tools",
+      "capture_screenshot",
+      "web_search",
+      "firecrawl"
+    ],
+    "selectedTools": [],
+    "selectedSkills": [],
+    "inputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "envVar"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "entity_status",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "Active,Inactive,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "date_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "Extract in MM/DD/YYYY Format",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_registered_address",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "Aruba, Australia, Austria, Azerbaijan, Bahamas, Bahrain, Bangladesh, Barbados, Belarus, Belgium, Belize, Benin, Bhutan, Bolivia, Bosnia and Herzegovina, Botswana, Brazil, Brunei Darussalam, Bulgaria, Burkina Faso, Burma, Burundi, Cambodia, Cameroon, Canada, Cape Verde, Central African Republic, Chad, Chile, China, Colombia, Comoros, Congo, Congo, The Democratic Republic of The, Costa Rica, Cote D'Ivoire, Croatia, Cuba, Curacao, Cyprus, Czech Republic, Denmark, Djibouti, Dominica, Dominican Republic, Ecuador, Egypt, El Salvador, Equatorial Guinea, Eritrea, Estonia, Ethiopia, Fiji, Finland, France, Gabon, Gambia, Georgia, Germany, Ghana, Greece, Grenada, Guatemala, Guinea, Guinea-Bissau, Guyana, Haiti, Vatican City, Honduras, Hungary, Iceland, India, Liberia, Libya, Liechtenstein, Lithuania, Luxembourg, Macedonia, the Former Yugoslav Republic of, Madagascar, Malawi, Malaysia, Maldives, Mali, Malta, Marshall Islands, Mauritania, Mauritius, Mexico, Micronesia, Federated States of, Moldova, Republic of, Monaco, Mongolia, Montenegro, Morocco, Mozambique, Myanmar, Namibia, Nauru, Nepal, Netherlands, New Zealand, Nicaragua, Niger, Nigeria, Norway, Oman, Pakistan, Palau, Panama, Papua New Guinea, Paraguay, Peru, Philippines, Poland, Portugal, Qatar, Romania, Russian Federation, Rwanda, Saint Kitts and Nevis, Saint Lucia, Saint Vincent and the Grenadines, Samoa, San Marino, Sao Tome and Principe, Saudi Arabia, Senegal, Serbia, Seychelles, Sierra Leone, Singapore, Slovakia, Slovenia, Solomon Islands, Somalia, South Africa, South Sudan, Spain, Sri Lanka, Sudan, Suriname, Swaziland, Sweden, Switzerland, Syrian Arab Republic, Tajikistan, Tanzania, United Republic of, Thailand, Timor-Leste, Togo, Tonga, Trinidad and Tobago, Tunisia, Turkey, Turkmenistan, Tuvalu, Uganda, Ukraine, United Arab Emirates, United Kingdom, United States, Uruguay, Uzbekistan, Vanuatu, Venezuela, Vietnam, Yemen, Zambia, Zimbabwe, Hong Kong, Taiwan, Macao, St. Lucia, Virgin Islands, Jamaica, Japan, Jordan, Kazakhstan, Kenya, Kiribati, Kuwait, Kyrgyzstan, North Korea, South Korea, Indonesia, Iran, Iraq, Ireland, Israel, Italy, Latvia, Lebanon, Lesotho, Andorra, Afghanistan, Albania, Algeria, Angola, Antigua and Barbuda, Argentina, Armenia, Brunei, Laos (Lao People's Democratic Republic), Macedonia, Moldova, Russia, Suriname, Syria, Tanzania, Kosovo, N/A, Jersey",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "Sole Proprietorship,General Partnership (GP),Limited Partnership (LP),Limited Liability Partnership (LLP),Limited Liability Company (LLC),C Corporation (C Corp),S Corporation (S Corp),Bank (Depository),Custodian,Investment Entity,Specified Insurance Company,Trust,Holding Company,Operating Company,n/a",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "regulator",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "Any of the 50 U.S. State Banking Regulators, Australian Prudential Regulatory Authority (APRA), Australian Securities and Investment Commission (ASIC), Autorité de Contrôle des Assurances et des Mutuelles, Autorité des Marchés Financiers (AMF), Banca d'Italia Eurosistema, Banco de España Eurosistema, Banco de Portugal, Bank of Greece, Banka Negara Malaysia - Central Bank of Malaysia, Banque de France/Commision Bancaire, Central Bank and Financial Services Authority of Ireland, Comisión Nacional del Mercado de Valores, Comissão do Mercado de Valores Mobiliários - Portugese Securities Market Commission (CMVM), Comissão do Valores Mobiliários - Securities and Exchange Commission of Brazil (CVM), Commission Bancaire; Financière et des Assurances - Banking Finance and Insurance Commission (BFIC), Commission de Surveillance du Secteur Financier (CSSF), Commission fédérale des banques - Swiss Federal Banking Commission (SFBC), Commissione Nazionale per le Società e la Borsa (Consob), Commodity Futures Trading Commission (CFTC), De Nederlandsche Bank Eurosysteem, Dirección General de Seguros y Fondos de Pensiones (DGSFP), Federal Deposit Insurance Corp. (FDIC), Federal Housing Finance Board (FHFB), Federal Reserve Board, Financial Market Authority, Financial Services Agency, Financial Services Authority (FSA), Financial Supervision Commission (FSM), Finansinspektionen - Swedish Financial Supervisory Authority, Finanstilsynet - Danish Financial Supervisory Authority, Finnish Financial Supervision Authority (FIN-FSA), Fjármálaeftirlitiđ - Financial Supervisory Authority; Iceland (FME), Germany) Bundesanstalt fur Finanzdienstleistungs-aufsicht (BaFin), Guernsey Financial Services Commission, Hellenic Republic Capital Market Commission, Hong Kong Monetary Authority, Instituto de Seguros de Portugal - Portugese Insurance Institute (ISP), Insurance Supervisory Authority (ISA), Istituto per la Vigilanza sulle Assicurazioni Private e di Interesse Collecttivo (ISVAP), Jersey Financial Services Corp. (JFSC), Kredittilsynet - Financial Supervisory Authority of Norway, Monetary Authority of Singapore, National Association of Securities Dealers (NASD), National Credit Union Administration (NCUA), National Futures Association (NFA), Netherlands Authority for Financial Markets (AFM), Office of the Commissioner of Insurance, Office of the Comptroller of the Currency (OCC), Office of the Superintendent of Financial Institutions Canada, Office of Thrift Supervision (OTS), Reserve Bank of New Zealand, Securities and Futures Commission, Securities Commission of New Zealand, Superintendência de Seguros Privados (Susep), U.S. Securities and Exchange Commission (SEC), N/A, Consumer Financial Protection Bureau (CFPB)",
+        "enumMultiSelect": false,
+        "arrayItemType": "text",
+        "children": []
+      },
+      {
+        "fieldName": "source_url",
+        "fieldType": "text",
+        "fieldDescription": "The URL that displays the Searched Entity",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": null,
+    "outputMode": "json_object",
+    "addMetadata": true,
+    "confidenceThreshold": null,
+    "downloadFormat": "json",
+    "createdBy": "anniewangzx26",
+    "lastModifiedBy": "spidiyath",
+    "versionNumber": 1,
+    "versionNote": "",
+    "basePersonaId": null,
+    "createdAt": "2026-05-05T08:54:03.110Z",
+    "updatedAt": "2026-06-18T16:46:38.588Z",
+    "__v": 0,
+    "groupConfigs": {},
+    "promptScanResult": {
+      "has_injection": false,
+      "reason": "Passed LLM verification",
+      "scanner": null,
+      "detected_patterns": [],
+      "match_details": [],
+      "scan_time_ms": 3275,
+      "mode": "llm-verify",
+      "llm_called": true,
+      "scanner_results": {
+        "InvisibleText": {
+          "isValid": true,
+          "reason": "No invisible characters detected",
+          "detectedPatterns": [],
+          "scanTimeMs": 2
+        },
+        "Regex": {
+          "isValid": true,
+          "reason": "No injection patterns detected",
+          "detectedPatterns": [],
+          "scanTimeMs": 7
+        },
+        "BanSubstrings": {
+          "isValid": true,
+          "reason": "No banned substrings detected",
+          "detectedPatterns": [],
+          "scanTimeMs": 1
+        },
+        "PromptInjection": {
+          "isValid": true,
+          "reason": "No injection detected. This is a legitimate agent persona definition for KYC data extraction. It contains: (1) role definition ('You are an expert in KYC data extraction'), (2) objective specification, (3) source constraints (legitimate domain restriction to Jersey FSC), (4) field matching logic, (5) extraction rules, and (6) general operational guidelines. All elements are standard persona configuration language. The instruction to use 'semantic understanding' and 'strict name matching' are behavioral rules, not overrides. The screenshot/audit trail requirements are legitimate output specifications. No platform override attempts, credential extraction, code injection, delimiter injection, jailbreak strings, or explicit instruction override language detected.",
+          "detectedPatterns": [],
+          "scanTimeMs": 3265
+        }
+      }
+    },
+    "promptScanStatus": "skipped",
+    "memoryEnabled": false
+  }
+]

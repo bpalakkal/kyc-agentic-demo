@@ -1,0 +1,320 @@
+[
+  {
+    "_id": "69de4c4ea97f3b8a7bdee861",
+    "personaId": "601e4a06902684e456e0d29673a27f8f",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitization - ADV Form",
+    "description": "This agent is responsible to extract information from the ADV Form",
+    "userPrompt": "Role:\r\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the SEC FORM ADV document retrieved from the designated data store .\r\n\r\nObjective: \r\n - Use the following file name -   {{file_name}}  in data store {{entity_id}}_{{case_id}} as the authoritative reference to retrieve the document.\r\n- Systematically review the document and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\r\n\r\nSource:\r\n - Source of truth: SEC FORM ADV document retrieved.\r\n - Do not infer, assume, fabricate, or supplement values from any external or secondary source.\r\n\r\nExtraction Rules:\r\n - Always preserve original document text exactly (characters, spelling, accents, abbreviations, punctuation, spacing, casing). Accurately convert the all the date listed in the document into MM/DD/YYYY format while preserving the original date’s meaning.\r\n - Do not infer, assume, normalize, fabricate, or supplement values.\r\n - If information appears across multiple pages, explicitly reference all relevant pages.\r\n - If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\r\n - Populate all fields defined in the output schema and return the results in the exact JSON format only. The schema field descriptions specify  exactly what to extract.\r\n - If a document or data store attribute is not found, return 'N/A' in the relevant column.\r\n\r\n\r\nAlso in _reasoning field add all the reasoning that you took to arrive on the result .",
+    "llmModel": "us.anthropic.claude-sonnet-4-6",
+    "temperature": 0,
+    "selectedGroups": [
+      "default_tools",
+      "upstream_artifacts",
+      "documents"
+    ],
+    "selectedTools": [],
+    "selectedSkills": [],
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "Repository maintaining the list of predefined values of Document Type.",
+        "valueSource": "predecessorOutput"
+      },
+      {
+        "fieldName": "entity_id",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "envVar"
+      },
+      {
+        "fieldName": "case_id",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "envVar"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "The full and officially registered legal name of the entity to which the document pertains, including all legal suffixes.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "text",
+        "fieldDescription": "Registration number with SEC under section 1",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "principal_place_of_business",
+        "fieldType": "text",
+        "fieldDescription": "Principal Place of Business under section 1",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "Derived from business activities under section 1F",
+        "expectedValues": "Bank (Depository),C Corporation (C Corp),Custodian,General Partnership (GP),Holding Company,Investment Entity,Limited Liability Company (LLC),Limited Liability Partnership (LLP),Limited Partnership (LP),Operating Company,S Corporation (S Corp),Sole Proprietorship,Specified Insurance Company,Trust,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "The formal classification of the financial or legal document based on its purpose and content.",
+        "expectedValues": "W9, Board Resolution, Authorized Signers List, Articles of Association, Articles of Incorporation, Articles of Organization, Certificate of Incorporation, Certificate of Incumbency, Certificate of Formation, Memorandum of Association, Prospectus, Offering Memorandum, Passport, Driver License, Government Photo ID, Form ADV, NA",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "beneficial_owner",
+        "fieldType": "array",
+        "fieldDescription": "derived  from Schedule A in the form ADV",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "beneficial_owner_name",
+            "fieldType": "text",
+            "fieldDescription": "Extract all direct and indirect owners (individuals and entities) from Schedule A and Schedule B of Form ADV, keep names exactly as written, remove duplicates, and return list or null if none found.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "beneficial_owner_type",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "Entity, Individual, N/A",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "beneficial_owner_percentage_of_ownership",
+            "fieldType": "number",
+            "fieldDescription": "Derived from Schedule A",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "beneficial_owner_entity_classification",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "Bank (Depository), C Corporation (C Corp), Custodian, General Partnership (GP), Holding Company, Investment Entity, Limited Liability Company (LLC), Limited Liability Partnership (LLP), Limited Partnership (LP), Operating Company, S Corporation (S Corp), Sole Proprietorship, Specified Insurance Company, Trust, N/A",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "corporate_officer",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "corporate_officer_name",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_type",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "Board Chairman, Board Director, Chief Compliance Officer, Chief Executive Officer, Chief Financial Officer, Chief Investment Officer, Chief Operating Officer, Designated Member, Director, Executive Director, General Partner, Manager, Managing Director, Managing General Partner, Managing Member, President, Secretary, Senior Vice President, Treasurer, Vice President, Limited Partner, General Counsel, General Partner",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "key_controller_name",
+        "fieldType": "text",
+        "fieldDescription": "Extract all distinct individuals and legal entities explicitly mentioned in Section A and Section B of the Form ADV only, preserve names exactly as stated without normalization or inference, exclude duplicates and any content outside these sections, and return the result as a structured list or null if no entries are found.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "investment_advisor",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "investment_advisor_name",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "investment_advisor_address",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "investment_advisor_country_of_incorporation",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "Afghanistan,Albania,Algeria,Andorra,Angola,Antigua and Barbuda,Argentina,Armenia,Aruba,Australia,Austria,Azerbaijan,Bahamas,Bahrain,Bangladesh,Barbados,Belarus,Belgium,Belize,Benin,Bhutan,Bolivia,Bosnia and Herzegovina,Botswana,Brazil,Brunei,Brunei Darussalam,Bulgaria,Burkina Faso,Burma,Burundi,Cambodia,Cameroon,Canada,Cape Verde,Central African Republic,Chad,Chile,China,Colombia,Comoros,Congo,The Democratic Republic of the Congo,Costa Rica,Cote D'Ivoire,Croatia,Cuba,Curacao,Cyprus,Czech Republic,Denmark,Djibouti,Dominica,Dominican Republic,Ecuador,Egypt,El Salvador,Equatorial Guinea,Eritrea,Estonia,Ethiopia,Fiji,Finland,France,Gabon,Gambia,Georgia,Germany,Ghana,Greece,Grenada,Guatemala,Guinea,Guinea-Bissau,Guyana,Haiti,Honduras,Hong Kong,Hungary,Iceland,India,Indonesia,Iran,Iraq,Ireland,Israel,Italy,Jamaica,Japan,Jordan,Kazakhstan,Kenya,Kiribati,Kosovo,Kuwait,Kyrgyzstan,Laos (Lao People's Democratic Republic),Latvia,Lebanon,Lesotho,Liberia,Libya,Liechtenstein,Lithuania,Luxembourg,Macao,Macedonia,The Former Yugoslav Republic of Macedonia,Madagascar,Malawi,Malaysia,Maldives,Mali,Malta,Marshall Islands,Mauritania,Mauritius,Mexico,Federated States of Micronesia,Moldova,Republic of Moldova,Monaco,Mongolia,Montenegro,Morocco,Mozambique,Myanmar,Namibia,Nauru,Nepal,Netherlands,New Zealand,Nicaragua,Niger,Nigeria,North Korea,Norway,Oman,Pakistan,Palau,Panama,Papua New Guinea,Paraguay,Peru,Philippines,Poland,Portugal,Qatar,Romania,Russia,Russian Federation,Rwanda,Saint Kitts and Nevis,Saint Lucia,Saint Vincent and the Grenadines,Samoa,San Marino,Sao Tome and Principe,Saudi Arabia,Senegal,Serbia,Seychelles,Sierra Leone,Singapore,Slovakia,Slovenia,Solomon Islands,Somalia,South Africa,South Korea,South Sudan,Spain,Sri Lanka,St. Lucia,Sudan,Suriname,Suriname,Swaziland,Sweden,Switzerland,Syria,Syrian Arab Republic,Taiwan,Tajikistan,Tanzania,United Republic of Tanzania,Thailand,Timor-Leste,Togo,Tonga,Trinidad and Tobago,Tunisia,Turkey,Turkmenistan,Tuvalu,Uganda,Ukraine,United Arab Emirates,United Kingdom,United States,Uruguay,Uzbekistan,Vanuatu,Vatican City,Venezuela,Vietnam,Virgin Islands,Yemen,Zambia,Zimbabwe,N/A",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "investment_advisor_incorporation_date",
+            "fieldType": "text",
+            "fieldDescription": "Extract only dates that are explicitly stated in the document.\nDo not infer, calculate, normalize, or assume any date.\nIf multiple dates are present, extract only the date relevant to the specified context (e.g., “issue date”, “effective date”, “filing date”) as mentioned in the document.\nPreserve the exact date format as it appears in the source.\nIf no date is explicitly mentioned, return null.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "investment_advisor_type",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "Entity,Individual,N/A",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "sub_advisor",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "sub_advisor_name",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "sub_advisor_address",
+            "fieldType": "text",
+            "fieldDescription": "Derived from Schedule A and B",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "other_business_activity",
+        "fieldType": "text",
+        "fieldDescription": "Derived from business activities under section 1F",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "Extract only dates that are explicitly stated in the document.\nDo not infer, calculate, normalize, or assume any date.\nIf multiple dates are present, extract only the date relevant to the specified context (e.g., “issue date”, “effective date”, “filing date”) as mentioned in the document.\nPreserve the exact date format as it appears in the source.\nIf no date is explicitly mentioned, return null.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "tax_identification_number",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "assets_under_management_aum",
+        "fieldType": "currency",
+        "fieldDescription": "Derived from section 5",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "website_address",
+        "fieldType": "text",
+        "fieldDescription": "Extract URLs from Schedule D Section 1.I of Form ADV; return exact URLs and publicly available social media accounts; no inference; return null if none, \"false\" if explicitly none.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "_reasoning",
+        "fieldType": "text",
+        "fieldDescription": "all the reasoning that you took to arrive on the result .",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": "{\r\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"entity_name\": {\r\n      \"description\": \"The full and officially registered legal name of the entity to which the document pertains, including all legal suffixes.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"registration_number\": {\r\n      \"description\": \"Registration number with SEC under section 1  \",\r\n      \"type\": \"string\"\r\n    },\r\n    \"principal_place_of_business\": {\r\n      \"description\": \"Principal Place of Business under section 1  \",\r\n      \"type\": \"string\"\r\n    },\r\n    \"legal_structure\": {\r\n      \"description\": \"Derived from business activities under section 1F  \",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"Bank (Depository)\",\r\n        \"C Corporation (C Corp)\",\r\n        \"Custodian\",\r\n        \"General Partnership (GP)\",\r\n        \"Holding Company\",\r\n        \"Investment Entity\",\r\n        \"Limited Liability Company (LLC)\",\r\n        \"Limited Liability Partnership (LLP)\",\r\n        \"Limited Partnership (LP)\",\r\n        \"Operating Company\",\r\n        \"S Corporation (S Corp)\",\r\n        \"Sole Proprietorship\",\r\n        \"Specified Insurance Company\",\r\n        \"Trust\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"document_type\": {\r\n      \"description\": \"The formal classification of the financial or legal document based on its purpose and content.\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"W9\",\r\n        \"Board Resolution\",\r\n        \"Authorized Signers List\",\r\n        \"Articles of Association\",\r\n        \"Articles of Incorporation\",\r\n        \"Articles of Organization\",\r\n        \"Certificate of Incorporation\",\r\n        \"Certificate of Incumbency\",\r\n        \"Certificate of Formation\",\r\n        \"Memorandum of Association\",\r\n        \"Prospectus\",\r\n        \"Offering Memorandum\",\r\n        \"Passport\",\r\n        \"Driver License\",\r\n        \"Government Photo ID\",\r\n        \"NA\"\r\n      ]\r\n    },\r\n    \"beneficial_owner\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"beneficial_owner_name\": {\r\n            \"description\": \"Derived from Schedule A and B\",\r\n            \"type\": \"string\"\r\n          },\r\n          \"beneficial_owner_type\": {\r\n            \"description\": \"Derived from Schedule A and B\",\r\n            \"type\": \"string\",\r\n            \"enum\": [\r\n              \"Entity\",\r\n              \"Individual\",\r\n              \"N/A\"\r\n            ]\r\n          },\r\n          \"beneficial_owner_percentage_of_ownership\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\"\r\n          },\r\n          \"beneficial_owner_entity_classification\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\",\r\n            \"enum\": [\r\n              \"Bank (Depository)\",\r\n              \"C Corporation (C Corp)\",\r\n              \"Custodian\",\r\n              \"General Partnership (GP)\",\r\n              \"Holding Company\",\r\n              \"Investment Entity\",\r\n              \"Limited Liability Company (LLC)\",\r\n              \"Limited Liability Partnership (LLP)\",\r\n              \"Limited Partnership (LP)\",\r\n              \"Operating Company\",\r\n              \"S Corporation (S Corp)\",\r\n              \"Sole Proprietorship\",\r\n              \"Specified Insurance Company\",\r\n              \"Trust\",\r\n              \"N/A\"\r\n            ]\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"beneficial_owner_name\",\r\n          \"beneficial_owner_type\",\r\n          \"beneficial_owner_percentage_of_ownership\",\r\n          \"beneficial_owner_entity_classification\"\r\n        ]\r\n      }\r\n    },\r\n    \"corporate_officer\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"corporate_officer_name\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\"\r\n          },\r\n          \"corporate_officer_type\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\",\r\n            \"enum\": [\r\n              \"Board Chairman\",\r\n              \"Board Director\",\r\n              \"Chief Compliance Officer\",\r\n              \"Chief Executive Officer\",\r\n              \"Chief Financial Officer\",\r\n              \"Chief Investment Officer\",\r\n              \"Chief Operating Officer\",\r\n              \"Designated Member\",\r\n              \"Director\",\r\n              \"Executive Director\",\r\n              \"General Partner\",\r\n              \"Manager\",\r\n              \"Managing Director\",\r\n              \"Managing General Partner\",\r\n              \"Managing Member\",\r\n              \"President\",\r\n              \"Secretary\",\r\n              \"Senior Vice President\",\r\n              \"Treasurer\",\r\n              \"Vice President\",\r\n              \"N/A\"\r\n            ]\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"corporate_officer_name\",\r\n          \"corporate_officer_type\"\r\n        ]\r\n      }\r\n    },\r\n    \"key_controller_name\": {\r\n      \"description\": \"Derived from Schedule A and B  \",\r\n      \"type\": \"string\"\r\n    },\r\n    \"investment_advisor\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"investment_advisor_name\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\"\r\n          },\r\n          \"investment_advisor_address\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\"\r\n          },\r\n          \"investment_advisor_country_of_incorporation\": {\r\n            \"type\": \"string\",\r\n            \"enum\": [\r\n              \"Afghanistan\",\r\n              \"Albania\",\r\n              \"Algeria\",\r\n              \"Andorra\",\r\n              \"Angola\",\r\n              \"Antigua and Barbuda\",\r\n              \"Argentina\",\r\n              \"Armenia\",\r\n              \"Aruba\",\r\n              \"Australia\",\r\n              \"Austria\",\r\n              \"Azerbaijan\",\r\n              \"Bahamas\",\r\n              \"Bahrain\",\r\n              \"Bangladesh\",\r\n              \"Barbados\",\r\n              \"Belarus\",\r\n              \"Belgium\",\r\n              \"Belize\",\r\n              \"Benin\",\r\n              \"Bhutan\",\r\n              \"Bolivia\",\r\n              \"Bosnia and Herzegovina\",\r\n              \"Botswana\",\r\n              \"Brazil\",\r\n              \"Brunei\",\r\n              \"Brunei Darussalam\",\r\n              \"Bulgaria\",\r\n              \"Burkina Faso\",\r\n              \"Burma\",\r\n              \"Burundi\",\r\n              \"Cambodia\",\r\n              \"Cameroon\",\r\n              \"Canada\",\r\n              \"Cape Verde\",\r\n              \"Central African Republic\",\r\n              \"Chad\",\r\n              \"Chile\",\r\n              \"China\",\r\n              \"Colombia\",\r\n              \"Comoros\",\r\n              \"Congo\",\r\n              \"The Democratic Republic of the Congo\",\r\n              \"Costa Rica\",\r\n              \"Cote D'Ivoire\",\r\n              \"Croatia\",\r\n              \"Cuba\",\r\n              \"Curacao\",\r\n              \"Cyprus\",\r\n              \"Czech Republic\",\r\n              \"Denmark\",\r\n              \"Djibouti\",\r\n              \"Dominica\",\r\n              \"Dominican Republic\",\r\n              \"Ecuador\",\r\n              \"Egypt\",\r\n              \"El Salvador\",\r\n              \"Equatorial Guinea\",\r\n              \"Eritrea\",\r\n              \"Estonia\",\r\n              \"Ethiopia\",\r\n              \"Fiji\",\r\n              \"Finland\",\r\n              \"France\",\r\n              \"Gabon\",\r\n              \"Gambia\",\r\n              \"Georgia\",\r\n              \"Germany\",\r\n              \"Ghana\",\r\n              \"Greece\",\r\n              \"Grenada\",\r\n              \"Guatemala\",\r\n              \"Guinea\",\r\n              \"Guinea-Bissau\",\r\n              \"Guyana\",\r\n              \"Haiti\",\r\n              \"Honduras\",\r\n              \"Hong Kong\",\r\n              \"Hungary\",\r\n              \"Iceland\",\r\n              \"India\",\r\n              \"Indonesia\",\r\n              \"Iran\",\r\n              \"Iraq\",\r\n              \"Ireland\",\r\n              \"Israel\",\r\n              \"Italy\",\r\n              \"Jamaica\",\r\n              \"Japan\",\r\n              \"Jordan\",\r\n              \"Kazakhstan\",\r\n              \"Kenya\",\r\n              \"Kiribati\",\r\n              \"Kosovo\",\r\n              \"Kuwait\",\r\n              \"Kyrgyzstan\",\r\n              \"Laos (Lao People's Democratic Republic)\",\r\n              \"Latvia\",\r\n              \"Lebanon\",\r\n              \"Lesotho\",\r\n              \"Liberia\",\r\n              \"Libya\",\r\n              \"Liechtenstein\",\r\n              \"Lithuania\",\r\n              \"Luxembourg\",\r\n              \"Macao\",\r\n              \"Macedonia\",\r\n              \"The Former Yugoslav Republic of Macedonia\",\r\n              \"Madagascar\",\r\n              \"Malawi\",\r\n              \"Malaysia\",\r\n              \"Maldives\",\r\n              \"Mali\",\r\n              \"Malta\",\r\n              \"Marshall Islands\",\r\n              \"Mauritania\",\r\n              \"Mauritius\",\r\n              \"Mexico\",\r\n              \"Federated States of Micronesia\",\r\n              \"Moldova\",\r\n              \"Republic of Moldova\",\r\n              \"Monaco\",\r\n              \"Mongolia\",\r\n              \"Montenegro\",\r\n              \"Morocco\",\r\n              \"Mozambique\",\r\n              \"Myanmar\",\r\n              \"Namibia\",\r\n              \"Nauru\",\r\n              \"Nepal\",\r\n              \"Netherlands\",\r\n              \"New Zealand\",\r\n              \"Nicaragua\",\r\n              \"Niger\",\r\n              \"Nigeria\",\r\n              \"North Korea\",\r\n              \"Norway\",\r\n              \"Oman\",\r\n              \"Pakistan\",\r\n              \"Palau\",\r\n              \"Panama\",\r\n              \"Papua New Guinea\",\r\n              \"Paraguay\",\r\n              \"Peru\",\r\n              \"Philippines\",\r\n              \"Poland\",\r\n              \"Portugal\",\r\n              \"Qatar\",\r\n              \"Romania\",\r\n              \"Russia\",\r\n              \"Russian Federation\",\r\n              \"Rwanda\",\r\n              \"Saint Kitts and Nevis\",\r\n              \"Saint Lucia\",\r\n              \"Saint Vincent and the Grenadines\",\r\n              \"Samoa\",\r\n              \"San Marino\",\r\n              \"Sao Tome and Principe\",\r\n              \"Saudi Arabia\",\r\n              \"Senegal\",\r\n              \"Serbia\",\r\n              \"Seychelles\",\r\n              \"Sierra Leone\",\r\n              \"Singapore\",\r\n              \"Slovakia\",\r\n              \"Slovenia\",\r\n              \"Solomon Islands\",\r\n              \"Somalia\",\r\n              \"South Africa\",\r\n              \"South Korea\",\r\n              \"South Sudan\",\r\n              \"Spain\",\r\n              \"Sri Lanka\",\r\n              \"St. Lucia\",\r\n              \"Sudan\",\r\n              \"Suriname\",\r\n              \"Suriname\",\r\n              \"Swaziland\",\r\n              \"Sweden\",\r\n              \"Switzerland\",\r\n              \"Syria\",\r\n              \"Syrian Arab Republic\",\r\n              \"Taiwan\",\r\n              \"Tajikistan\",\r\n              \"Tanzania\",\r\n              \"United Republic of Tanzania\",\r\n              \"Thailand\",\r\n              \"Timor-Leste\",\r\n              \"Togo\",\r\n              \"Tonga\",\r\n              \"Trinidad and Tobago\",\r\n              \"Tunisia\",\r\n              \"Turkey\",\r\n              \"Turkmenistan\",\r\n              \"Tuvalu\",\r\n              \"Uganda\",\r\n              \"Ukraine\",\r\n              \"United Arab Emirates\",\r\n              \"United Kingdom\",\r\n              \"United States\",\r\n              \"Uruguay\",\r\n              \"Uzbekistan\",\r\n              \"Vanuatu\",\r\n              \"Vatican City\",\r\n              \"Venezuela\",\r\n              \"Vietnam\",\r\n              \"Virgin Islands\",\r\n              \"Yemen\",\r\n              \"Zambia\",\r\n              \"Zimbabwe\",\r\n              \"N/A\"\r\n            ]\r\n          },\r\n          \"investment_advisor_incorporation_date\": {\r\n            \"description\": \"Extract only dates that are explicitly stated in the document.\\nDo not infer, calculate, normalize, or assume any date.\\nIf multiple dates are present, extract only the date relevant to the specified context (e.g., “issue date”, “effective date”, “filing date”) as mentioned in the document.\\nPreserve the exact date format as it appears in the source.\\nIf no date is explicitly mentioned, return null.\",\r\n            \"type\": \"string\"\r\n          },\r\n          \"investment_advisor_type\": {\r\n            \"type\": \"string\",\r\n            \"enum\": [\r\n              \"Entity\",\r\n              \"Individual\",\r\n              \"N/A\"\r\n            ]\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"investment_advisor_name\",\r\n          \"investment_advisor_address\",\r\n          \"investment_advisor_country_of_incorporation\",\r\n          \"investment_advisor_incorporation_date\",\r\n          \"investment_advisor_type\"\r\n        ]\r\n      }\r\n    },\r\n    \"sub_advisor\": {\r\n      \"type\": \"array\",\r\n      \"items\": {\r\n        \"type\": \"object\",\r\n        \"properties\": {\r\n          \"sub_advisor_name\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\"\r\n          },\r\n          \"sub_advisor_address\": {\r\n            \"description\": \"Derived from Schedule A and B  \",\r\n            \"type\": \"string\"\r\n          }\r\n        },\r\n        \"required\": [\r\n          \"sub_advisor_name\",\r\n          \"sub_advisor_address\"\r\n        ]\r\n      }\r\n    },\r\n    \"other_business_activity\": {\r\n      \"description\": \"Derived from business activities under section 1F  \",\r\n      \"type\": \"string\"\r\n    },\r\n    \"document_date\": {\r\n      \"description\": \"Extract only dates that are explicitly stated in the document.\\nDo not infer, calculate, normalize, or assume any date.\\nIf multiple dates are present, extract only the date relevant to the specified context (e.g., “issue date”, “effective date”, “filing date”) as mentioned in the document.\\nPreserve the exact date format as it appears in the source.\\nIf no date is explicitly mentioned, return null.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"tax_identification_number\": {\r\n      \"type\": \"string\"\r\n    },\r\n    \"assets_under_management_aum\": {\r\n      \"description\": \"Derived from section 5  \",\r\n      \"type\": \"string\"\r\n    },\r\n    \"website_address\": {\r\n      \"description\": \"Derived from section 1  \",\r\n      \"type\": \"string\"\r\n    },\r\n    \"_reasoning\": {\r\n      \"description\": \"all the reasoning that you took to arrive on the result .\",\r\n      \"type\": \"string\"\r\n    }\r\n  },\r\n  \"required\": [\r\n    \"entity_name\",\r\n    \"registration_number\",\r\n    \"principal_place_of_business\",\r\n    \"legal_structure\",\r\n    \"document_type\",\r\n    \"beneficial_owner\",\r\n    \"corporate_officer\",\r\n    \"key_controller_name\",\r\n    \"investment_advisor\",\r\n    \"sub_advisor\",\r\n    \"other_business_activity\",\r\n    \"document_date\",\r\n    \"tax_identification_number\",\r\n    \"assets_under_management_aum\",\r\n    \"website_address\",\r\n    \"_reasoning\"\r\n  ]\r\n}",
+    "outputMode": "json_object",
+    "addMetadata": true,
+    "downloadFormat": "json",
+    "createdBy": "rvssarankumar",
+    "lastModifiedBy": "bpalakkal",
+    "createdAt": "2026-04-14T14:16:46.581Z",
+    "updatedAt": "2026-06-04T14:24:08.798Z",
+    "__v": 0,
+    "groupConfigs": {
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "confidenceThreshold": null,
+    "memoryEnabled": true
+  }
+]

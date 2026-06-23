@@ -1,0 +1,266 @@
+[
+  {
+    "_id": "69d4e856aa5e0d26c06ef0bc",
+    "personaId": "305301423285617b2d6d1309c4cbea92",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitization - Articles of Incorporation",
+    "description": "The agent leverages intelligent document processing to extract all required attributes from Articles of Incorporation Document.",
+    "userPrompt": "Role:\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the Articles of Incorporation document retrieved from the designated data store.\n\nObjective: \n - Use the following file name - {{file_name}} in data store as the authoritative reference to retrieve the document.\n- Systematically review the document and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\n\nSource:\n - Source of truth: Articles of Incorporation document retrieved.\n - Do not infer, assume, fabricate, or supplement values from any external or secondary source.\n\nExtraction Rules:\n - Always preserve original document text exactly (characters, spelling, accents, abbreviations, punctuation, spacing, casing). Accurately convert the all the date listed in the document into MM/DD/YYYY format while preserving the original date’s meaning.\n - Do not infer, assume, normalize, fabricate, or supplement values.\n - If information appears across multiple pages, explicitly reference all relevant pages.\n - If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\n - Populate all fields defined in the output schema and return the results in the exact JSON format only. The schema field descriptions specify  exactly what to extract.\n - If a document or data store attribute is not found, return 'null' in the relevant column.\n- Also ensure comprehensive tracking of all internal thoughts, input parameters, intermediate steps, and summarized outcomes for every action, maintaining full traceability throughout execution.\n- Enforce that all thoughts, intermediate inputs, and call summaries are strictly confined within the '_reasoning' field, with no leakage outside it under any circumstances.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0.3,
+    "selectedGroups": [
+      "default_tools",
+      "documents"
+    ],
+    "selectedTools": [],
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "Repository maintaining the file to be analyzed.",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "The official name under which the entity is registered and recognized legally.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "number",
+        "fieldDescription": "A unique identifier assigned to the entity by the relevant registration authority, used for legal and administrative purposes.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "date_of_incorporation",
+        "fieldType": "date",
+        "fieldDescription": "- Identify the date when the entity was legally formed or incorporated. - Use only information explicitly stated in the document. - Accept labels such as “Date of Formation”, “Date of Incorporation”, or equivalent. - If the date is not found, return null. - Do not infer or assume dates.Convert the date accurately to MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The country where the entity was legally registered",
+        "expectedValues": "Articles of Incorporation, other",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_structure",
+        "fieldType": "text",
+        "fieldDescription": "Determine the legal structure strictly from the document content include legal structure as per Allowed Values (Enum).",
+        "expectedValues": "Sole Proprietorship, General Partnership (GP), Limited Partnership (LP), Limited Liability Partnership (LLP), Limited Liability Company (LLC), C Corporation (C Corp), S Corporation (S Corp), Bank (Depository), Custodian, Investment Entity, Specified Insurance Company, Trust, Holding Company, Operating Company",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "legal_registered_address",
+        "fieldType": "text",
+        "fieldDescription": "The official address where the entity is registered, often used for legal correspondence",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "principal_place_of_business",
+        "fieldType": "text",
+        "fieldDescription": "The primary mailing address where the entity conducts day-to-day business (e.g., main business address, operating address), distinct from the legal address if disclosed, and typically identified by a full address including street, city, state, ZIP, and country.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "previous_names",
+        "fieldType": "array",
+        "fieldDescription": "",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": "text",
+        "children": []
+      },
+      {
+        "fieldName": "corporate_officers",
+        "fieldType": "array",
+        "fieldDescription": "Return the Designation of the Corporate Officer - CEO, CFO, COO etc",
+        "expectedValues": "CEO, President, CFO, Treasurer, COO, General Partner",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "corporate_officer_type",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_name",
+            "fieldType": "text",
+            "fieldDescription": "The full name(s) of individual corporate officers (e.g., CEO, CFO, Managing Director, Director, Member, Managing Member, Managers, Founder, President) who exercise executive authority, oversee daily management, or make significant operational or financial decisions on behalf of the entity. Ensure that the extraction strictly includes only the names of all corporate officers; no corporate officer should be omitted, and no titles, roles, affiliations, or non‑officer individuals should be included in the output.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_nationality",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate_officer_address",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "corporate Officer_date_of_birth",
+            "fieldType": "date",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "The official date on which the document was issued, filed, signed, or became legally effective. Convert the date accurately to MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "key_controller",
+        "fieldType": "array",
+        "fieldDescription": "Name of the individual or entity who has significant control over the operations.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": [
+          {
+            "fieldName": "key_controller_name",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_entity_type",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_country_of_incorporation",
+            "fieldType": "text",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_nationality",
+            "fieldType": "text",
+            "fieldDescription": "The nationality of the key controller.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_address",
+            "fieldType": "text",
+            "fieldDescription": "The address of this individual or entity.",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          },
+          {
+            "fieldName": "key_controller_date_of_birth",
+            "fieldType": "date",
+            "fieldDescription": "",
+            "expectedValues": "",
+            "enumMultiSelect": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "fieldName": "document_certification_indicator",
+        "fieldType": "boolean",
+        "fieldDescription": "Certification language should be similar to \"I hearby certify to the accuracy of the information in this document\" or \" attested as accurate\"",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "expectedValues": "Articles of Incorporation, other",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": null,
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "createdBy": "etukalam",
+    "lastModifiedBy": "spidiyath",
+    "createdAt": "2026-04-07T11:19:50.006Z",
+    "updatedAt": "2026-06-18T14:32:27.124Z",
+    "__v": 0,
+    "groupConfigs": {
+      "document_storage": {
+        "toggleSelect": "save_documentation"
+      },
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "selectedSkills": [],
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "addMetadata": true,
+    "confidenceThreshold": null,
+    "memoryEnabled": false,
+    "promptScanStatus": "skipped"
+  }
+]

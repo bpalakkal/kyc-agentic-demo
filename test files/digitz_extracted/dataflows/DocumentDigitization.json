@@ -1,0 +1,749 @@
+{
+  "name": "Document Digitization",
+  "description": "Intelligent flow which classifies the document and extracts attributes based on the document type.",
+  "nodes": [
+    {
+      "id": "dndnode_1",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "DocumentClassifier",
+        "description": "Agent retrieves documents, analyzes their content, and assigns a single auditable KYC/corporate document classification based strictly on explicit indicators.",
+        "dataBackbone": null,
+        "personaId": "3006a05e68e0c6057123fbae6f7de6c0",
+        "personaName": "Document Classifier",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_14",
+      "type": "data-flatten",
+      "props": {
+        "name": null,
+        "alias": "ClassifierData",
+        "description": "A flattened table of classification results.",
+        "sourceName": {
+          "id": "dndnode_1",
+          "alias": "DocumentClassifier",
+          "type": "agent"
+        },
+        "outputFormat": "tabular",
+        "flattenMapping": [
+          {
+            "include": true,
+            "sourcePath": "document_type.value",
+            "type": "string",
+            "targetName": "document_type"
+          },
+          {
+            "include": false,
+            "sourcePath": "document_type.confidence",
+            "type": "string",
+            "targetName": "document_type_confidence"
+          },
+          {
+            "include": false,
+            "sourcePath": "document_type.confidenceScore",
+            "type": "number",
+            "targetName": "document_type_confidenceScore"
+          },
+          {
+            "include": false,
+            "sourcePath": "document_type.source",
+            "type": "string",
+            "targetName": "document_type_source"
+          },
+          {
+            "include": false,
+            "sourcePath": "document_type.rationale",
+            "type": "string",
+            "targetName": "document_type_rationale"
+          },
+          {
+            "include": true,
+            "sourcePath": "file_name.value",
+            "type": "string",
+            "targetName": "file_name"
+          },
+          {
+            "include": false,
+            "sourcePath": "file_name.confidence",
+            "type": "string",
+            "targetName": "file_name_confidence"
+          },
+          {
+            "include": false,
+            "sourcePath": "file_name.confidenceScore",
+            "type": "number",
+            "targetName": "file_name_confidenceScore"
+          },
+          {
+            "include": false,
+            "sourcePath": "file_name.source",
+            "type": "string",
+            "targetName": "file_name_source"
+          },
+          {
+            "include": false,
+            "sourcePath": "file_name.rationale",
+            "type": "string",
+            "targetName": "file_name_rationale"
+          }
+        ],
+        "validated": true
+      }
+    },
+    {
+      "id": "dndnode_17",
+      "type": "decision-point",
+      "props": {
+        "name": null,
+        "alias": "Router",
+        "description": "Route file metadata based on the classification/document type.",
+        "routingMode": "split",
+        "branches": [
+          {
+            "label": "document_type is 'Certificate of Name Change'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Certificate of Name Change'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Certificate of Incorporation'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Certificate of Incorporation'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Annual Return'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Annual Return'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'SEC Form ADV'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'SEC Form ADV'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Prospectus'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Prospectus'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is '10K/Annual Report'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'10K/Annual Report'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Articles of Incorporation'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Articles of Incorporation'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Memorandum of Association'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Memorandum of Association'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Articles of Association'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Articles of Association'"
+              }
+            ]
+          },
+          {
+            "label": "document_type is 'Articles of Organization'",
+            "conditions": [
+              {
+                "attribute": {
+                  "entity": "ClassifierData",
+                  "attribute": "document_type"
+                },
+                "operator": "is",
+                "expression": "'Articles of Organization'"
+              }
+            ]
+          }
+        ],
+        "defaultBranch": "Default",
+        "dataModelAttributes": [
+          {
+            "name": "[ClassifierData.document_type]",
+            "value": {
+              "entity": "ClassifierData",
+              "attribute": "document_type"
+            }
+          },
+          {
+            "name": "[ClassifierData.file_name]",
+            "value": {
+              "entity": "ClassifierData",
+              "attribute": "file_name"
+            }
+          }
+        ],
+        "validated": true,
+        "sourceName": {
+          "id": "dndnode_14",
+          "alias": "ClassifierData",
+          "type": "data-flatten"
+        }
+      }
+    },
+    {
+      "id": "dndnode_4",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "CertificateofNameChange",
+        "description": "The agent leverages intelligent document processing to extract all required attributes from Certificate of Name Change Document.",
+        "dataBackbone": null,
+        "personaId": "b725c3b82b93c562a94cb46e240bb67b",
+        "personaName": "Digitization - Certificate of Name Change",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_5",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "CertificateofIncorporation",
+        "description": "The agent leverages intelligent document processing to extract all required attributes from Certificate of Incorporation Document.",
+        "dataBackbone": null,
+        "personaId": "f7b89c69c9410d3ded7835d87a399b6e",
+        "personaName": "Digitization - Certificate of Incorporation",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_6",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "AnnualReturn",
+        "description": "The agent leverages intelligent document processing to extract all required attributes from Certificate of Annual Return Document.",
+        "dataBackbone": null,
+        "personaId": "008068c46adf55f0859dbfa53881e07c",
+        "personaName": "Digitization - Annual Return",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_8",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "DigitizationADVForm",
+        "description": null,
+        "dataBackbone": null,
+        "personaId": "601e4a06902684e456e0d29673a27f8f",
+        "personaName": "Digitization - ADV Form",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "trackedEnvVarFields": [
+          "entity_id",
+          "case_id"
+        ],
+        "personaVersionMismatchFlag": false
+      }
+    },
+    {
+      "id": "dndnode_18",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "Prospectus",
+        "description": null,
+        "dataBackbone": null,
+        "personaId": "dd3f1ae4699969ac3108abdba464613b",
+        "personaName": "Digitize - Prospectus",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_19",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "AnnualReport",
+        "description": "AnnualReport",
+        "dataBackbone": null,
+        "personaId": "83a49f6095df35ac9790c752e25f05f1",
+        "personaName": "Digitization - Annual Report",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_23",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "ArticlesofIncorporation",
+        "description": "The agent leverages intelligent document processing to extract all required attributes from Articles of Incorporation Document.",
+        "dataBackbone": null,
+        "personaId": "305301423285617b2d6d1309c4cbea92",
+        "personaName": "Digitization - Articles of Incorporation",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_24",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "MemorandumofAssociation",
+        "description": null,
+        "dataBackbone": null,
+        "personaId": "ab22c3639b5c385195beae35a34af91c",
+        "personaName": "Digitization - Memorandum of Association",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_25",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "ArticlesofAssociation",
+        "description": "The agent leverages intelligent document processing to extract all required attributes from Articles of Association Document.",
+        "dataBackbone": null,
+        "personaId": "59760b8a7b753bdda9fba83d27d2ba11",
+        "personaName": "Digitization - Articles of Association",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_26",
+      "type": "agent",
+      "props": {
+        "name": null,
+        "alias": "ArticlesofOrganization",
+        "description": "The agent leverages intelligent document processing to extract all required attributes from Articles of Organization Document.",
+        "dataBackbone": null,
+        "personaId": "03288d827579ed99ea5286ebc13754cf",
+        "personaName": "Digitization - Articles of Organization",
+        "outputMode": "json_object",
+        "downloadFormat": "json",
+        "outputType": null,
+        "fileName": null,
+        "fileTarget": null,
+        "s3Credentials": null,
+        "s3BucketName": null,
+        "s3FilePath": null,
+        "adlsCredentials": null,
+        "adlsContainer": null,
+        "adlsFilePath": null,
+        "validated": true,
+        "cachedPDF": null,
+        "inputRowLimit": null,
+        "recursionLimit": null,
+        "parallelExecution": false,
+        "personaUpdatedFlag": false,
+        "personaVersionMismatchFlag": false,
+        "trackedEnvVarFields": []
+      }
+    },
+    {
+      "id": "dndnode_20",
+      "type": "code",
+      "props": {
+        "name": null,
+        "alias": "DigitizationCollector",
+        "description": null,
+        "code": "    /**\n     * The 'inputs' object contains all upstream node outputs, keyed by alias.\n     *\n     * INPUT FORMATS:\n     *   Tabular nodes  →  inputs['alias'] is an Array of row objects\n     *     Example: inputs['sales_data'] = [{ region: 'US', amount: 100 }, ...]\n     *\n     *   JSON object nodes  →  inputs['alias'] is a parsed JavaScript value\n     *     Example: inputs['api_response'] = { status: 'ok', results: [...] }\n     *\n     * OUTPUT FORMAT:\n     *   If output mode is \"tabular\"     —  outputData should be an Array of row objects\n     *   If output mode is \"json_object\" —  outputData can be any JavaScript value\n     */\n\n    // Get the first upstream input (use the alias key for a specific node)\n\n    const outputData = {}\n\n    const nodeNames = Object.keys(inputs);\n\n    for (const node of nodeNames) {\n        outputData[node] = inputs[node]\n    }\n",
+        "outputMode": "json_object",
+        "rowLimit": null,
+        "validated": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "dndnode_1",
+      "target": "dndnode_14"
+    },
+    {
+      "source": "dndnode_14",
+      "target": "dndnode_17"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_4"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_5"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_6"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_8"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_18"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_19"
+    },
+    {
+      "source": "dndnode_4",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_5",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_6",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_8",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_18",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_19",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_23"
+    },
+    {
+      "source": "dndnode_23",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_24"
+    },
+    {
+      "source": "dndnode_24",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_25"
+    },
+    {
+      "source": "dndnode_25",
+      "target": "dndnode_20"
+    },
+    {
+      "source": "dndnode_17",
+      "target": "dndnode_26"
+    },
+    {
+      "source": "dndnode_26",
+      "target": "dndnode_20"
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "3006a05e68e0c6057123fbae6f7de6c0",
+      "personaName": "Document Classifier",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "b725c3b82b93c562a94cb46e240bb67b",
+      "personaName": "Digitization - Certificate of Name Change",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "f7b89c69c9410d3ded7835d87a399b6e",
+      "personaName": "Digitization - Certificate of Incorporation",
+      "versionNumber": 2
+    },
+    {
+      "personaId": "008068c46adf55f0859dbfa53881e07c",
+      "personaName": "Digitization - Annual Return",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "601e4a06902684e456e0d29673a27f8f",
+      "personaName": "Digitization - ADV Form",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "dd3f1ae4699969ac3108abdba464613b",
+      "personaName": "Digitize - Prospectus",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "83a49f6095df35ac9790c752e25f05f1",
+      "personaName": "Digitization - Annual Report",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "305301423285617b2d6d1309c4cbea92",
+      "personaName": "Digitization - Articles of Incorporation",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "ab22c3639b5c385195beae35a34af91c",
+      "personaName": "Digitization - Memorandum of Association",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "59760b8a7b753bdda9fba83d27d2ba11",
+      "personaName": "Digitization - Articles of Association",
+      "versionNumber": 1
+    },
+    {
+      "personaId": "03288d827579ed99ea5286ebc13754cf",
+      "personaName": "Digitization - Articles of Organization",
+      "versionNumber": 1
+    }
+  ]
+}

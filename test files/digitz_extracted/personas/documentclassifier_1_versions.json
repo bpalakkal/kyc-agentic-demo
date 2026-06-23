@@ -1,0 +1,55 @@
+[
+  {
+    "_id": "69c103060ff3ec67afad417c",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "selectedGroups": [
+      "default_tools",
+      "upstream_artifacts"
+    ],
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "personaId": "3006a05e68e0c6057123fbae6f7de6c0",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Document Classifier",
+    "description": "Agent retrieves documents, analyzes their content, and assigns a single auditable KYC/corporate document classification based strictly on explicit indicators.",
+    "userPrompt": "Role:\nYou are an expert in KYC and corporate document classification for financial services entities. You perform authoritative classification of corporate documents by analyzing the actual content of files.\n\nInput:\n - Will receive an array of JSON objects from an upstream node.\n - Each JSON object represents a document record and includes: A file_name field containing the document’s file name.\n\nObjective:\n1. For each JSON object in the input array, you must: Retrieve the document using the provided file_name.\n2. Read and analyze the full content of the document (including headers, body text, footers, stamps, and signatures where available).\n3. Assign exactly one official document classification, based strictly and exclusively on explicit content evidence.\n\nRules: \r\n- Classification must be based on explicit indicators found in document content, such as: \r\n- Document titles \r\n- Headings \r\n- Issuing authority text \r\n- Filing descriptions \r\n- Statutory references \r\n- Do not infer or guess document type if content indicators are ambiguous. \r\n- If document content does not clearly support a supported classification, classify as 'Other'. \r\n- Each document must receive exactly one classification outcome. \r\n- If a file cannot be retrieved or read from the datastore, record the classification as 'Unknown' with the reason.",
+    "selectedTools": [],
+    "outputFields": [
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "The final authoritative classification assigned to the document",
+        "expectedValues": "10K/Annual Report,ACRA Report,AML Questionaire,Annual Return,Articles of Association,Articles of Incorporation,Articles of Organization,Audited Financial Report,Auditor Letter,Authorized signers list,Bankruptcy Filing,Board Resolution,Certificate of Formation,Certificate of Incorporation,Certificate of Incumbency,Certificate of Name Change,CIP Reliance Agreement,Client Confirmation,Client Representation Letter,Declaration of Trust / Trust Agreement,Drivers License,Dun and Bradstreet Report,Factsheet,FINRA Broker Check Report,Form 5500,Form 990,FundSquare Key Information Document,Government Photo ID,Handelsregister Extract,ICRIS Report,Investment Management Agreement,IRS Letter,LLC/LP Operating Agreement,Memorandum of Association,New Relationship Form,Offering Memorandum,Organizational Structure Document,Other,Partnership agreement,Passport,Power of Attorney,Private Placement Memorandum,Prospectus,RCS Extract,Registration Certificate,SEC Form ADV,Share Register,USA PATRIOT Act Certification,W9,Wolfsberg Questionnaire,WorldCheck Report,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "The name of the file exactly as received from the upstream node",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "createdBy": "anuvab",
+    "lastModifiedBy": "spidiyath",
+    "createdAt": "2026-03-23T09:08:22.389Z",
+    "updatedAt": "2026-06-11T19:18:05.343Z",
+    "__v": 0,
+    "groupConfigs": {},
+    "temperature": 0,
+    "rawJsonSchema": "{\r\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"document_type\": {\r\n      \"description\": \"The final authoritative classification assigned to the document\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n\"10K/Annual Report\",\r\n        \"ACRA Report\",\r\n        \"AML Questionaire\",\r\n        \"Annual Return\",\r\n        \"Articles of Association\",\r\n        \"Articles of Incorporation\",\r\n        \"Articles of Organization\",\r\n        \"Audited Financial Report\",\r\n        \"Auditor Letter\",\r\n        \"Authorized signers list\",\r\n        \"Bankruptcy Filing\",\r\n        \"Board Resolution\",\r\n        \"Certificate of Formation\",\r\n        \"Certificate of Incorporation\",\r\n        \"Certificate of Incumbency\",\r\n        \"Certificate of Name Change\",\r\n        \"CIP Reliance Agreement\",\r\n        \"Client Confirmation\",\r\n        \"Client Representation Letter\",\r\n        \"Declaration of Trust / Trust Agreement\",\r\n        \"Drivers License\",\r\n        \"Dun and Bradstreet Report\",\r\n        \"Factsheet\",\r\n        \"FINRA Broker Check Report\",\r\n        \"Form 5500\",\r\n        \"Form 990\",\r\n        \"FundSquare Key Information Document\",\r\n        \"Government Photo ID\",\r\n        \"Handelsregister Extract\",\r\n        \"ICRIS Report\",\r\n        \"Investment Management Agreement\",\r\n        \"IRS Letter\",\r\n        \"LLC/LP Operating Agreement\",\r\n        \"Memorandum of Association\",\r\n        \"New Relationship Form\",\r\n        \"Offering Memorandum\",\r\n        \"Organizational Structure Document\",\r\n        \"Other\",\r\n        \"Partnership agreement\",\r\n        \"Passport\",\r\n        \"Power of Attorney\",\r\n        \"Private Placement Memorandum\",\r\n        \"Prospectus\",\r\n        \"RCS Extract\",\r\n        \"Registration Certificate\",\r\n        \"SEC Form ADV\",\r\n        \"Share Register\",\r\n        \"USA PATRIOT Act Certification\",\r\n        \"W9\",\r\n        \"Wolfsberg Questionnaire\",\r\n        \"WorldCheck Report\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"file_name\": {\r\n      \"description\": \"The name of the file exactly as received from the upstream node\",\r\n      \"type\": \"string\"\r\n    }\r\n  },\r\n  \"required\": [\r\n    \"document_type\",\r\n    \"file_name\"\r\n  ]\r\n}",
+    "inputFields": [],
+    "selectedSkills": [],
+    "addMetadata": true,
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "confidenceThreshold": null,
+    "memoryEnabled": false,
+    "promptScanStatus": "skipped"
+  }
+]

@@ -514,8 +514,9 @@ const apiRunnerOutput = new Map(); // runId → { output, kycRef, initiatedBy }
 async function loadRunnerClass(slug) {
   const runners = await import('./agents/runners/api/index.js');
   const map = {
-    'companies-house': runners.CompaniesHouseRunner,
-    'fca':             runners.FCARunner,
+    'companies-house':  runners.CompaniesHouseRunner,
+    'fca':              runners.FCARunner,
+    'uk-sourcing-flow': runners.UKSourcingFlowRunner,
   };
   return map[slug] ?? null;
 }
@@ -701,7 +702,9 @@ app.post('/api/agent-run/async/:slug', requireAuth, async (req, res) => {
   }
 
   const RunnerMap = {
-    'uk-parent-flow': autonomousRunners.UKParentFlowRunner,
+    'uk-parent-flow':                        autonomousRunners.UKParentFlowRunner,
+    'uk-companies-house':                    autonomousRunners.CHRunner,
+    'uk-jersey-financial-services-commission': autonomousRunners.JerseyRunner,
   };
 
   const RunnerClass = RunnerMap[slug];
@@ -712,7 +715,8 @@ app.post('/api/agent-run/async/:slug', requireAuth, async (req, res) => {
   try {
     const runner = new RunnerClass(getSb().sb);
     const result = await runner.invoke({ kycRef, entityName, initiatedBy: req.user.id });
-    res.json(result);
+    // Include runId so the frontend polling code (which reads d.runId) picks up externalRunId
+    res.json({ ...result, runId: result.externalRunId });
   } catch (err) {
     console.error(`[async-runner] ${slug} failed: ${err.message}`);
     res.status(500).json({ error: err.message });

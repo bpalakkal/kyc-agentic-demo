@@ -1,0 +1,271 @@
+[
+  {
+    "_id": "69d4f3c44066aa75261f70c5",
+    "personaId": "d6369e72b521ed5ce8895ac91ec9ec4b",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitization - Certificate of Incorporation",
+    "description": "The agent leverages intelligent document processing to extract all required attributes from Certificate of Incorporation Document.",
+    "userPrompt": "Role:\r\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the Certificate of Incorporation document retrieved from the designated data store. You are meticulous about distinguishing between what is explicitly stated in a document versus what may be inferred, and you apply strict evidentiary standards.\r\n\r\n\n\nObjective: \r\n - Use the following file name - {{file_name}} as the authoritative reference to retrieve the document.\r\n- Systematically review the document in its entirety and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\r\n\r\n- Apply field-level extraction rules precisely as described in the schema before populating any value.\n\n\n\nSource:\r\n\n- Source of truth: Certificate of Incorporation document retrieved from the designated data store.\n- Do not infer, assume, fabricate, or supplement values from any external, secondary, or prior knowledge source.\n- Every extracted value must be traceable to a specific location (page, section, or paragraph) within the document.\n\n\nExtraction Rules:\r\n - Always preserve original document text exactly - including characters, spelling, accents, abbreviations, punctuation, spacing, and casing.\n - Accurately convert all dates found in the document into MM/DD/YYYY format while preserving the original date's meaning.\n - Do not infer, assume, normalize, fabricate, or supplement values under any circumstances.\n - If information appears across multiple pages, explicitly reference all relevant pages in the _reasoning field.\n - If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\n - Populate all fields defined in the output schema and return results in the exact JSON format only.\n - If a document attribute is not found anywhere in the document, return 'null' in the relevant field.\n - Ensure comprehensive tracking of all internal thoughts, input parameters, intermediate steps, and summarized outcomes for every action, maintaining full traceability throughout execution.\n - Enforce that all thoughts, intermediate inputs, and call summaries are strictly confined within the '_reasoning' field, with no leakage outside it under any circumstances.\n- Document Date Extraction — Flexible Label Recognition: Identify the official date a document was issued, filed, registered, certified, stamped, or executed by an authority. Scan the entire document for labels such as: Date of Issue / Issued On / Issue Date / Filing Date / Filed On / Registration Date / Registered On / Certification Date / Certified On / Effective Date / Execution Date—as well as phrasing like: “issued on”, “filed on”, “given under seal on”, “signed/dated this”, “witness my hand this [DATE]”, or similar. Also consider dates near official signatures, seals, stamps, headers, or footers. Priority (if multiple dates exist): Date tied to official signature, seal, or stamp, Filing or registration date, Certification/attestation date, or any other formal issuance or execution date.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0.30000000000000004,
+    "selectedGroups": [
+      "default_tools",
+      "documents"
+    ],
+    "selectedTools": [],
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "envVar"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "Full Legal name for which the document is issued, usually found within the first page of the document",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "date_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The official date on which the legal entity was formally registered or established as per the issuing authority. This date marks the legal creation of the entity. Some labels to Recognize: Date of Incorporation, Date of Formation, Date of Registration, Date of Establishment, Incorporated On / Incorporation Date, Formed On / Established On. Return the value strictly in MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The country where the legal entity is officially incorporated, registered, or legally established, as recognized by the relevant governing authority. Represents the jurisdiction under which the entity is legally constituted and regulated. If information cannot be confidently determined, return 'null'.",
+        "expectedValues": "Afghanistan,Albania,Algeria,Andorra,Angola,Antigua and Barbuda,Argentina,Armenia,Aruba,Australia,Austria,Azerbaijan,Bahamas,Bahrain,Bangladesh,Barbados,Belarus,Belgium,Belize,Benin,Bhutan,Bolivia,Bosnia and Herzegovina,Botswana,Brazil,Brunei,Brunei Darussalam,Bulgaria,Burkina Faso,Burma,Burundi,Cambodia,Cameroon,Canada,Cape Verde,Central African Republic,Chad,Chile,China,Colombia,Comoros,Congo,The Democratic Republic of the Congo,Costa Rica,Cote D'Ivoire,Croatia,Cuba,Curacao,Cyprus,Czech Republic,Denmark,Djibouti,Dominica,Dominican Republic,Ecuador,Egypt,El Salvador,Equatorial Guinea,Eritrea,Estonia,Ethiopia,Fiji,Finland,France,Gabon,Gambia,Georgia,Germany,Ghana,Greece,Grenada,Guatemala,Guinea,Guinea-Bissau,Guyana,Haiti,Honduras,Hong Kong,Hungary,Iceland,India,Indonesia,Iran,Iraq,Ireland,Israel,Italy,Jamaica,Japan,Jersey,Jordan,Kazakhstan,Kenya,Kiribati,Kosovo,Kuwait,Kyrgyzstan,Laos (Lao People's Democratic Republic),Latvia,Lebanon,Lesotho,Liberia,Libya,Liechtenstein,Lithuania,Luxembourg,Macao,Macedonia,The Former Yugoslav Republic of Macedonia,Madagascar,Malawi,Malaysia,Maldives,Mali,Malta,Marshall Islands,Mauritania,Mauritius,Mexico,Federated States of Micronesia,Moldova,Republic of Moldova,Monaco,Mongolia,Montenegro,Morocco,Mozambique,Myanmar,Namibia,Nauru,Nepal,Netherlands,New Zealand,Nicaragua,Niger,Nigeria,North Korea,Norway,Oman,Pakistan,Palau,Panama,Papua New Guinea,Paraguay,Peru,Philippines,Poland,Portugal,Qatar,Romania,Russia,Russian Federation,Rwanda,Saint Kitts and Nevis,Saint Lucia,Saint Vincent and the Grenadines,Samoa,San Marino,Sao Tome and Principe,Saudi Arabia,Senegal,Serbia,Seychelles,Sierra Leone,Singapore,Slovakia,Slovenia,Solomon Islands,Somalia,South Africa,South Korea,South Sudan,Spain,Sri Lanka,St. Lucia,Sudan,Suriname,Suriname,Swaziland,Sweden,Switzerland,Syria,Syrian Arab Republic,Taiwan,Tajikistan,Tanzania,United Republic of Tanzania,Thailand,Timor-Leste,Togo,Tonga,Trinidad and Tobago,Tunisia,Turkey,Turkmenistan,Tuvalu,Uganda,Ukraine,United Arab Emirates,United Kingdom,United States,Uruguay,Uzbekistan,Vanuatu,Vatican City,Venezuela,Vietnam,Virgin Islands,Yemen,Zambia,Zimbabwe,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "text",
+        "fieldDescription": "A unique identification number assigned to a legal entity by a government authority or official registry at the time of incorporation or registration. The number serves as the primary reference for identifying the entity within the issuing jurisdiction. Some labels to Recognize: Company Number, Registration Number, Registered Number, Corporate Identification Number (CIN), Entity Registration Number, Business Registration Number, Firm Registration Number, Employer Identification Number (EIN), Tax Identification Number (TIN, ITIN), Legal Entity Identifier (LEI), Incorporation Number, Certificate Number (only when explicitly tied to entity registration).",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_certification_indicator",
+        "fieldType": "boolean",
+        "fieldDescription": "An indicator capturing whether the document contains explicit certification, attestation, or declarative language confirming that the information presented is true, accurate, and/or officially validated by an authorized individual or authority.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "The date on which the document was officially issued, certified, or generated by the relevant authority. This date represents the formal issuance or execution date of the Certificate of Incorporation or associated document. Return the value strictly in MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "The formal classification of the financial or legal document based on its purpose and content.",
+        "expectedValues": "10K/Annual Report,ACRA Report,AML Questionaire,Annual Return,Articles of Association,Articles of Incorporation,Articles of Organization,Audited Financial Report,Auditor Letter,Authorized signers list,Bankruptcy Filing,Board Resolution,Certificate of Formation,Certificate of Incorporation,Certificate of Incumbency,Certificate of Name Change,CIP Reliance Agreement,Client Confirmation,Client Representation Letter,Declaration of Trust / Trust Agreement,Drivers License,Dun and Bradstreet Report,Factsheet,FINRA Broker Check Report,Form 5500,Form 990,FundSquare Key Information Document,Government Photo ID,Handelsregister Extract,ICRIS Report,Investment Management Agreement,IRS Letter,LLC/LP Operating Agreement,Memorandum of Association,New Relationship Form,Offering Memorandum,Organizational Structure Document,Other,Partnership agreement,Passport,Power of Attorney,Private Placement Memorandum,Prospectus,RCS Extract,Registration Certificate,SEC Form ADV,Share Register,USA PATRIOT Act Certification,W9,Wolfsberg Questionnaire,WorldCheck Report,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "The name of the file for which the analysis is done.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "_reasoning",
+        "fieldType": "text",
+        "fieldDescription": "The agent’s full internal execution context—covering reasoning, inputs, intermediate steps, decisions, and action summaries.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": "{\r\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"entity_name\": {\r\n      \"description\": \"Full Legal name for which the document is issued, usually found within the first page of the document\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"date_of_incorporation\": {\r\n      \"description\": \"The official date on which the legal entity was formally registered or established as per the issuing authority. This date marks the legal creation of the entity. Some labels to Recognize: Date of Incorporation, Date of Formation, Date of Registration, Date of Establishment, Incorporated On / Incorporation Date, Formed On / Established On. Return the value strictly in MM/DD/YYYY format.\",\r\n      \"type\": \"string\",\r\n      \"format\": \"date\",\r\n      \"x-fieldType\": \"date\"\r\n    },\r\n    \"country_of_incorporation\": {\r\n      \"description\": \"The country where the legal entity is officially incorporated, registered, or legally established, as recognized by the relevant governing authority. Represents the jurisdiction under which the entity is legally constituted and regulated. If information cannot be confidently determined, return 'null'.\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"Afghanistan\",\r\n        \"Albania\",\r\n        \"Algeria\",\r\n        \"Andorra\",\r\n        \"Angola\",\r\n        \"Antigua and Barbuda\",\r\n        \"Argentina\",\r\n        \"Armenia\",\r\n        \"Aruba\",\r\n        \"Australia\",\r\n        \"Austria\",\r\n        \"Azerbaijan\",\r\n        \"Bahamas\",\r\n        \"Bahrain\",\r\n        \"Bangladesh\",\r\n        \"Barbados\",\r\n        \"Belarus\",\r\n        \"Belgium\",\r\n        \"Belize\",\r\n        \"Benin\",\r\n        \"Bhutan\",\r\n        \"Bolivia\",\r\n        \"Bosnia and Herzegovina\",\r\n        \"Botswana\",\r\n        \"Brazil\",\r\n        \"Brunei\",\r\n        \"Brunei Darussalam\",\r\n        \"Bulgaria\",\r\n        \"Burkina Faso\",\r\n        \"Burma\",\r\n        \"Burundi\",\r\n        \"Cambodia\",\r\n        \"Cameroon\",\r\n        \"Canada\",\r\n        \"Cape Verde\",\r\n        \"Central African Republic\",\r\n        \"Chad\",\r\n        \"Chile\",\r\n        \"China\",\r\n        \"Colombia\",\r\n        \"Comoros\",\r\n        \"Congo\",\r\n        \"The Democratic Republic of the Congo\",\r\n        \"Costa Rica\",\r\n        \"Cote D'Ivoire\",\r\n        \"Croatia\",\r\n        \"Cuba\",\r\n        \"Curacao\",\r\n        \"Cyprus\",\r\n        \"Czech Republic\",\r\n        \"Denmark\",\r\n        \"Djibouti\",\r\n        \"Dominica\",\r\n        \"Dominican Republic\",\r\n        \"Ecuador\",\r\n        \"Egypt\",\r\n        \"El Salvador\",\r\n        \"Equatorial Guinea\",\r\n        \"Eritrea\",\r\n        \"Estonia\",\r\n        \"Ethiopia\",\r\n        \"Fiji\",\r\n        \"Finland\",\r\n        \"France\",\r\n        \"Gabon\",\r\n        \"Gambia\",\r\n        \"Georgia\",\r\n        \"Germany\",\r\n        \"Ghana\",\r\n        \"Greece\",\r\n        \"Grenada\",\r\n        \"Guatemala\",\r\n        \"Guinea\",\r\n        \"Guinea-Bissau\",\r\n        \"Guyana\",\r\n        \"Haiti\",\r\n        \"Honduras\",\r\n        \"Hong Kong\",\r\n        \"Hungary\",\r\n        \"Iceland\",\r\n        \"India\",\r\n        \"Indonesia\",\r\n        \"Iran\",\r\n        \"Iraq\",\r\n        \"Ireland\",\r\n        \"Israel\",\r\n        \"Italy\",\r\n        \"Jamaica\",\r\n        \"Japan\",\r\n        \"Jersey\",\r\n        \"Jordan\",\r\n        \"Kazakhstan\",\r\n        \"Kenya\",\r\n        \"Kiribati\",\r\n        \"Kosovo\",\r\n        \"Kuwait\",\r\n        \"Kyrgyzstan\",\r\n        \"Laos (Lao People's Democratic Republic)\",\r\n        \"Latvia\",\r\n        \"Lebanon\",\r\n        \"Lesotho\",\r\n        \"Liberia\",\r\n        \"Libya\",\r\n        \"Liechtenstein\",\r\n        \"Lithuania\",\r\n        \"Luxembourg\",\r\n        \"Macao\",\r\n        \"Macedonia\",\r\n        \"The Former Yugoslav Republic of Macedonia\",\r\n        \"Madagascar\",\r\n        \"Malawi\",\r\n        \"Malaysia\",\r\n        \"Maldives\",\r\n        \"Mali\",\r\n        \"Malta\",\r\n        \"Marshall Islands\",\r\n        \"Mauritania\",\r\n        \"Mauritius\",\r\n        \"Mexico\",\r\n        \"Federated States of Micronesia\",\r\n        \"Moldova\",\r\n        \"Republic of Moldova\",\r\n        \"Monaco\",\r\n        \"Mongolia\",\r\n        \"Montenegro\",\r\n        \"Morocco\",\r\n        \"Mozambique\",\r\n        \"Myanmar\",\r\n        \"Namibia\",\r\n        \"Nauru\",\r\n        \"Nepal\",\r\n        \"Netherlands\",\r\n        \"New Zealand\",\r\n        \"Nicaragua\",\r\n        \"Niger\",\r\n        \"Nigeria\",\r\n        \"North Korea\",\r\n        \"Norway\",\r\n        \"Oman\",\r\n        \"Pakistan\",\r\n        \"Palau\",\r\n        \"Panama\",\r\n        \"Papua New Guinea\",\r\n        \"Paraguay\",\r\n        \"Peru\",\r\n        \"Philippines\",\r\n        \"Poland\",\r\n        \"Portugal\",\r\n        \"Qatar\",\r\n        \"Romania\",\r\n        \"Russia\",\r\n        \"Russian Federation\",\r\n        \"Rwanda\",\r\n        \"Saint Kitts and Nevis\",\r\n        \"Saint Lucia\",\r\n        \"Saint Vincent and the Grenadines\",\r\n        \"Samoa\",\r\n        \"San Marino\",\r\n        \"Sao Tome and Principe\",\r\n        \"Saudi Arabia\",\r\n        \"Senegal\",\r\n        \"Serbia\",\r\n        \"Seychelles\",\r\n        \"Sierra Leone\",\r\n        \"Singapore\",\r\n        \"Slovakia\",\r\n        \"Slovenia\",\r\n        \"Solomon Islands\",\r\n        \"Somalia\",\r\n        \"South Africa\",\r\n        \"South Korea\",\r\n        \"South Sudan\",\r\n        \"Spain\",\r\n        \"Sri Lanka\",\r\n        \"St. Lucia\",\r\n        \"Sudan\",\r\n        \"Suriname\",\r\n        \"Suriname\",\r\n        \"Swaziland\",\r\n        \"Sweden\",\r\n        \"Switzerland\",\r\n        \"Syria\",\r\n        \"Syrian Arab Republic\",\r\n        \"Taiwan\",\r\n        \"Tajikistan\",\r\n        \"Tanzania\",\r\n        \"United Republic of Tanzania\",\r\n        \"Thailand\",\r\n        \"Timor-Leste\",\r\n        \"Togo\",\r\n        \"Tonga\",\r\n        \"Trinidad and Tobago\",\r\n        \"Tunisia\",\r\n        \"Turkey\",\r\n        \"Turkmenistan\",\r\n        \"Tuvalu\",\r\n        \"Uganda\",\r\n        \"Ukraine\",\r\n        \"United Arab Emirates\",\r\n        \"United Kingdom\",\r\n        \"United States\",\r\n        \"Uruguay\",\r\n        \"Uzbekistan\",\r\n        \"Vanuatu\",\r\n        \"Vatican City\",\r\n        \"Venezuela\",\r\n        \"Vietnam\",\r\n        \"Virgin Islands\",\r\n        \"Yemen\",\r\n        \"Zambia\",\r\n        \"Zimbabwe\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"registration_number\": {\r\n      \"description\": \"A unique identification number assigned to a legal entity by a government authority or official registry at the time of incorporation or registration. The number serves as the primary reference for identifying the entity within the issuing jurisdiction. Some labels to Recognize: Company Number, Registration Number, Registered Number, Corporate Identification Number (CIN), Entity Registration Number, Business Registration Number, Firm Registration Number, Employer Identification Number (EIN), Tax Identification Number (TIN, ITIN), Legal Entity Identifier (LEI), Incorporation Number, Certificate Number (only when explicitly tied to entity registration).\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"document_certification_indicator\": {\r\n      \"description\": \"An indicator capturing whether the document contains explicit certification, attestation, or declarative language confirming that the information presented is true, accurate, and/or officially validated by an authorized individual or authority.\",\r\n      \"type\": \"boolean\"\r\n    },\r\n    \"document_date\": {\r\n      \"description\": \"The date on which the document was officially issued, certified, or generated by the relevant authority. This date represents the formal issuance or execution date of the Certificate of Incorporation or associated document. Return the value strictly in MM/DD/YYYY format.\",\r\n      \"type\": \"string\",\r\n      \"format\": \"date\",\r\n      \"x-fieldType\": \"date\"\r\n    },\r\n    \"document_type\": {\r\n      \"description\": \"The formal classification of the financial or legal document based on its purpose and content.\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"10K/Annual Report\",\r\n        \"ACRA Report\",\r\n        \"AML Questionaire\",\r\n        \"Annual Return\",\r\n        \"Articles of Association\",\r\n        \"Articles of Incorporation\",\r\n        \"Articles of Organization\",\r\n        \"Audited Financial Report\",\r\n        \"Auditor Letter\",\r\n        \"Authorized signers list\",\r\n        \"Bankruptcy Filing\",\r\n        \"Board Resolution\",\r\n        \"Certificate of Formation\",\r\n        \"Certificate of Incorporation\",\r\n        \"Certificate of Incumbency\",\r\n        \"Certificate of Name Change\",\r\n        \"CIP Reliance Agreement\",\r\n        \"Client Confirmation\",\r\n        \"Client Representation Letter\",\r\n        \"Declaration of Trust / Trust Agreement\",\r\n        \"Drivers License\",\r\n        \"Dun and Bradstreet Report\",\r\n        \"Factsheet\",\r\n        \"FINRA Broker Check Report\",\r\n        \"Form 5500\",\r\n        \"Form 990\",\r\n        \"FundSquare Key Information Document\",\r\n        \"Government Photo ID\",\r\n        \"Handelsregister Extract\",\r\n        \"ICRIS Report\",\r\n        \"Investment Management Agreement\",\r\n        \"IRS Letter\",\r\n        \"LLC/LP Operating Agreement\",\r\n        \"Memorandum of Association\",\r\n        \"New Relationship Form\",\r\n        \"Offering Memorandum\",\r\n        \"Organizational Structure Document\",\r\n        \"Other\",\r\n        \"Partnership agreement\",\r\n        \"Passport\",\r\n        \"Power of Attorney\",\r\n        \"Private Placement Memorandum\",\r\n        \"Prospectus\",\r\n        \"RCS Extract\",\r\n        \"Registration Certificate\",\r\n        \"SEC Form ADV\",\r\n        \"Share Register\",\r\n        \"USA PATRIOT Act Certification\",\r\n        \"W9\",\r\n        \"Wolfsberg Questionnaire\",\r\n        \"WorldCheck Report\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"file_name\": {\r\n      \"description\": \"The name of the file for which the analysis is done.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"_reasoning\": {\r\n      \"description\": \"The agent’s full internal execution context—covering reasoning, inputs, intermediate steps, decisions, and action summaries.\",\r\n      \"type\": \"string\"\r\n    }\r\n  },\r\n  \"required\": [\r\n    \"entity_name\",\r\n    \"date_of_incorporation\",\r\n    \"country_of_incorporation\",\r\n    \"registration_number\",\r\n    \"document_certification_indicator\",\r\n    \"document_date\",\r\n    \"document_type\",\r\n    \"file_name\",\r\n    \"_reasoning\"\r\n  ]\r\n}",
+    "outputMode": "json_object",
+    "downloadFormat": "json",
+    "createdBy": "69c3ee32c4f6fe3d0b5d5bce",
+    "lastModifiedBy": "spidiyath",
+    "createdAt": "2026-04-07T12:08:36.080Z",
+    "updatedAt": "2026-06-09T07:41:32.502Z",
+    "__v": 0,
+    "groupConfigs": {
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "selectedSkills": [],
+    "addMetadata": true,
+    "basePersonaId": null,
+    "versionNumber": 1,
+    "confidenceThreshold": null,
+    "memoryEnabled": false
+  },
+  {
+    "_id": "6a27cd3fceeba9ca3339f497",
+    "personaId": "f7b89c69c9410d3ded7835d87a399b6e",
+    "projectName": "Agentic KYC",
+    "projectVersion": "1.0",
+    "personaName": "Digitization - Certificate of Incorporation",
+    "description": "The agent leverages intelligent document processing to extract all required attributes from Certificate of Incorporation Document.",
+    "userPrompt": "Role:\r\nYou are an expert at reviewing documentation packages and extracting comprehensive KYC data on financial services entities. Your approach is thorough, analytical, and focused on providing actionable intelligence for compliance decision-making. You perform precise, schema-driven attribute extraction using only the Certificate of Incorporation document retrieved from the designated data store. You are meticulous about distinguishing between what is explicitly stated in a document versus what may be inferred, and you apply strict evidentiary standards.\r\n\r\nObjective: \r\n - Use the following file name - {{file_name}} as the authoritative reference to retrieve the document.\r\n- Systematically review the document in its entirety and extract all attributes defined in the output schema with accuracy, completeness, and integrity.\r\n- Apply field-level extraction rules precisely as described in the schema before populating any value.\n\nSource:\r\n- Source of truth: Certificate of Incorporation document retrieved from the designated data store.\n- Do not infer, assume, fabricate, or supplement values from any external, secondary, or prior knowledge source.\n- Every extracted value must be traceable to a specific location (page, section, or paragraph) within the document.\n\nExtraction Rules:\r\n1. Always preserve original document text exactly - including characters, spelling, accents, abbreviations, punctuation, spacing, and casing.\n2. Accurately convert all dates found in the document into MM/DD/YYYY format while preserving the original date's meaning.\n3. Do not infer, assume, normalize, fabricate, or supplement values under any circumstances.\n4. If information appears across multiple pages, explicitly reference all relevant pages in the _reasoning field.\n5. If multiple rows refer to the same entity, match on full name, full address, and full identification number, and consolidate into a single record.\n6. Populate all fields defined in the output schema and return results in the exact JSON format only.\n7. If a document attribute is not found anywhere in the document, return 'null' in the relevant field.\n8. Document Date Extraction — Flexible Label Recognition: Identify the official date a document was issued, filed, registered, certified, stamped, or executed by an authority. Scan the entire document for labels such as: Date of Issue / Issued On / Issue Date / Filing Date / Filed On / Registration Date / Registered On / Certification Date / Certified On / Effective Date / Execution Date—as well as phrasing like: “issued on”, “filed on”, “given under seal on”, “signed/dated this”, “witness my hand this [DATE]”, or similar. Also consider dates near official signatures, seals, stamps, headers, or footers. Priority (if multiple dates exist): Date tied to official signature, seal, or stamp, Filing or registration date, Certification/attestation date, or any other formal issuance or execution date.\nLast-Resort Fallback (apply only when all of the above attempts yield no result): If no document_date can be derived from any issuance, filing, certification, stamping, or execution indicator anywhere in the document, populate document_date using the value already extracted for date_of_incorporation. This fallback must be applied strictly as a last resort - only after exhausting every label, phrase, positional cue (header, footer, seal area, signature block), and contextual date indicator described above. When the fallback is applied, you must record the following in the _reasoning field: Confirmation that no primary document_date was found and all scanning attempts were exhausted.\n 9. Document Certification Indicator — Strict Standard\n - Set to True only if one of the conditions are met:\n  1. Explicit Certification Language - The document contains clear, affirmative statements certifying accuracy or validity (e.g., “I hereby certify…,” “true and correct copy,” “attested,” “declared,” “sworn”). Must explicitly use terms like certify, attest, declare, affirm. General descriptions or boilerplate text do not qualify.\n  2. Signature / Seal / Stamp - Presence of at least one of the following near the certification language: \n     Authorized signature (e.g., officer, registrar, notary)\n     Official seal (embossed/printed)\n     Official stamp (e.g., Filed, Certified, Registered)\n     Recognized digital signature/certification mark\n - Set to False if: Missing explicit certification language, Missing signature/seal/stamp, Language is vague or descriptive.\n10. Ensure comprehensive tracking of all internal thoughts, input parameters, intermediate steps, and summarized outcomes for every action, maintaining full traceability throughout execution.\n11. Enforce that all thoughts, intermediate inputs, and call summaries are strictly confined within the '_reasoning' field, with no leakage outside it under any circumstances.",
+    "llmModel": "global.anthropic.claude-sonnet-4-6",
+    "temperature": 0.30000000000000004,
+    "selectedGroups": [
+      "default_tools",
+      "documents"
+    ],
+    "groupConfigs": {
+      "documents": {
+        "accessMode": "selected",
+        "allowedStores": [
+          "all_unstructured_docs"
+        ],
+        "allowedFiles": {
+          "all_unstructured_docs": [
+            "#file_name"
+          ]
+        }
+      }
+    },
+    "selectedTools": [],
+    "selectedSkills": [],
+    "inputFields": [
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "",
+        "valueSource": "predecessorOutput"
+      }
+    ],
+    "outputFields": [
+      {
+        "fieldName": "entity_name",
+        "fieldType": "text",
+        "fieldDescription": "Full Legal name for which the document is issued, usually found within the first page of the document.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "date_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The official date on which the legal entity was formally registered or established as per the issuing authority. This date marks the legal creation of the entity. Some labels to Recognize: Date of Incorporation, Date of Formation, Date of Registration, Date of Establishment, Incorporated On / Incorporation Date, Formed On / Established On. Return the value strictly in MM/DD/YYYY format.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "country_of_incorporation",
+        "fieldType": "text",
+        "fieldDescription": "The country where the legal entity is officially incorporated, registered, or legally established, as recognized by the relevant governing authority. Represents the jurisdiction under which the entity is legally constituted and regulated. If information cannot be confidently determined, return 'null'.",
+        "expectedValues": "Afghanistan, Albania, Algeria, Andorra, Angola, Antigua and Barbuda, Argentina, Armenia, Aruba, Australia, Austria, Azerbaijan, Bahamas, Bahrain, Bangladesh, Barbados, Belarus, Belgium, Belize, Benin, Bhutan, Bolivia, Bosnia and Herzegovina, Botswana, Brazil, Brunei, Brunei Darussalam, Bulgaria, Burkina Faso, Burma, Burundi, Cambodia, Cameroon, Canada, Cape Verde, Central African Republic, Chad, Chile, China, Colombia, Comoros, Congo, The Democratic Republic of the Congo, Costa Rica, Cote D'Ivoire, Croatia, Cuba, Curacao, Cyprus, Czech Republic, Denmark, Djibouti, Dominica, Dominican Republic, Ecuador, Egypt, El Salvador, Equatorial Guinea, Eritrea, Estonia, Ethiopia, Fiji, Finland, France, Gabon, Gambia, Georgia, Germany, Ghana, Greece, Grenada, Guatemala, Guinea, Guinea-Bissau, Guyana, Haiti, Honduras, Hong Kong, Hungary, Iceland, India, Indonesia, Iran, Iraq, Ireland, Israel, Italy, Jamaica, Japan, Jersey, Jordan, Kazakhstan, Kenya, Kiribati, Kosovo, Kuwait, Kyrgyzstan, Laos (Lao People's Democratic Republic), Latvia, Lebanon, Lesotho, Liberia, Libya, Liechtenstein, Lithuania, Luxembourg, Macao, Macedonia, The Former Yugoslav Republic of Macedonia, Madagascar, Malawi, Malaysia, Maldives, Mali, Malta, Marshall Islands, Mauritania, Mauritius, Mexico, Federated States of Micronesia, Moldova, Republic of Moldova, Monaco, Mongolia, Montenegro, Morocco, Mozambique, Myanmar, Namibia, Nauru, Nepal, Netherlands, New Zealand, Nicaragua, Niger, Nigeria, North Korea, Norway, Oman, Pakistan, Palau, Panama, Papua New Guinea, Paraguay, Peru, Philippines, Poland, Portugal, Qatar, Romania, Russia, Russian Federation, Rwanda, Saint Kitts and Nevis, Saint Lucia, Saint Vincent and the Grenadines, Samoa, San Marino, Sao Tome and Principe, Saudi Arabia, Senegal, Serbia, Seychelles, Sierra Leone, Singapore, Slovakia, Slovenia, Solomon Islands, Somalia, South Africa, South Korea, South Sudan, Spain, Sri Lanka, St. Lucia, Sudan, Suriname, Suriname, Swaziland, Sweden, Switzerland, Syria, Syrian Arab Republic, Taiwan, Tajikistan, Tanzania, United Republic of Tanzania, Thailand, Timor-Leste, Togo, Tonga, Trinidad and Tobago, Tunisia, Turkey, Turkmenistan, Tuvalu, Uganda, Ukraine, United Arab Emirates, United Kingdom, United States, Uruguay, Uzbekistan, Vanuatu, Vatican City, Venezuela, Vietnam, Virgin Islands, Yemen, Zambia, Zimbabwe, N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "registration_number",
+        "fieldType": "text",
+        "fieldDescription": "A unique identification number assigned to a legal entity by a government authority or official registry at the time of incorporation or registration. The number serves as the primary reference for identifying the entity within the issuing jurisdiction. Some labels to Recognize: Company Number, Registration Number, Registered Number, Corporate Identification Number (CIN), Entity Registration Number, Business Registration Number, Firm Registration Number, Employer Identification Number (EIN), Tax Identification Number (TIN, ITIN), Legal Entity Identifier (LEI), Incorporation Number, Certificate Number (only when explicitly tied to entity registration).",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_certification_indicator",
+        "fieldType": "boolean",
+        "fieldDescription": "True only if explicit certification language or signature/stamp/seal are present. Default False when in doubt.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_date",
+        "fieldType": "text",
+        "fieldDescription": "Official date the document was issued/certified/filed/stamped/executed in MM/DD/YYYY format. Return 'null' if not found.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "document_type",
+        "fieldType": "text",
+        "fieldDescription": "The formal classification of the financial or legal document based on its purpose and content.",
+        "expectedValues": "10K/Annual Report,ACRA Report,AML Questionaire,Annual Return,Articles of Association,Articles of Incorporation,Articles of Organization,Audited Financial Report,Auditor Letter,Authorized signers list,Bankruptcy Filing,Board Resolution,Certificate of Formation,Certificate of Incorporation,Certificate of Incumbency,Certificate of Name Change,CIP Reliance Agreement,Client Confirmation,Client Representation Letter,Declaration of Trust / Trust Agreement,Drivers License,Dun and Bradstreet Report,Factsheet,FINRA Broker Check Report,Form 5500,Form 990,FundSquare Key Information Document,Government Photo ID,Handelsregister Extract,ICRIS Report,Investment Management Agreement,IRS Letter,LLC/LP Operating Agreement,Memorandum of Association,New Relationship Form,Offering Memorandum,Organizational Structure Document,Other,Partnership agreement,Passport,Power of Attorney,Private Placement Memorandum,Prospectus,RCS Extract,Registration Certificate,SEC Form ADV,Share Register,USA PATRIOT Act Certification,W9,Wolfsberg Questionnaire,WorldCheck Report,N/A",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "file_name",
+        "fieldType": "text",
+        "fieldDescription": "The name of the file for which the analysis is done.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      },
+      {
+        "fieldName": "_reasoning",
+        "fieldType": "text",
+        "fieldDescription": "The agent’s full internal execution context—covering reasoning, inputs, intermediate steps, decisions, and action summaries.",
+        "expectedValues": "",
+        "enumMultiSelect": false,
+        "arrayItemType": null,
+        "children": []
+      }
+    ],
+    "rawJsonSchema": "{\r\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\r\n  \"type\": \"object\",\r\n  \"properties\": {\r\n    \"entity_name\": {\r\n      \"description\": \"Full Legal name for which the document is issued, usually found within the first page of the document\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"date_of_incorporation\": {\r\n      \"description\": \"The official date on which the legal entity was formally registered or established as per the issuing authority. This date marks the legal creation of the entity. Some labels to Recognize: Date of Incorporation, Date of Formation, Date of Registration, Date of Establishment, Incorporated On / Incorporation Date, Formed On / Established On. Return the value strictly in MM/DD/YYYY format.\",\r\n      \"type\": \"string\",\r\n      \"format\": \"date\",\r\n      \"x-fieldType\": \"date\"\r\n    },\r\n    \"country_of_incorporation\": {\r\n      \"description\": \"The country where the legal entity is officially incorporated, registered, or legally established, as recognized by the relevant governing authority. Represents the jurisdiction under which the entity is legally constituted and regulated. If information cannot be confidently determined, return 'null'.\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"Afghanistan\",\r\n        \"Albania\",\r\n        \"Algeria\",\r\n        \"Andorra\",\r\n        \"Angola\",\r\n        \"Antigua and Barbuda\",\r\n        \"Argentina\",\r\n        \"Armenia\",\r\n        \"Aruba\",\r\n        \"Australia\",\r\n        \"Austria\",\r\n        \"Azerbaijan\",\r\n        \"Bahamas\",\r\n        \"Bahrain\",\r\n        \"Bangladesh\",\r\n        \"Barbados\",\r\n        \"Belarus\",\r\n        \"Belgium\",\r\n        \"Belize\",\r\n        \"Benin\",\r\n        \"Bhutan\",\r\n        \"Bolivia\",\r\n        \"Bosnia and Herzegovina\",\r\n        \"Botswana\",\r\n        \"Brazil\",\r\n        \"Brunei\",\r\n        \"Brunei Darussalam\",\r\n        \"Bulgaria\",\r\n        \"Burkina Faso\",\r\n        \"Burma\",\r\n        \"Burundi\",\r\n        \"Cambodia\",\r\n        \"Cameroon\",\r\n        \"Canada\",\r\n        \"Cape Verde\",\r\n        \"Central African Republic\",\r\n        \"Chad\",\r\n        \"Chile\",\r\n        \"China\",\r\n        \"Colombia\",\r\n        \"Comoros\",\r\n        \"Congo\",\r\n        \"The Democratic Republic of the Congo\",\r\n        \"Costa Rica\",\r\n        \"Cote D'Ivoire\",\r\n        \"Croatia\",\r\n        \"Cuba\",\r\n        \"Curacao\",\r\n        \"Cyprus\",\r\n        \"Czech Republic\",\r\n        \"Denmark\",\r\n        \"Djibouti\",\r\n        \"Dominica\",\r\n        \"Dominican Republic\",\r\n        \"Ecuador\",\r\n        \"Egypt\",\r\n        \"El Salvador\",\r\n        \"Equatorial Guinea\",\r\n        \"Eritrea\",\r\n        \"Estonia\",\r\n        \"Ethiopia\",\r\n        \"Fiji\",\r\n        \"Finland\",\r\n        \"France\",\r\n        \"Gabon\",\r\n        \"Gambia\",\r\n        \"Georgia\",\r\n        \"Germany\",\r\n        \"Ghana\",\r\n        \"Greece\",\r\n        \"Grenada\",\r\n        \"Guatemala\",\r\n        \"Guinea\",\r\n        \"Guinea-Bissau\",\r\n        \"Guyana\",\r\n        \"Haiti\",\r\n        \"Honduras\",\r\n        \"Hong Kong\",\r\n        \"Hungary\",\r\n        \"Iceland\",\r\n        \"India\",\r\n        \"Indonesia\",\r\n        \"Iran\",\r\n        \"Iraq\",\r\n        \"Ireland\",\r\n        \"Israel\",\r\n        \"Italy\",\r\n        \"Jamaica\",\r\n        \"Japan\",\r\n        \"Jersey\",\r\n        \"Jordan\",\r\n        \"Kazakhstan\",\r\n        \"Kenya\",\r\n        \"Kiribati\",\r\n        \"Kosovo\",\r\n        \"Kuwait\",\r\n        \"Kyrgyzstan\",\r\n        \"Laos (Lao People's Democratic Republic)\",\r\n        \"Latvia\",\r\n        \"Lebanon\",\r\n        \"Lesotho\",\r\n        \"Liberia\",\r\n        \"Libya\",\r\n        \"Liechtenstein\",\r\n        \"Lithuania\",\r\n        \"Luxembourg\",\r\n        \"Macao\",\r\n        \"Macedonia\",\r\n        \"The Former Yugoslav Republic of Macedonia\",\r\n        \"Madagascar\",\r\n        \"Malawi\",\r\n        \"Malaysia\",\r\n        \"Maldives\",\r\n        \"Mali\",\r\n        \"Malta\",\r\n        \"Marshall Islands\",\r\n        \"Mauritania\",\r\n        \"Mauritius\",\r\n        \"Mexico\",\r\n        \"Federated States of Micronesia\",\r\n        \"Moldova\",\r\n        \"Republic of Moldova\",\r\n        \"Monaco\",\r\n        \"Mongolia\",\r\n        \"Montenegro\",\r\n        \"Morocco\",\r\n        \"Mozambique\",\r\n        \"Myanmar\",\r\n        \"Namibia\",\r\n        \"Nauru\",\r\n        \"Nepal\",\r\n        \"Netherlands\",\r\n        \"New Zealand\",\r\n        \"Nicaragua\",\r\n        \"Niger\",\r\n        \"Nigeria\",\r\n        \"North Korea\",\r\n        \"Norway\",\r\n        \"Oman\",\r\n        \"Pakistan\",\r\n        \"Palau\",\r\n        \"Panama\",\r\n        \"Papua New Guinea\",\r\n        \"Paraguay\",\r\n        \"Peru\",\r\n        \"Philippines\",\r\n        \"Poland\",\r\n        \"Portugal\",\r\n        \"Qatar\",\r\n        \"Romania\",\r\n        \"Russia\",\r\n        \"Russian Federation\",\r\n        \"Rwanda\",\r\n        \"Saint Kitts and Nevis\",\r\n        \"Saint Lucia\",\r\n        \"Saint Vincent and the Grenadines\",\r\n        \"Samoa\",\r\n        \"San Marino\",\r\n        \"Sao Tome and Principe\",\r\n        \"Saudi Arabia\",\r\n        \"Senegal\",\r\n        \"Serbia\",\r\n        \"Seychelles\",\r\n        \"Sierra Leone\",\r\n        \"Singapore\",\r\n        \"Slovakia\",\r\n        \"Slovenia\",\r\n        \"Solomon Islands\",\r\n        \"Somalia\",\r\n        \"South Africa\",\r\n        \"South Korea\",\r\n        \"South Sudan\",\r\n        \"Spain\",\r\n        \"Sri Lanka\",\r\n        \"St. Lucia\",\r\n        \"Sudan\",\r\n        \"Suriname\",\r\n        \"Suriname\",\r\n        \"Swaziland\",\r\n        \"Sweden\",\r\n        \"Switzerland\",\r\n        \"Syria\",\r\n        \"Syrian Arab Republic\",\r\n        \"Taiwan\",\r\n        \"Tajikistan\",\r\n        \"Tanzania\",\r\n        \"United Republic of Tanzania\",\r\n        \"Thailand\",\r\n        \"Timor-Leste\",\r\n        \"Togo\",\r\n        \"Tonga\",\r\n        \"Trinidad and Tobago\",\r\n        \"Tunisia\",\r\n        \"Turkey\",\r\n        \"Turkmenistan\",\r\n        \"Tuvalu\",\r\n        \"Uganda\",\r\n        \"Ukraine\",\r\n        \"United Arab Emirates\",\r\n        \"United Kingdom\",\r\n        \"United States\",\r\n        \"Uruguay\",\r\n        \"Uzbekistan\",\r\n        \"Vanuatu\",\r\n        \"Vatican City\",\r\n        \"Venezuela\",\r\n        \"Vietnam\",\r\n        \"Virgin Islands\",\r\n        \"Yemen\",\r\n        \"Zambia\",\r\n        \"Zimbabwe\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"registration_number\": {\r\n      \"description\": \"A unique identification number assigned to a legal entity by a government authority or official registry at the time of incorporation or registration. The number serves as the primary reference for identifying the entity within the issuing jurisdiction. Some labels to Recognize: Company Number, Registration Number, Registered Number, Corporate Identification Number (CIN), Entity Registration Number, Business Registration Number, Firm Registration Number, Employer Identification Number (EIN), Tax Identification Number (TIN, ITIN), Legal Entity Identifier (LEI), Incorporation Number, Certificate Number (only when explicitly tied to entity registration).\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"document_certification_indicator\": {\r\n      \"description\": \"An indicator capturing whether the document contains explicit certification, attestation, or declarative language confirming that the information presented is true, accurate, and/or officially validated by an authorized individual or authority.\",\r\n      \"type\": \"boolean\"\r\n    },\r\n    \"document_date\": {\r\n      \"description\": \"The date on which the document was officially issued, certified, or generated by the relevant authority. This date represents the formal issuance or execution date of the Certificate of Incorporation or associated document. Return the value strictly in MM/DD/YYYY format.\",\r\n      \"type\": \"string\",\r\n      \"format\": \"date\",\r\n      \"x-fieldType\": \"date\"\r\n    },\r\n    \"document_type\": {\r\n      \"description\": \"The formal classification of the financial or legal document based on its purpose and content.\",\r\n      \"type\": \"string\",\r\n      \"enum\": [\r\n        \"10K/Annual Report\",\r\n        \"ACRA Report\",\r\n        \"AML Questionaire\",\r\n        \"Annual Return\",\r\n        \"Articles of Association\",\r\n        \"Articles of Incorporation\",\r\n        \"Articles of Organization\",\r\n        \"Audited Financial Report\",\r\n        \"Auditor Letter\",\r\n        \"Authorized signers list\",\r\n        \"Bankruptcy Filing\",\r\n        \"Board Resolution\",\r\n        \"Certificate of Formation\",\r\n        \"Certificate of Incorporation\",\r\n        \"Certificate of Incumbency\",\r\n        \"Certificate of Name Change\",\r\n        \"CIP Reliance Agreement\",\r\n        \"Client Confirmation\",\r\n        \"Client Representation Letter\",\r\n        \"Declaration of Trust / Trust Agreement\",\r\n        \"Drivers License\",\r\n        \"Dun and Bradstreet Report\",\r\n        \"Factsheet\",\r\n        \"FINRA Broker Check Report\",\r\n        \"Form 5500\",\r\n        \"Form 990\",\r\n        \"FundSquare Key Information Document\",\r\n        \"Government Photo ID\",\r\n        \"Handelsregister Extract\",\r\n        \"ICRIS Report\",\r\n        \"Investment Management Agreement\",\r\n        \"IRS Letter\",\r\n        \"LLC/LP Operating Agreement\",\r\n        \"Memorandum of Association\",\r\n        \"New Relationship Form\",\r\n        \"Offering Memorandum\",\r\n        \"Organizational Structure Document\",\r\n        \"Other\",\r\n        \"Partnership agreement\",\r\n        \"Passport\",\r\n        \"Power of Attorney\",\r\n        \"Private Placement Memorandum\",\r\n        \"Prospectus\",\r\n        \"RCS Extract\",\r\n        \"Registration Certificate\",\r\n        \"SEC Form ADV\",\r\n        \"Share Register\",\r\n        \"USA PATRIOT Act Certification\",\r\n        \"W9\",\r\n        \"Wolfsberg Questionnaire\",\r\n        \"WorldCheck Report\",\r\n        \"N/A\"\r\n      ]\r\n    },\r\n    \"file_name\": {\r\n      \"description\": \"The name of the file for which the analysis is done.\",\r\n      \"type\": \"string\"\r\n    },\r\n    \"_reasoning\": {\r\n      \"description\": \"The agent’s full internal execution context—covering reasoning, inputs, intermediate steps, decisions, and action summaries.\",\r\n      \"type\": \"string\"\r\n    }\r\n  },\r\n  \"required\": [\r\n    \"entity_name\",\r\n    \"date_of_incorporation\",\r\n    \"country_of_incorporation\",\r\n    \"registration_number\",\r\n    \"document_certification_indicator\",\r\n    \"document_date\",\r\n    \"document_type\",\r\n    \"file_name\",\r\n    \"_reasoning\"\r\n  ]\r\n}",
+    "outputMode": "json_object",
+    "addMetadata": true,
+    "confidenceThreshold": null,
+    "downloadFormat": "json",
+    "memoryEnabled": false,
+    "createdBy": "spidiyath",
+    "lastModifiedBy": "Kuber_Vetti",
+    "versionNumber": 2,
+    "versionNote": "Review Changes",
+    "basePersonaId": "d6369e72b521ed5ce8895ac91ec9ec4b",
+    "createdAt": "2026-06-09T08:22:23.975Z",
+    "updatedAt": "2026-06-10T10:03:42.016Z",
+    "__v": 0
+  }
+]
