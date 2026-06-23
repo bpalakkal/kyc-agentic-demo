@@ -363,25 +363,50 @@ export async function getAttributes(kycRef, { group } = {}) {
  * Used by the Tracing panel.
  */
 export async function getAttributeTrace(kycRef, attributeName) {
-  const { data: snap, error: snapErr } = await sb
+  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage';
+
+  // Layer 1: latest Forge snapshot
+  const { data: snap } = await sb
     .from('entity_snapshots')
     .select('id')
     .eq('kyc_ref', kycRef)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (snapErr) throw snapErr;
-  if (!snap) return null;
 
-  const { data, error } = await sb
-    .from('entity_attributes')
-    .select('attribute_name, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
+  if (snap) {
+    const { data, error } = await sb
+      .from('entity_attributes')
+      .select(TRACE_SELECT)
+      .eq('kyc_ref', kycRef)
+      .eq('snapshot_id', snap.id)
+      .eq('attribute_name', attributeName)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+  }
+
+  // Layer 2: most recent completed agent run that has this attribute
+  const { data: runs } = await sb
+    .from('agent_runs')
+    .select('id')
     .eq('kyc_ref', kycRef)
-    .eq('snapshot_id', snap.id)
-    .eq('attribute_name', attributeName)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+    .eq('status', 'complete')
+    .order('completed_at', { ascending: false });
+
+  for (const run of (runs ?? [])) {
+    const { data, error } = await sb
+      .from('entity_attributes')
+      .select(TRACE_SELECT)
+      .eq('kyc_ref', kycRef)
+      .eq('agent_run_id', run.id)
+      .eq('attribute_name', attributeName)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) return data;
+  }
+
+  return null;
 }
 
 // ─── Person queries ───────────────────────────────────────────────────────────

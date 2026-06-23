@@ -3318,6 +3318,7 @@ const AttributeFormView = ({
               const isOverridden = !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`];
               return (pa?.source === "CRM") || isOverridden;
             })()}
+            forgeAttr={forgeAttrs[openTraceFor.label] ?? null}
             savedOverrides={savedOverrides}
             trace={trace}
             traceDocs={traceDocs}

@@ -2,6 +2,7 @@ export type ForgeAttrRow = {
   attribute_name: string;
   attribute_group: string;
   display_value: string | null;
+  confidence: number | null;
   id_flag: boolean;
   id_source: string | null;
   verification_flag: boolean;

@@ -7,17 +7,6 @@
 
 const SOURCE = 'FCA Register';
 
-function lineage(frn) {
-  return [
-    {
-      source: SOURCE,
-      sourceUrl: `https://register.fca.org.uk/s/firm?id=${frn}`,
-      fetchedAt: new Date().toISOString(),
-      confidence: 1.0,
-    },
-  ];
-}
-
 /**
  * @param {object} merged  — output of mergeFcaData()
  * @param {string} frn     — resolved FRN (for lineage URL)
@@ -25,7 +14,8 @@ function lineage(frn) {
  */
 export function fcaToAttributes(merged, frn) {
   const attrs = [];
-  const lg    = lineage(frn || merged.entity_registration_number || '');
+  const fetchedAt  = new Date().toISOString();
+  const source_url = `https://register.fca.org.uk/s/firm?id=${frn || merged.entity_registration_number || ''}`;
 
   function push(attributeName, attributeGroup, displayValue, extra = {}) {
     if (displayValue === null || displayValue === undefined) return;
@@ -40,7 +30,13 @@ export function fcaToAttributes(merged, frn) {
       idFlag:           extra.idFlag           ?? false,
       verificationFlag: extra.verificationFlag ?? false,
       exceptionFlag:    extra.exceptionFlag    ?? false,
-      lineage:          lg,
+      lineage: [{
+        value:            val,
+        source:           SOURCE,
+        source_url,
+        timestamp:        fetchedAt,
+        confidence_score: 1.0,
+      }],
     });
   }
 

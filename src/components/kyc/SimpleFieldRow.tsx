@@ -194,6 +194,7 @@ type InlineTraceDrawerProps = {
   label: string;
   entity: string;
   isAuditOnly: boolean;
+  forgeAttr?: ForgeAttrRow | null;
   savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
   trace: AttrTrace | null;
   traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
@@ -208,13 +209,16 @@ type InlineTraceDrawerProps = {
 
 export const InlineTraceDrawer = ({
   label, entity, isAuditOnly,
+  forgeAttr,
   savedOverrides, trace, traceDocs,
   runAgents, setOpenTraceFor,
   openOverrideFor, setOpenOverrideFor,
   overrideDraft, setOverrideDraft, setOverrideNote,
 }: InlineTraceDrawerProps) => {
   const isManualOverride = !!savedOverrides[`${entity}::${label}`];
-  const displayConf = isManualOverride ? 100 : (trace?.confidence ?? 0);
+  // Prefer real DB confidence (0-100 int) over mock trace confidence
+  const rawConf = forgeAttr?.confidence ?? (trace?.confidence ?? null);
+  const displayConf = isManualOverride ? 100 : (rawConf ?? 0);
   const confLabel = isManualOverride ? "1.0" : `${Math.round(displayConf)}%`;
   const confColor = isManualOverride ? "text-success"
     : displayConf >= 90 ? "text-primary"
@@ -260,7 +264,10 @@ export const InlineTraceDrawer = ({
         <button
           onClick={() => {
             const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
-            const current = savedOverrides[`${entity}::${label}`]?.value ?? pa?.value ?? "";
+            const current = savedOverrides[`${entity}::${label}`]?.value
+              ?? forgeAttr?.display_value
+              ?? pa?.value
+              ?? "";
             setOverrideDraft(current);
             setOverrideNote("");
             setOpenOverrideFor({ label, entity });
