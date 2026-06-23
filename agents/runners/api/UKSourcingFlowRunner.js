@@ -3,20 +3,20 @@
  *
  * Runs three sources in parallel and merges their attribute outputs:
  *   1. FCA Register    — direct REST API (fast, no LLM)
- *   2. Companies House — GS Forge autonomous agent (async, Forge-managed)
+ *   2. Companies House — direct REST API via CompaniesHouseRunner (no Forge)
  *   3. Jersey FSC      — GS Forge autonomous agent (async, Forge-managed)
  *
  * Extends ApiRunner so the existing two-phase preview/commit flow (diff modal)
- * works identically to the standalone FCA runner. The long-running Forge polls
- * execute inside startPreview()'s background promise — the HTTP response returns
- * immediately and the frontend polls /api/agent-run-api-status/:runId.
+ * works identically to the standalone FCA runner. The long-running Forge poll
+ * for Jersey executes inside startPreview()'s background promise — the HTTP
+ * response returns immediately and the frontend polls /api/agent-run-api-status/:runId.
  */
 
-import { ApiRunner }            from '../../base/ApiRunner.js';
-import { FCARunner }            from './FCARunner.js';
-import { chToAttributes }       from './ukSourcingFlow/chToAttributes.js';
-import { jerseyToAttributes }   from './ukSourcingFlow/jerseyToAttributes.js';
-import { mergeAttributeSources } from './ukSourcingFlow/mergeAttributes.js';
+import { ApiRunner }              from '../../base/ApiRunner.js';
+import { FCARunner }              from './FCARunner.js';
+import { CompaniesHouseRunner }   from './CompaniesHouseRunner.js';
+import { jerseyToAttributes }     from './ukSourcingFlow/jerseyToAttributes.js';
+import { mergeAttributeSources }  from './ukSourcingFlow/mergeAttributes.js';
 
 const AWS_AGENT_BASE  = process.env.AWS_AGENT_BASE ??
   'http://gs-forge-agentic-runtime-lb-1873180191.us-east-1.elb.amazonaws.com';
@@ -32,70 +32,87 @@ export class UKSourcingFlowRunner extends ApiRunner {
     const { kycRef, entityName } = ctx;
     const startedAt = Date.now();
 
-    // ── Phase 1: FCA Register (direct, synchronous) ──────────────────────────
-    this.step('Phase 1/3 — Querying FCA Register…');
+    // ── Phase 1: FCA Register + Companies House (direct, synchronous, parallel) ─
+    this.step('Phase 1/3 — Querying FCA Register and Companies House…');
     let fcaAttrs   = [];
     let fcaFiles   = [];
     let fcaSources = [];
+    let chAttrs    = [];
+    let chFiles    = [];
+    let chSources  = [];
 
-    try {
-      const fca = new FCARunner(this.sb);
-      fca._onStep = msg => this.step(`  FCA ▸ ${msg}`);
-      const fcaOut = await fca.execute(ctx);
-      fcaAttrs   = fcaOut.attributes ?? [];
-      fcaFiles   = fcaOut.files ?? [];
-      fcaSources = fcaOut.metadata?.sourcesConsulted ?? [];
-      this.step(`  FCA ▸ ${fcaAttrs.length} attribute(s)`);
-    } catch (err) {
-      this.step(`  FCA ▸ failed — ${err.message} (continuing with other sources)`);
-    }
+    await Promise.all([
+      // FCA Register
+      (async () => {
+        try {
+          const fca = new FCARunner(this.sb);
+          fca._onStep = msg => this.step(`  FCA ▸ ${msg}`);
+          const fcaOut = await fca.execute(ctx);
+          fcaAttrs   = fcaOut.attributes ?? [];
+          fcaFiles   = fcaOut.files ?? [];
+          fcaSources = fcaOut.metadata?.sourcesConsulted ?? [];
+          this.step(`  FCA ▸ ${fcaAttrs.length} attribute(s)`);
+        } catch (err) {
+          this.step(`  FCA ▸ failed — ${err.message} (continuing with other sources)`);
+        }
+      })(),
 
-    // ── Phase 2: Invoke CH + Jersey on Forge (parallel) ──────────────────────
-    this.step('Phase 2/3 — Invoking Companies House and Jersey FSC on Forge…');
-
-    let chRunId, jerseyRunId;
-    try {
-      [chRunId, jerseyRunId] = await Promise.all([
-        this._invokeForge('uk-companies-house', {
-          entity_name:        entityName,
-          out_document_store: 'all_unstructured_docs',
-          jurisdiction:       'UK',
-          async:              true,
-        }),
-        this._invokeForge('uk-jersey-financial-services-commission', {
-          entity_name:  entityName,
-          jurisdiction: 'UK',
-          async:        true,
-        }),
-      ]);
-      this.step(`  CH run ID:     ${chRunId}`);
-      this.step(`  Jersey run ID: ${jerseyRunId}`);
-    } catch (err) {
-      throw new Error(`Failed to invoke Forge agents: ${err.message}`);
-    }
-
-    // ── Phase 3: Poll both to completion ─────────────────────────────────────
-    this.step('Phase 3/3 — Polling Forge agents (this may take several minutes)…');
-
-    const [chData, jerseyData] = await Promise.all([
-      this._pollForge(chRunId,     'Companies House'),
-      this._pollForge(jerseyRunId, 'Jersey FSC'),
+      // Companies House (direct API — no Forge)
+      (async () => {
+        try {
+          const ch = new CompaniesHouseRunner(this.sb);
+          ch._onStep = msg => this.step(`  CH ▸ ${msg}`);
+          const chOut = await ch.execute(ctx);
+          chAttrs   = chOut.attributes ?? [];
+          chFiles   = chOut.files ?? [];
+          chSources = chOut.metadata?.sourcesConsulted ?? [];
+          this.step(`  CH ▸ ${chAttrs.length} attribute(s), ${chFiles.length} file(s)`);
+        } catch (err) {
+          this.step(`  CH ▸ failed — ${err.message} (continuing with other sources)`);
+        }
+      })(),
     ]);
 
-    // ── Map Forge outputs → AttributeOutput[] ────────────────────────────────
-    const chAttrs     = chToAttributes(chData,     chRunId);
-    const jerseyAttrs = jerseyToAttributes(jerseyData, jerseyRunId);
+    // ── Phase 2: Invoke Jersey FSC on Forge ──────────────────────────────────
+    this.step('Phase 2/3 — Invoking Jersey FSC on Forge…');
+
+    let jerseyRunId;
+    try {
+      jerseyRunId = await this._invokeForge('uk-jersey-financial-services-commission', {
+        entity_name:  entityName,
+        jurisdiction: 'UK',
+        async:        true,
+      });
+      this.step(`  Jersey run ID: ${jerseyRunId}`);
+    } catch (err) {
+      this.step(`  Jersey FSC ▸ failed to invoke — ${err.message} (continuing without Jersey)`);
+    }
+
+    // ── Phase 3: Poll Jersey to completion ───────────────────────────────────
+    let jerseyAttrs = [];
+    if (jerseyRunId) {
+      this.step('Phase 3/3 — Polling Jersey FSC (this may take several minutes)…');
+      try {
+        const jerseyData = await this._pollForge(jerseyRunId, 'Jersey FSC');
+        jerseyAttrs = jerseyToAttributes(jerseyData, jerseyRunId);
+        this.step(`  Jersey FSC ▸ ${jerseyAttrs.length} attribute(s)`);
+      } catch (err) {
+        this.step(`  Jersey FSC ▸ ${err.message} (continuing without Jersey data)`);
+      }
+    } else {
+      this.step('Phase 3/3 — Skipping Jersey FSC poll (not invoked)');
+    }
 
     this.step(`  CH: ${chAttrs.length} attr(s) | Jersey: ${jerseyAttrs.length} attr(s) | FCA: ${fcaAttrs.length} attr(s)`);
 
     // ── Merge — priority order: FCA → CH → Jersey ────────────────────────────
     // FCA is highest priority: it's a direct API call, no LLM inference.
-    // CH next: structured MCP data. Jersey last: web-scraped.
+    // CH next: direct API data (replaces Forge-based extraction). Jersey last: web-scraped.
     // All source values appear in lineage[] so the analyst can compare.
     const merged = mergeAttributeSources([
-      { source: 'FCA Register',   attrs: fcaAttrs   },
-      { source: 'Companies House', attrs: chAttrs   },
-      { source: 'Jersey FSC',     attrs: jerseyAttrs },
+      { source: 'FCA Register',    attrs: fcaAttrs    },
+      { source: 'Companies House', attrs: chAttrs     },
+      { source: 'Jersey FSC',      attrs: jerseyAttrs },
     ]);
 
     this.step(`Merged ${merged.length} unique attribute(s) across 3 sources — ready for review`);
@@ -105,19 +122,20 @@ export class UKSourcingFlowRunner extends ApiRunner {
       kycRef,
       outputType: 'attributes',
       attributes: merged,
-      files:      fcaFiles, // Forge screenshots are harvested separately by the snapshot endpoint
+      files:      [...fcaFiles, ...chFiles],
       metadata: {
         completedAt:      new Date().toISOString(),
         durationMs:       Date.now() - startedAt,
         sourcesConsulted: [
-          'FCA Register', 'Companies House (Forge)', 'Jersey FSC (Forge)',
+          'FCA Register', 'Companies House (direct API)', 'Jersey FSC (Forge)',
           ...fcaSources,
+          ...chSources,
         ],
       },
     };
   }
 
-  // ── Forge helpers ──────────────────────────────────────────────────────────
+  // ── Forge helpers (Jersey FSC only) ───────────────────────────────────────
 
   async _invokeForge(slug, body) {
     const res = await fetch(`${AWS_AGENT_BASE}/api/invoke/${slug}`, {
@@ -162,7 +180,7 @@ export class UKSourcingFlowRunner extends ApiRunner {
       }
 
       if (['complete', 'completed', 'done', 'success'].includes(status)) {
-        this.step(`  ${label}: complete ✓`);
+        this.step(`  ${label}: complete`);
         return data;
       }
       if (['failed', 'error', 'cancelled'].includes(status)) {
