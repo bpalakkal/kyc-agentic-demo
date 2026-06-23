@@ -136,7 +136,7 @@ export function AttributeDiffModal({ pending }: Props) {
     setLoading(true);
     setError(null);
     apiFetch(`${AGENT_API_BASE}/api/agent-run-api/${pending.runId}/diff`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((data: DiffData) => {
         const diffRows = buildDiffRows(data);
         setRows(diffRows);
