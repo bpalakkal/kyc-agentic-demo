@@ -77,7 +77,7 @@ import { AttributeDiffModal, type PendingDiff } from "@/components/kyc/Attribute
 export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
   | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
-  | "companies-house" | "uk-parent-flow" | "jersey-fsc" | "fca" | "uk-sourcing-flow";
+  | "companies-house" | "jersey-fsc" | "fca" | "uk-sourcing-flow";
 
 export type Agent = {
   id: AgentId;
@@ -119,21 +119,18 @@ export const AGENTS: Agent[] = [
   { id: "audit", name: "Audit Trail Agent", short: "Audit", icon: ShieldCheck,
     description: "Writes decisions, sources, and evidence pointers to the immutable log.",
     defaultThoughts: ["Hashing decision payload (SHA-256)", "Committing to evidence locker", "Audit entry #A-29104 written"] },
-  { id: "companies-house", name: "UK Companies House Agent", short: "Co. House", icon: Building2,
-    description: "Queries the UK Companies House registry to verify incorporation, filing status, and directors.",
-    defaultThoughts: ["Connecting to Companies House registry…", "Preparing company name search query…", "Awaiting API response…"] },
-  { id: "uk-parent-flow", name: "UK Orchestration Flow", short: "UK Flow", icon: Network,
-    description: "Orchestrates all UK-registered entity agents end-to-end — Companies House, FCA, JFSC, and more.",
-    defaultThoughts: ["Initialising UK entity orchestration flow…", "Dispatching sub-agents…", "Awaiting results…"] },
-  { id: "jersey-fsc", name: "Jersey FSC Agent", short: "JFSC", icon: Landmark,
+  { id: "companies-house", name: "UK Companies House", short: "Co. House", icon: Building2,
+    description: "Queries the CH REST API directly — incorporation, filing status, officers, PSCs, and document download.",
+    defaultThoughts: ["Searching Companies House…", "Fetching company details, officers, PSCs…", "Downloading incorporation documents…", "Digitizing documents with Claude…"] },
+  { id: "jersey-fsc", name: "Jersey FSC", short: "JFSC", icon: Landmark,
     description: "Sources data from the Jersey Financial Services Commission registry for regulated entities.",
     defaultThoughts: ["Connecting to JFSC registry…", "Searching entity name…", "Awaiting API response…"] },
-  { id: "fca", name: "FCA Data Sourcing Agent", short: "FCA", icon: Scale,
+  { id: "fca", name: "FCA Register", short: "FCA", icon: Scale,
     description: "Sources regulatory data from the UK Financial Conduct Authority register.",
     defaultThoughts: ["Connecting to FCA register…", "Searching entity name…", "Awaiting API response…"] },
-  { id: "uk-sourcing-flow", name: "UK Data Sourcing Flow", short: "UK Sourcing", icon: Database,
-    description: "Orchestrates FCA, Companies House, and Jersey FSC in parallel — merges all sources with full multi-lineage tracking.",
-    defaultThoughts: ["Querying FCA Register directly…", "Invoking Companies House on Forge…", "Invoking Jersey FSC on Forge…", "Polling Forge agents…", "Merging attributes across 3 sources…"] },
+  { id: "uk-sourcing-flow", name: "UK Data Sourcing — All Sources", short: "UK All", icon: Database,
+    description: "Triggers FCA, Companies House, and Jersey FSC in parallel — merges all sources with full multi-lineage tracking.",
+    defaultThoughts: ["Querying FCA Register…", "Querying Companies House directly…", "Invoking Jersey FSC on Forge…", "Polling Jersey FSC…", "Merging attributes across 3 sources…"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -148,6 +145,38 @@ export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string
     agents: ["uk-sourcing-flow"] },
   { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · full UK entity orchestration",
     agents: ["uk-sourcing-flow"] },
+];
+
+// ─── Agent categories (structured dropdown sections) ─────────────────────────
+type AgentCategoryDef = {
+  id: string;
+  label: string;
+  triggerAllId?: AgentId;   // agent invoked by "Trigger All" button for this section
+  agentIds: AgentId[];      // individual agents shown inside the section
+};
+
+const AGENT_CATEGORIES: AgentCategoryDef[] = [
+  {
+    id: "uk-sourcing",
+    label: "UK Data Sourcing",
+    triggerAllId: "uk-sourcing-flow",
+    agentIds: ["fca", "companies-house", "jersey-fsc"],
+  },
+  {
+    id: "us-sourcing",
+    label: "US Data Sourcing",
+    agentIds: [],
+  },
+  {
+    id: "screening",
+    label: "Screening",
+    agentIds: ["sanctions", "pep", "adverse-media"],
+  },
+  {
+    id: "due-diligence",
+    label: "Due Diligence",
+    agentIds: ["identity", "document", "beneficial-owner", "risk-scoring", "outreach", "audit"],
+  },
 ];
 
 // VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
@@ -179,18 +208,13 @@ type AgentApiConfig = {
 };
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "companies-house": {
-    slug: "uk-companies-house",
-    endpoint: "/api/agent-run/async/uk-companies-house",
+    slug: "companies-house",
+    endpoint: "/api/agent-run/api/companies-house",
     buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,
-  },
-  "uk-parent-flow": {
-    slug: "uk-parent-flow",
-    endpoint: "/api/agent-run/async/uk-parent-flow",
-    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
-    fetchSteps: true,
-    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
   },
   "jersey-fsc": {
     slug: "uk-jersey-financial-services-commission",
@@ -895,52 +919,82 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
               onClick={() => setOpen((o) => !o)}
               className="text-xs px-3 py-1.5 rounded-full border border-border bg-card flex items-center gap-1.5 hover:bg-secondary"
             >
-              Run Agent <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+              Trigger <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
             </button>
             {open && (
-              <div className="absolute right-0 top-full mt-2 w-[340px] rounded-xl border border-border bg-card shadow-xl z-40 animate-fade-in">
+              <div className="absolute right-0 top-full mt-2 w-[360px] rounded-xl border border-border bg-card shadow-xl z-40 animate-fade-in">
                 <div className="p-3 border-b border-border">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Select agents to run</p>
-                  <p className="text-[11px] text-muted-foreground">Pick any combination to run</p>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Trigger Agents</p>
+                  <p className="text-[11px] text-muted-foreground">Select agents or trigger an entire section</p>
                 </div>
-                <div className="max-h-[380px] overflow-y-auto py-1">
-                  {AGENTS.filter((a) => !!AGENT_API_CONFIGS[a.id]).map((a) => {
-                    const Icon = a.icon;
-                    const isSel = selected.has(a.id);
-                    const isRec = bundle.agents.includes(a.id);
-                    const isLive = !!AGENT_API_CONFIGS[a.id];
-                    return (
-                      <button
-                        key={a.id}
-                        onClick={() => toggle(a.id)}
-                        className="w-full text-left px-3 py-2 flex items-start gap-2.5 hover:bg-secondary/60 transition-colors"
-                      >
-                        <span className={cn(
-                          "size-4 rounded border flex items-center justify-center mt-0.5 shrink-0",
-                          isSel ? "bg-primary border-primary" : "border-border"
-                        )}>
-                          {isSel && <CheckCircle2 className="size-3 text-primary-foreground" />}
-                        </span>
-                        <span className={cn(
-                          "size-7 rounded-md grid place-items-center shrink-0",
-                          isLive ? "bg-success-soft text-success border border-success-soft-border" : "bg-primary/10 text-primary"
-                        )}>
-                          <Icon className="size-3.5" />
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="text-[12px] font-medium truncate">{a.name}</p>
-                            {isRec && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Rec</span>}
-                            {isLive && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide flex items-center gap-0.5"><span className="size-1 rounded-full bg-success inline-block" />Live</span>}
-                          </div>
-                          <p className="text-[11px] text-muted-foreground leading-snug">{a.description}</p>
-                          {isLive && !entityContext?.name && (
-                            <p className="text-[10px] text-amber-500/80 mt-0.5">Open an entity in the review page to run live</p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="max-h-[480px] overflow-y-auto py-1">
+                  {AGENT_CATEGORIES.map((cat, catIdx) => (
+                    <div key={cat.id}>
+                      {catIdx > 0 && <div className="h-px bg-border mx-3 my-1" />}
+                      {/* Section header */}
+                      <div className="px-3 pt-2 pb-1 flex items-center justify-between">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <span className="size-1.5 rounded-full bg-primary inline-block" />
+                          {cat.label}
+                        </p>
+                        {cat.triggerAllId && AGENT_API_CONFIGS[cat.triggerAllId] && (
+                          <button
+                            onClick={() => { runAgents([cat.triggerAllId!], `${cat.label} — All`); setOpen(false); }}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1 transition-colors"
+                          >
+                            <Zap className="size-2.5" /> Trigger All
+                          </button>
+                        )}
+                      </div>
+                      {/* Empty section placeholder */}
+                      {cat.agentIds.length === 0 && (
+                        <p className="px-3 py-1.5 pb-2 text-[11px] text-muted-foreground/50 italic">Coming soon</p>
+                      )}
+                      {/* Individual agents */}
+                      {cat.agentIds.map((id) => {
+                        const a = AGENTS_BY_ID[id];
+                        const Icon = a.icon;
+                        const isSel = selected.has(id);
+                        const isLive = !!AGENT_API_CONFIGS[id];
+                        const isRec = bundle.agents.includes(id);
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => isLive && toggle(id)}
+                            className={cn(
+                              "w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors",
+                              isLive ? "hover:bg-secondary/60" : "opacity-40 cursor-not-allowed"
+                            )}
+                          >
+                            <span className={cn(
+                              "size-4 rounded border flex items-center justify-center mt-0.5 shrink-0",
+                              isSel ? "bg-primary border-primary" : "border-border"
+                            )}>
+                              {isSel && <CheckCircle2 className="size-3 text-primary-foreground" />}
+                            </span>
+                            <span className={cn(
+                              "size-7 rounded-md grid place-items-center shrink-0",
+                              isLive ? "bg-success-soft text-success border border-success-soft-border" : "bg-secondary text-muted-foreground"
+                            )}>
+                              <Icon className="size-3.5" />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-[12px] font-medium truncate">{a.short}</p>
+                                {isRec && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Rec</span>}
+                                {isLive && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide flex items-center gap-0.5"><span className="size-1 rounded-full bg-success inline-block" />Live</span>}
+                                {!isLive && <span className="text-[9px] text-muted-foreground/50">Soon</span>}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground leading-snug">{a.description}</p>
+                              {isLive && !entityContext?.name && (
+                                <p className="text-[10px] text-amber-500/80 mt-0.5">Open an entity to run live</p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
                 <div className="p-3 border-t border-border flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground">{selected.size} selected</span>
@@ -949,10 +1003,9 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                     disabled={selected.size === 0}
                     className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-95 disabled:opacity-40"
                   >
-                    <Play className="size-3" /> Run Selected
+                    <Play className="size-3" /> Trigger Selected
                   </button>
                 </div>
-
                 {/* ── Quality Assurance ─────────────────────────── */}
                 {qaReviewCallback && (
                   <div className="border-t border-border bg-secondary/30">
