@@ -69,18 +69,34 @@ interface DiffData {
 // Matches numbered multi-value attributes: corporate_officer_1, key_controller_2, etc.
 const MULTI_VALUE_RE = /^(.+)_(\d+)$/;
 
+// Person-name attribute prefixes — role suffixes in parentheses are stripped before comparison.
+const PERSON_PREFIXES = new Set([
+  'key_controller', 'beneficial_owner', 'corporate_officer', 'authorized_signatory',
+  'board_director', 'trustee', 'investment_advisor', 'power_of_attorney', 'acting_person',
+]);
+
+// Strip trailing role/title suffix: "SMITH, John (Chief Compliance Officer)" → "SMITH, John"
+function stripRole(s: string): string {
+  return s.replace(/\s*\([^)]*\)/g, '').trim();
+}
+
+function normalise(s: string, isPersonAttr: boolean): string {
+  return (isPersonAttr ? stripRole(s) : s).toLowerCase();
+}
+
 function buildDiffRows(data: DiffData): DiffRow[] {
   const currentMap = new Map(data.currentAttributes.map(a => [a.attribute_name, a.display_value ?? null]));
 
   // Build a value-set per multi-value group so reordering (officer_2 → officer_3)
   // is not treated as a change — we compare by value membership, not position.
+  // Person attributes also strip role suffixes before adding to the set.
   const currentGroupValues = new Map<string, Set<string>>();
   for (const [name, value] of currentMap) {
     const m = name.match(MULTI_VALUE_RE);
     if (m && value) {
       const base = m[1];
       if (!currentGroupValues.has(base)) currentGroupValues.set(base, new Set());
-      currentGroupValues.get(base)!.add(value.toLowerCase());
+      currentGroupValues.get(base)!.add(normalise(value, PERSON_PREFIXES.has(base)));
     }
   }
 
@@ -95,8 +111,9 @@ function buildDiffRows(data: DiffData): DiffRow[] {
 
     const m = attr.attributeName.match(MULTI_VALUE_RE);
     if (m) {
+      const isPerson = PERSON_PREFIXES.has(m[1]);
       const currentValues = currentGroupValues.get(m[1]);
-      const inGroup = currentValues?.has(attr.displayValue.toLowerCase()) ?? false;
+      const inGroup = currentValues?.has(normalise(attr.displayValue, isPerson)) ?? false;
       return {
         attributeName:  attr.attributeName,
         attributeGroup: attr.attributeGroup,
@@ -387,7 +404,9 @@ function DiffTable({ rows, checked, onToggle, showCurrent = false, dimmed = fals
                 {row.sources.length >= 2 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {row.sources.map(s => {
-                      const agrees = s.value.toLowerCase() === row.newValue.toLowerCase();
+                      const mRow = row.attributeName.match(MULTI_VALUE_RE);
+                      const isPerson = mRow ? PERSON_PREFIXES.has(mRow[1]) : false;
+                      const agrees = normalise(s.value, isPerson) === normalise(row.newValue, isPerson);
                       return (
                         <span
                           key={s.source}
