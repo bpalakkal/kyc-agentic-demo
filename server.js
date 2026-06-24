@@ -1,18 +1,17 @@
 /**
- * KYC Platform — Express proxy server
+ * KYC Platform — Express server (no-forge build)
  *
  * Responsibilities
  * ────────────────
  * 1. Zoom meeting creation  (server-to-server OAuth — credentials stay secret)
- * 2. AWS agent runtime proxy (HTTP ELB behind HTTPS Railway → avoids mixed-
- *    content errors and CORS issues when the browser is on HTTPS GitHub Pages)
+ * 2. All KYC data API routes (Supabase, Neo4j, agent runners)
+ * 3. API-runner two-phase preview/commit flow (no AWS/Forge dependency)
  *
  * Environment variables (set in .env locally, Railway dashboard in production)
  * ─────────────────────────────────────────────────────────────────────────────
  * ZOOM_ACCOUNT_ID      Zoom Server-to-Server OAuth account ID
  * ZOOM_CLIENT_ID       Zoom OAuth client ID
  * ZOOM_CLIENT_SECRET   Zoom OAuth client secret
- * AWS_AGENT_BASE       Base URL of the AWS agent ELB (defaults to the current ELB)
  * PORT                 HTTP port (defaults to 3001)
  *
  * Production deployment
@@ -207,121 +206,7 @@ app.post("/api/zoom/create-meeting", async (req, res) => {
   }
 });
 
-// ─── AWS agent runtime proxy ──────────────────────────────────────────────────
-// The ELB runs on plain HTTP.  This proxy lets the HTTPS browser reach it
-// without mixed-content blocks or CORS rejections.
-//
-// TODO: if the ELB is ever put behind HTTPS + a domain, this proxy can be
-// removed and the frontend can call the ELB directly.
-
-const AWS_AGENT_BASE =
-  process.env.AWS_AGENT_BASE ??
-  "http://gs-forge-agentic-runtime-lb-1873180191.us-east-1.elb.amazonaws.com";
-
-// Fetches a URL and always returns { ok, status, data } — never throws and
-// never forwards raw HTML error pages to the browser.
-// timeoutMs defaults to 25 s so we always respond before Railway's 30 s stream
-// idle timeout, avoiding "Stream idle timeout - partial response received".
-async function proxyFetch(url, options = {}, timeoutMs = 25000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let status = 502;
-  try {
-    const upstream = await fetch(url, { ...options, signal: controller.signal });
-    status = upstream.status;
-    const text = await upstream.text();
-    clearTimeout(timer);
-    console.log(`[agent-proxy] ${options.method ?? "GET"} ${url} → ${status} (${text.length} chars)`);
-    try {
-      return { ok: upstream.ok, status, data: JSON.parse(text) };
-    } catch {
-      // Upstream returned non-JSON (e.g. HTML 404/502 from the load balancer)
-      const preview = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
-      console.error(`[agent-proxy] Non-JSON body from ${url}: ${preview}`);
-      return { ok: false, status, data: { error: `Upstream returned non-JSON (HTTP ${status})`, preview } };
-    }
-  } catch (err) {
-    clearTimeout(timer);
-    if (err.name === "AbortError") {
-      console.error(`[agent-proxy] Timeout (${timeoutMs}ms) fetching ${url}`);
-      return { ok: false, status: 504, data: { error: `Upstream timed out after ${timeoutMs / 1000}s — the agent is still running, keep polling` } };
-    }
-    console.error(`[agent-proxy] Network error fetching ${url}: ${err.message}`);
-    return { ok: false, status, data: { error: `Network error: ${err.message}` } };
-  }
-}
-
-// ── File MIME helpers (used by snapshot route) ────────────────────────────────
-function isImage(filename) {
-  return /\.(png|jpe?g|gif|webp|svg)$/i.test(filename ?? '');
-}
-function guessMime(filename) {
-  if (/\.pdf$/i.test(filename))   return 'application/pdf';
-  if (/\.docx$/i.test(filename))  return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  if (/\.xlsx$/i.test(filename))  return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  if (isImage(filename))          return 'image/png';
-  return 'application/octet-stream';
-}
-
-// Invoke an agent.  Body is forwarded as-is from the frontend, including
-// { async: true } when the frontend uses asyncMode.
-app.post("/api/agent/:slug", requireAuth, async (req, res) => {
-  const url = `${AWS_AGENT_BASE}/api/invoke/${req.params.slug}`;
-  console.log(`[agent-proxy] Invoking agent: ${url}`, req.body);
-  const { status, data } = await proxyFetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req.body ?? {}),
-  });
-  res.status(status).json(data);
-});
-
-// Agent thinking steps — polled every 2 s by the frontend while a run is live.
-app.get("/api/agent-steps/:runId", requireAuth, async (req, res) => {
-  const url = `${AWS_AGENT_BASE}/api/execution-logs/${req.params.runId}/agent-steps`;
-  const { status, data } = await proxyFetch(url);
-  res.status(status).json(data);
-});
-
-// Run status — polled alongside agent-steps to detect completion / failure.
-app.get("/api/agent-run/:runId", requireAuth, async (req, res) => {
-  const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}`;
-  const { status, data } = await proxyFetch(url);
-  res.status(status).json(data);
-});
-
-// Artifacts list for a completed run.
-app.get("/api/agent-artifacts/:runId", requireAuth, async (req, res) => {
-  const url = `${AWS_AGENT_BASE}/api/runs/${req.params.runId}/artifacts`;
-  const { status, data } = await proxyFetch(url);
-  res.status(status).json(data);
-});
-
-// Binary artifact download — streams file content back to the browser.
-// ?path= must be the relative downloadUrl returned by the artifacts endpoint.
-app.get("/api/artifact-download", requireAuth, async (req, res) => {
-  const artifactPath = req.query.path;
-  if (!artifactPath || typeof artifactPath !== "string") {
-    return res.status(400).json({ error: "path query param is required" });
-  }
-  // C4: Validate path to prevent SSRF — must look like /artifacts/<safe-segments>
-  if (!/^\/artifacts\/[A-Za-z0-9_\-\/\.]+$/.test(artifactPath)) {
-    return res.status(400).json({ error: "Invalid artifact path" });
-  }
-  const url = `${AWS_AGENT_BASE}${artifactPath}`;
-  try {
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(30000) });
-    res.status(upstream.status);
-    const ct = upstream.headers.get("content-type");
-    if (ct) res.setHeader("content-type", ct);
-    const cd = upstream.headers.get("content-disposition");
-    if (cd) res.setHeader("content-disposition", cd);
-    const buffer = await upstream.arrayBuffer();
-    res.send(Buffer.from(buffer));
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
+// ─── Supabase API endpoints ───────────────────────────────────────────────────
 
 // ─── Supabase API endpoints ───────────────────────────────────────────────────
 
@@ -358,75 +243,15 @@ app.get('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/entity/:kycRef/snapshot — save a new Forge JSON snapshot
-// Body: { data: <Forge JSON object>, agentId?: string, runId?: string }
-// When runId is provided (autonomous agent run), also creates/updates the agent_runs
-// record and processes any artifact files from the AWS ELB.
+// POST /api/entity/:kycRef/snapshot — save a KYC JSON snapshot
+// Body: { data: <Forge JSON object>, agentId?: string }
 app.post('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
-  const { data, agentId, runId } = req.body ?? {};
+  const { data, agentId } = req.body ?? {};
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ error: 'body.data (object) is required' });
   }
   try {
-    const sbMod = getSb();
-    const row   = await sbMod.saveSnapshot(req.params.kycRef, data, { agentId, runId });
-
-    // When the frontend signals completion of an autonomous run (runId = AWS runId),
-    // create/update agent_runs and harvest any artifact files. Non-fatal on failure.
-    if (runId) {
-      setImmediate(async () => {
-        try {
-          // Upsert agent_runs so re-saves are idempotent.
-          let agentRunId;
-          const { data: existing } = await sbMod.sb
-            .from('agent_runs')
-            .select('id')
-            .eq('external_run_id', runId)
-            .maybeSingle();
-
-          if (existing) {
-            agentRunId = existing.id;
-            await sbMod.updateAgentRun(agentRunId, { status: 'complete' });
-          } else {
-            const ar = await sbMod.createAgentRun({
-              kycRef:      req.params.kycRef,
-              agentSlug:   agentId ?? 'autonomous',
-              runnerType:  'autonomous',
-              initiatedBy: req.user.id,
-            });
-            agentRunId = ar.id;
-            await sbMod.updateAgentRun(agentRunId, { status: 'complete', externalRunId: runId });
-          }
-
-          // Fetch artifact list from AWS and store files.
-          const artifactsResp = await proxyFetch(`${AWS_AGENT_BASE}/api/runs/${runId}/artifacts`, {}, 20000);
-          if (artifactsResp.ok) {
-            const artifacts = artifactsResp.data?.artifacts ?? artifactsResp.data ?? [];
-            const fileList  = Array.isArray(artifacts) ? artifacts : [];
-            const fileMeta  = fileList
-              .filter(a => a.downloadUrl && a.filename)
-              .map(a => ({
-                filename:     a.filename,
-                mimeType:     a.mimeType ?? guessMime(a.filename),
-                fileCategory: isImage(a.filename) ? 'screenshot' : 'document',
-                title:        a.name ?? a.filename,
-                artifactPath: a.downloadUrl,
-                sourceUrl:    a.sourceUrl ?? null,
-              }));
-
-            if (fileMeta.length > 0) {
-              const { FilePublisher } = await import('./agents/publishers/FilePublisher.js');
-              const pub = new FilePublisher(sbMod.sb);
-              await pub.publish(req.params.kycRef, agentRunId, fileMeta, req.user.id);
-              console.log(`[snapshot] Stored ${fileMeta.length} artifact(s) for ${req.params.kycRef}`);
-            }
-          }
-        } catch (err) {
-          console.error(`[snapshot] agent_runs / file pipeline failed: ${err.message}`);
-        }
-      });
-    }
-
+    const row = await getSb().saveSnapshot(req.params.kycRef, data, { agentId });
     res.status(201).json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -684,44 +509,6 @@ app.delete('/api/agent-run-api/:runId', requireAuth, async (req, res) => {
     apiRunnerSteps.delete(req.params.runId);
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST /api/agent-run/async/:slug — start an autonomous AWS agent and persist the run
-// Body: { kycRef: string, entityName: string }
-// Returns: { agentRunId, externalRunId } — frontend continues to poll externalRunId as before
-app.post('/api/agent-run/async/:slug', requireAuth, async (req, res) => {
-  const { slug } = req.params;
-  const { kycRef, entityName } = req.body ?? {};
-  if (!kycRef)     return res.status(400).json({ error: 'kycRef is required' });
-  if (!entityName) return res.status(400).json({ error: 'entityName is required' });
-
-  let autonomousRunners;
-  try {
-    autonomousRunners = await import('./agents/runners/autonomous/index.js');
-  } catch (e) {
-    return res.status(503).json({ error: `Autonomous runner modules unavailable: ${e.message}` });
-  }
-
-  const RunnerMap = {
-    'uk-parent-flow':                        autonomousRunners.UKParentFlowRunner,
-    'uk-companies-house':                    autonomousRunners.CHRunner,
-    'uk-jersey-financial-services-commission': autonomousRunners.JerseyRunner,
-  };
-
-  const RunnerClass = RunnerMap[slug];
-  if (!RunnerClass) {
-    return res.status(404).json({ error: `No autonomous runner registered for slug "${slug}"` });
-  }
-
-  try {
-    const runner = new RunnerClass(getSb().sb);
-    const result = await runner.invoke({ kycRef, entityName, initiatedBy: req.user.id });
-    // Include runId so the frontend polling code (which reads d.runId) picks up externalRunId
-    res.json({ ...result, runId: result.externalRunId });
-  } catch (err) {
-    console.error(`[async-runner] ${slug} failed: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });

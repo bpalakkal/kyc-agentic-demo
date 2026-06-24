@@ -23,41 +23,15 @@
  *
  * runAgents()       Core orchestration function.
  *                   1. Creates AgentRun records (pending/running/done).
- *                   2. For each live agent: POSTs to the proxy with
- *                      { ...buildBody(), async: true }.
+ *                   2. For each live agent: POSTs to /api/agent-run/api/:slug.
  *                   3. Receives { runId, status: "running" } immediately.
- *                   4. Starts startPolling(runId) — polls every 2 s:
- *                        a. GET /api/agent-steps/:runId  → live step stream
- *                        b. GET /api/agent-run/:runId    → completion status
- *                   5. On completion, builds final thought list and marks done.
+ *                   4. Starts startApiRunnerPolling(runId) — polls every 2 s:
+ *                        a. GET /api/agent-run-api-steps/:runId → live step strings
+ *                        b. GET /api/agent-run-api-status/:runId → DB status
+ *                   5. On pending_review, opens AttributeDiffModal for analyst review.
+ *                   6. On accept, publishes to DB and marks done.
  *
- * Step parsing pipeline
- * ──────────────────────
- * Raw API response → extractRawSteps() → buildThoughtsFromAgentSteps()
- *
- *   extractRawSteps   Normalises whatever shape the API returns into a flat
- *                     array of step objects.  Handles bare arrays of node
- *                     objects ([{node_alias, agent_steps:[]},...]), the
- *                     {value:[...], Count:N} envelope, and several fallback
- *                     keyed shapes.
- *
- *   buildThoughtsFromAgentSteps
- *                     Maps each step to a human-readable string:
- *                       "reasoning" / "thinking" → 💭 cleaned text
- *                       "tool_call" / "tool_use"  → semantic conversion or
- *                                                   suppressed (see SUPPRESSED set)
- *                       "node_header" (synthetic) → 📍 Node: alias (Xs)
- *                     Add entries to SUPPRESSED to hide internal tool noise.
- *                     Add new `if (name === "...")` branches to convert tool
- *                     calls into readable statements.
- *
- * Proxy (server.js)
- * ─────────────────
- * Browser → HTTPS Railway proxy → HTTP AWS ELB (CORS + mixed-content bypass)
- * Routes: POST /api/agent/:slug, GET /api/agent-steps/:runId,
- *         GET /api/agent-run/:runId
- * Set VITE_AGENT_API_BASE in GitHub Secrets (build-time) and Railway env
- * (runtime) to the Railway URL.
+ * All live agents use the apiRunner two-phase preview/commit flow.
  */
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
@@ -123,14 +97,14 @@ export const AGENTS: Agent[] = [
     description: "Queries the CH REST API directly — incorporation, filing status, officers, PSCs, and document download.",
     defaultThoughts: ["Searching Companies House…", "Fetching company details, officers, PSCs…", "Downloading incorporation documents…", "Digitizing documents with Claude…"] },
   { id: "jersey-fsc", name: "Jersey FSC", short: "JFSC", icon: Landmark,
-    description: "Sources data from the Jersey Financial Services Commission registry for regulated entities.",
+    description: "Sources data from the Jersey Financial Services Commission registry via the Claude SDK.",
     defaultThoughts: ["Connecting to JFSC registry…", "Searching entity name…", "Awaiting API response…"] },
   { id: "fca", name: "FCA Register", short: "FCA", icon: Scale,
     description: "Sources regulatory data from the UK Financial Conduct Authority register.",
     defaultThoughts: ["Connecting to FCA register…", "Searching entity name…", "Awaiting API response…"] },
   { id: "uk-sourcing-flow", name: "UK Data Sourcing — All Sources", short: "UK All", icon: Database,
-    description: "Triggers FCA, Companies House, and Jersey FSC in parallel — merges all sources with full multi-lineage tracking.",
-    defaultThoughts: ["Querying FCA Register…", "Querying Companies House directly…", "Invoking Jersey FSC on Forge…", "Polling Jersey FSC…", "Merging attributes across 3 sources…"] },
+    description: "Triggers FCA Register and Companies House in parallel — merges both sources with full multi-lineage tracking.",
+    defaultThoughts: ["Querying FCA Register…", "Querying Companies House directly…", "Merging attributes across 2 sources…"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -139,11 +113,11 @@ const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<
 // One bundle per route.  The strip picks the matching route; falls back to
 // the last entry.  TODO: drive this from a backend config (per-user, per-case).
 export const RECOMMENDED_BUNDLES: { route: string; label: string; reason: string; agents: AgentId[] }[] = [
-  { route: "/work-queue/review", label: "Full UK Data Sourcing", reason: "Recommended · FCA + Companies House + Jersey FSC in one run",
+  { route: "/work-queue/review", label: "Full UK Data Sourcing", reason: "Recommended · FCA + Companies House in one run",
     agents: ["uk-sourcing-flow"] },
   { route: "/work-queue", label: "Bulk Triage Selected Cases", reason: "Best for UK-registered entities in queue",
     agents: ["uk-sourcing-flow"] },
-  { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · full UK entity orchestration",
+  { route: "/", label: "Daily KYC Refresh", reason: "Recommended each morning · full UK entity sourcing",
     agents: ["uk-sourcing-flow"] },
 ];
 
@@ -217,11 +191,13 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
     skipSnapshot: true,
   },
   "jersey-fsc": {
-    slug: "uk-jersey-financial-services-commission",
-    endpoint: "/api/agent-run/async/uk-jersey-financial-services-commission",
+    slug: "jersey-fsc",
+    endpoint: "/api/agent-run/api/jersey-fsc",
     buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
   },
   "fca": {
     slug: "fca",
@@ -608,76 +584,6 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         });
       };
 
-      // Live-update the dock thoughts without marking the run done yet
-      const updateLiveThoughts = (steps: unknown[]) => {
-        if (steps.length === 0) return;
-        const thoughts = buildThoughtsFromAgentSteps(steps);
-        setRuns((prev) => {
-          const idx = prev.findIndex((r) => r.id === run.id);
-          if (idx === -1 || prev[idx].state !== "running") return prev;
-          const next = [...prev];
-          next[idx] = { ...next[idx], thoughts, currentThought: thoughts.length - 1 };
-          return next;
-        });
-      };
-
-      // Poll agent-steps and run-status until complete
-      // H5: cancelled flag prevents setRuns after unmount
-      const startPolling = (runId: string, cancelled: { current: boolean }) => {
-        let polls = 0;
-        const poll = async () => {
-          if (cancelled.current) return;
-          polls++;
-          if (polls > 1800) { markDone(["⚠ Agent run timed out after 60 minutes"]); return; }
-
-          // Fetch latest thinking steps and show them live
-          try {
-            const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
-            const stepsRaw = await sr.json() as unknown;
-            if (!cancelled.current) updateLiveThoughts(extractRawSteps(stepsRaw));
-          } catch { /* non-fatal — keep polling */ }
-
-          // Check completion status
-          try {
-            const rr = await apiFetch(`${AGENT_API_BASE}/api/agent-run/${runId}`);
-            const rd = await rr.json() as Record<string, unknown>;
-            const status = String(rd.status ?? "");
-
-            if (["complete", "completed", "done", "succeeded"].includes(status)) {
-              // Final step fetch so we get every thought before marking done
-              try {
-                const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
-                const stepsRaw = await sr.json() as unknown;
-                const steps = extractRawSteps(stepsRaw);
-                markDone(
-                  steps.length > 0 ? buildThoughtsFromAgentSteps(steps, rd) : buildThoughtsFromResult(rd, run.agentId),
-                  rd,
-                );
-              } catch { markDone(buildThoughtsFromResult(rd, run.agentId), rd); }
-              if (!cfg.skipSnapshot) await saveSnapshot(rd, runId);
-              return;
-            }
-            if (["failed", "error", "cancelled"].includes(status)) {
-              // Show whatever steps ran before the failure, then append the error
-              const errLine = `⚠ Run ${status}: ${String(rd.error ?? rd.message ?? "unknown error")}`;
-              try {
-                const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${runId}`);
-                const stepsRaw = await sr.json() as unknown;
-                const steps = extractRawSteps(stepsRaw);
-                const thoughts = steps.length > 0
-                  ? [...buildThoughtsFromAgentSteps(steps), errLine]
-                  : [errLine];
-                markDone(thoughts, rd);
-              } catch { markDone([errLine], rd); }
-              return;
-            }
-          } catch { /* non-fatal — keep polling */ }
-
-          setTimeout(poll, 2000);
-        };
-        setTimeout(poll, 1500); // first poll after 1.5 s
-      };
-
       // Poll for API runner steps (plain string array) and status (from agent_runs table).
       // When status reaches 'pending_review', open the diff modal instead of marking done.
       const startApiRunnerPolling = (runId: string, kycRef: string, cancelled: { current: boolean }) => {
@@ -785,27 +691,14 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 
           // Already complete (sync response or instant agent)
           if (!runId || !cfg.asyncMode || ["complete", "completed", "done"].includes(status)) {
-            let thoughts: string[] = [];
-            if (cfg.fetchSteps && runId) {
-              try {
-                const sr = await apiFetch(`${AGENT_API_BASE}/api/agent-steps/${String(runId)}`);
-                const stepsRaw = await sr.json() as unknown;
-                const steps = extractRawSteps(stepsRaw);
-                if (steps.length > 0) thoughts = buildThoughtsFromAgentSteps(steps, data);
-              } catch { /* fall through */ }
-            }
-            markDone(thoughts.length > 0 ? thoughts : buildThoughtsFromResult(data, run.agentId), data);
+            markDone(buildThoughtsFromResult(data, run.agentId), data);
             if (!cfg.skipSnapshot) await saveSnapshot(data, String(runId ?? ""));
             return;
           }
 
-          // Async: route to the appropriate polling function
-          if (cfg.apiRunner) {
-            const kycRef = ctx?.kyc ?? "";
-            startApiRunnerPolling(String(runId), kycRef, cancelled);
-          } else {
-            startPolling(String(runId), cancelled);
-          }
+          // Async: start API runner polling
+          const kycRef = ctx?.kyc ?? "";
+          startApiRunnerPolling(String(runId), kycRef, cancelled);
         })
         .catch((err: Error) => {
           if (!cancelled.current) markDone([`⚠ API error: ${err.message}`]);
