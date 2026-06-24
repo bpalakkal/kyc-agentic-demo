@@ -344,6 +344,7 @@ async function loadRunnerClass(slug) {
   const map = {
     'companies-house':  runners.CompaniesHouseRunner,
     'fca':              runners.FCARunner,
+    'jersey-fsc':       runners.JerseyFSCRunner,
     'uk-sourcing-flow': runners.UKSourcingFlowRunner,
   };
   return map[slug] ?? null;
