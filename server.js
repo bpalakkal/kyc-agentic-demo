@@ -344,8 +344,13 @@ async function loadRunnerClass(slug) {
   const map = {
     'companies-house':  runners.CompaniesHouseRunner,
     'fca':              runners.FCARunner,
+    'gleif':            runners.GLEIFRunner,
+    'iapd':             runners.IAPDRunner,
     'jersey-fsc':       runners.JerseyFSCRunner,
+    'nyse':             runners.NYSERunner,
+    'sec':              runners.SECEDGARRunner,
     'uk-sourcing-flow': runners.UKSourcingFlowRunner,
+    'us-sourcing-flow': runners.USSourcingFlowRunner,
   };
   return map[slug] ?? null;
 }

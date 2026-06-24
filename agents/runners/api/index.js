@@ -1,4 +1,9 @@
 export { CompaniesHouseRunner }    from './CompaniesHouseRunner.js';
 export { FCARunner }               from './FCARunner.js';
+export { GLEIFRunner }             from './GLEIFRunner.js';
+export { IAPDRunner }              from './IAPDRunner.js';
 export { JerseyFSCRunner }         from './JerseyFSCRunner.js';
+export { NYSERunner }              from './NYSERunner.js';
+export { SECEDGARRunner }          from './SECEDGARRunner.js';
 export { UKSourcingFlowRunner }    from './UKSourcingFlowRunner.js';
+export { USSourcingFlowRunner }    from './USSourcingFlowRunner.js';

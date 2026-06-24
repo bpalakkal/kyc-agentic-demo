@@ -38,7 +38,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import {
   Bot, Sparkles, ChevronDown, ChevronUp, X, Loader2, CheckCircle2, Play, Search,
   ShieldCheck, FileCheck2, Database, Mail, Scale, UserCheck, Globe, Brain, Zap, Minus, Building2,
-  Network, Landmark,
+  Network, Landmark, FileText, BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
@@ -51,7 +51,8 @@ import { AttributeDiffModal, type PendingDiff } from "@/components/kyc/Attribute
 export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
   | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
-  | "companies-house" | "jersey-fsc" | "fca" | "uk-sourcing-flow";
+  | "companies-house" | "jersey-fsc" | "fca" | "uk-sourcing-flow"
+  | "gleif" | "sec" | "iapd" | "nyse" | "us-sourcing-flow";
 
 export type Agent = {
   id: AgentId;
@@ -105,6 +106,21 @@ export const AGENTS: Agent[] = [
   { id: "uk-sourcing-flow", name: "UK Data Sourcing — All Sources", short: "UK All", icon: Database,
     description: "Triggers FCA Register and Companies House in parallel — merges both sources with full multi-lineage tracking.",
     defaultThoughts: ["Querying FCA Register…", "Querying Companies House directly…", "Merging attributes across 2 sources…"] },
+  { id: "gleif", name: "GLEIF — Global LEI", short: "GLEIF", icon: Globe,
+    description: "Looks up the Legal Entity Identifier (LEI) via the GLEIF open API — legal name, jurisdiction, addresses, and LEI status.",
+    defaultThoughts: ["Searching GLEIF by legal name…", "Fetching LEI record…", "Extracting LEI attributes…"] },
+  { id: "sec", name: "SEC EDGAR", short: "SEC", icon: FileText,
+    description: "Searches SEC EDGAR for CIK, entity type, SIC code, EIN, tickers, and incorporation state via the EDGAR submissions API.",
+    defaultThoughts: ["Searching EDGAR for entity name…", "Fetching submissions record…", "Extracting SEC attributes…"] },
+  { id: "iapd", name: "IAPD — Investment Adviser", short: "IAPD", icon: Scale,
+    description: "Queries IAPD/Form ADV for registered investment advisers — CRD number, registration status, AUM, and principal office.",
+    defaultThoughts: ["Searching IAPD for firm name…", "Fetching Form ADV data…", "Extracting adviser attributes…"] },
+  { id: "nyse", name: "NYSE Listing", short: "NYSE", icon: BarChart2,
+    description: "Checks NYSE/NASDAQ listing status via the NYSE quotes filter API — ticker symbol, exchange, and listing status.",
+    defaultThoughts: ["Searching NYSE/NASDAQ listings…", "Checking listing status…", "Extracting ticker attributes…"] },
+  { id: "us-sourcing-flow", name: "US Data Sourcing — All Sources", short: "US All", icon: Database,
+    description: "Triggers GLEIF, SEC EDGAR, IAPD, and NYSE in parallel — merges all four sources with priority ordering.",
+    defaultThoughts: ["Querying GLEIF, SEC EDGAR, IAPD, and NYSE in parallel…", "Merging attributes across 4 sources…", "Ready for review"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -139,7 +155,8 @@ const AGENT_CATEGORIES: AgentCategoryDef[] = [
   {
     id: "us-sourcing",
     label: "US Data Sourcing",
-    agentIds: [],
+    triggerAllId: "us-sourcing-flow",
+    agentIds: ["gleif", "sec", "iapd", "nyse"],
   },
   {
     id: "screening",
@@ -211,6 +228,51 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
   "uk-sourcing-flow": {
     slug: "uk-sourcing-flow",
     endpoint: "/api/agent-run/api/uk-sourcing-flow",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
+  },
+  "gleif": {
+    slug: "gleif",
+    endpoint: "/api/agent-run/api/gleif",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
+  },
+  "sec": {
+    slug: "sec",
+    endpoint: "/api/agent-run/api/sec",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
+  },
+  "iapd": {
+    slug: "iapd",
+    endpoint: "/api/agent-run/api/iapd",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
+  },
+  "nyse": {
+    slug: "nyse",
+    endpoint: "/api/agent-run/api/nyse",
+    buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
+    fetchSteps: true,
+    asyncMode: true,
+    apiRunner: true,
+    skipSnapshot: true,
+  },
+  "us-sourcing-flow": {
+    slug: "us-sourcing-flow",
+    endpoint: "/api/agent-run/api/us-sourcing-flow",
     buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
     fetchSteps: true,
     asyncMode: true,
