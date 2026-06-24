@@ -2118,7 +2118,7 @@ const ExceptionReview = () => {
                       const agenda = (document.getElementById("zoom-agenda") as HTMLTextAreaElement)?.value ?? "";
                       const durationMins = parseInt(zoomDuration);
                       const startTime = new Date(`${zoomDate}T${zoomTime}:00Z`).toISOString();
-                      const res = await fetch(`${AGENT_API_BASE}/api/zoom/create-meeting`, {
+                      const res = await apiFetch(`${AGENT_API_BASE}/api/zoom/create-meeting`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({

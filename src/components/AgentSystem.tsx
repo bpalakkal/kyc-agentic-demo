@@ -179,9 +179,9 @@ const AGENT_CATEGORIES: AgentCategoryDef[] = [
   },
 ];
 
-// VITE_AGENT_API_BASE is injected at build time from GitHub Secrets.
-// Locally it falls back to the Express proxy on 3002 (`npm run server`).
-export const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3002";
+// VITE_AGENT_API_BASE is injected at build time from GitHub Secrets / Railway env.
+// Locally it falls back to the Express server default port.
+export const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
 // EntityCtx is set by ExceptionReview when an entity is open, giving
 // Live Data Source agents the entity name to search for.

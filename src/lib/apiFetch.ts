@@ -3,9 +3,10 @@
  * Automatically injects the current Supabase session JWT as a Bearer token
  * so every call to the Express backend passes the C3 authentication check.
  */
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 
-let currentSession: any = null;
+let currentSession: Session | null = null;
 
 // Initialize session tracking on module load
 supabase.auth.onAuthStateChange((_event, session) => {

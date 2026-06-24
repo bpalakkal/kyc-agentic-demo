@@ -126,14 +126,17 @@ function getNeo4j() {
 
 const app = express();
 
+// CORS_ORIGIN env var allows adding extra allowed origins at deploy time (comma-separated).
 const ALLOWED_ORIGINS = [
   "https://bpalakkal.github.io",
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()) : []),
 ];
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow server-to-server requests (no Origin header), any localhost port, and whitelisted origins
+    // Allow server-to-server requests (no Origin header) and whitelisted origins.
     if (!origin) return cb(null, true);
-    if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
+    // Localhost only allowed in development — never in production to prevent request forgery.
+    if (process.env.NODE_ENV !== 'production' && /^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
     if (ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
@@ -1034,8 +1037,10 @@ app.get("/api/health", async (_req, res) => {
 
   // Supabase is required; Neo4j is optional (graph feature only)
   const ok = checks.supabase === "ok";
-  // Only expose details to authenticated internal callers; external probes get ok/fail only
-  const detailed = req.headers['x-health-token'] === process.env.HEALTH_SECRET;
+  // Only expose details when HEALTH_SECRET is configured AND the caller provides it.
+  // If HEALTH_SECRET is unset, all callers get the minimal { ok } response.
+  const secret = process.env.HEALTH_SECRET;
+  const detailed = !!secret && req.headers['x-health-token'] === secret;
   res.status(ok ? 200 : 503).json(detailed ? { ok, ...checks } : { ok });
 });
 

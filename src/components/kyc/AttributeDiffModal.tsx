@@ -14,8 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import type { ForgeLineageEntry } from "@/types/forgeTypes";
-
-const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
+import { AGENT_API_BASE } from "@/components/AgentSystem";
 
 export interface PendingDiff {
   runId: string;
