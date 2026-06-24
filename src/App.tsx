@@ -60,7 +60,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter basename="/kyc-agentic2">
+        <BrowserRouter basename="/kyc-agentic">
           <AuthProvider>
             <AppRoutes />
           </AuthProvider>
