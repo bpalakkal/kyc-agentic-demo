@@ -69,7 +69,6 @@ export default function Login() {
           <div className="w-[3px] h-[28px] rounded-full bg-gradient-to-b from-blue-400 to-indigo-400 shrink-0" />
           <div>
             <div className="text-[22px] font-bold text-white tracking-tight leading-tight">KYC Sentinel</div>
-            <div className="text-[10px] text-blue-300 uppercase tracking-widest leading-tight">Powered by Forge</div>
           </div>
         </div>
         <p className="text-blue-200 text-sm text-center max-w-[220px] leading-relaxed">
@@ -85,7 +84,6 @@ export default function Login() {
             <div className="w-[3px] h-[22px] rounded-full bg-gradient-to-b from-blue-500 to-indigo-500 shrink-0" />
             <div>
               <div className="text-[17px] font-bold text-foreground tracking-tight leading-tight">KYC Sentinel</div>
-              <div className="text-[9px] text-muted-foreground uppercase tracking-widest leading-tight">Powered by Forge</div>
             </div>
           </div>
 
