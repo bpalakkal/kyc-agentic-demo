@@ -38,6 +38,10 @@ export interface AttributeOutput {
   exceptionFlag: boolean;
   exceptionType?: string;
   lineage: LineageEntry[];
+  // DD-result fields (populated by DdRunner; null for sourcing agents)
+  idReasoning?: string | null;
+  verificationSources?: string[] | null;
+  verificationReasoning?: string | null;
 }
 
 export interface LineageEntry {

@@ -118,6 +118,12 @@ my-app/
 
 **Bold columns** were added to existing tables by migrations.
 
+### Migration 008 additions
+- `entity_persons.snapshot_id` is now **nullable** — agent-run runners (no Forge snapshot) can write party records directly.
+- `entity_attributes.id_reasoning text` — DD agent reasoning for why id_flag was set.
+- `entity_attributes.verification_reasoning text` — DD agent reasoning for why verification_flag was set.
+- `entity_attributes.verification_source` type changed from `text` → **`jsonb`** to hold an array of independent verification sources.
+
 ### agent_runs status values
 `running` → `pending_review` → `complete` | `failed` | `cancelled`
 
@@ -136,6 +142,18 @@ my-app/
 `src/db/supabase.js` `getAttributes(kycRef)` merges:
 1. **Layer 1**: latest Forge snapshot attributes (`snapshot_id` set, `agent_run_id` null)
 2. **Layer 2**: completed (`status='complete'`) agent-run attributes (`snapshot_id` null, `agent_run_id` set) — most recent run wins per attribute_name
+
+### getPersons() — two-layer merge (migration 008+)
+`src/db/supabase.js` `getPersons(kycRef)` merges:
+1. **Layer 1**: latest Forge snapshot persons (`snapshot_id` set)
+2. **Layer 2**: agent-run persons (`snapshot_id IS NULL` — written by no-Forge API runners) — override per role+person_index
+
+### Party data pattern (nested, NOT flat)
+Sourcing agents (CompaniesHouseRunner etc.) write party data to **`entity_persons`** (one row per person), NOT as flat `beneficial_owner_1_name` rows in `entity_attributes`.
+- `entity_persons.attributes` (jsonb): child attributes keyed by full name, e.g. `{ "beneficial_owner_name": { lineage:[...], id_flag: false, ... }, ... }`
+- `buildEntityDataJson(attrs, persons)` in `agents/dd/entityData.js` reconstructs the full nested entity_data.json format for DD agent input
+- DD agents update `entity_persons.attributes` in-place for party results (record_index present)
+- Scalar DD results still emit as entity_attributes rows via the normal publisher pipeline
 
 Agent-run attributes override snapshot attributes for the same `attribute_name`.
 
@@ -301,6 +319,7 @@ scripts/migrations/002_agent_runs_status_constraint.sql
 scripts/migrations/003_entity_attributes_confidence.sql
 scripts/migrations/006_screening.sql
 scripts/migrations/007_kyc_ref_from_ids.sql    ← WIPES all case data (TRUNCATE entities CASCADE)
+scripts/migrations/008_persons_and_dd_columns.sql  ← entity_persons nullable + DD reasoning cols
 ```
 
 ## API Authentication & Connectivity

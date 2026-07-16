@@ -20,6 +20,7 @@
  */
 
 import { ApiRunner } from '../../base/ApiRunner.js';
+import { savePersons } from '../../../src/db/supabase.js';
 import Anthropic from '@anthropic-ai/sdk';
 
 const CH_BASE = 'https://api.company-information.service.gov.uk';
@@ -70,11 +71,18 @@ export class CompaniesHouseRunner extends ApiRunner {
     }
     this.step(`Company details retrieved — ${officersData.length} officer(s), ${pscData.length} PSC(s)`);
 
-    // ── Phase 1: Map to AttributeOutput[] ────────────────────────────────────
+    // ── Phase 1: Map scalar attributes + save party records ─────────────────
     this.step('Extracting attributes from Companies House data…');
     const sourceUrl = `https://find-and-update.company-information.service.gov.uk/company/${companyNumber}`;
-    const phase1Attrs = this._mapToAttributes(companyDetails, officersData, pscData, companyNumber, sourceUrl);
+    const phase1Attrs = this._mapToAttributes(companyDetails, companyNumber, sourceUrl);
     this.step(`${phase1Attrs.length} attribute(s) extracted from Companies House API`);
+
+    this.step(`Saving ${pscData.length} PSC(s) and ${officersData.length} officer(s) to entity_persons…`);
+    const persons = this._mapToPersons(officersData, pscData, sourceUrl);
+    if (persons.length > 0) {
+      await savePersons(kycRef, persons);
+      this.step(`Saved ${persons.length} person record(s) (${pscData.length} PSC(s) → beneficial_owner + key_controller, ${officersData.length} officer(s) → corporate_officer)`);
+    }
 
     // ── Phase 2: Download incorporation + name-change documents ──────────────
     this.step('Retrieving incorporation and name-change filing history…');
@@ -223,9 +231,11 @@ export class CompaniesHouseRunner extends ApiRunner {
     return allItems;
   }
 
-  // ── Phase 1: Attribute mapping ──────────────────────────────────────────────
+  // ── Phase 1: Scalar attribute mapping ──────────────────────────────────────
+  // Only entity-level scalar attributes go here.
+  // Party data (officers, PSCs) is written to entity_persons via _mapToPersons().
 
-  _mapToAttributes(company, officers, pscs, companyNumber, sourceUrl) {
+  _mapToAttributes(company, companyNumber, sourceUrl) {
     const attrs = [];
     const fetchedAt = new Date().toISOString();
     const SOURCE = 'Companies House';
@@ -304,29 +314,94 @@ export class CompaniesHouseRunner extends ApiRunner {
       if (prevNames) push('previous_names', prevNames);
     }
 
-    // Corporate officers (active only — already filtered by the API call)
-    officers.forEach((officer, i) => {
-      const name = officer.name;
-      const role = officer.officer_role;
-      if (name) {
-        push(`corporate_officer_${i + 1}`, role ? `${name} (${role})` : name);
-      }
-    });
-
-    // PSCs (Persons with Significant Control) — mapped to key_controller only.
-    // CH does not provide verified beneficial ownership data; PSCs ≠ beneficial owners.
-    pscs.forEach((psc, i) => {
-      const name = psc.name;
-      const kind = psc.kind; // 'individual-person-with-significant-control' | 'corporate-entity-...' etc.
-      const isCorporate = kind && kind.includes('corporate');
-
-      if (name) {
-        const displayName = isCorporate ? `${name} (corporate)` : name;
-        push(`key_controller_${i + 1}`, displayName);
-      }
-    });
-
     return attrs;
+  }
+
+  // ── Phase 1: Person record mapping ─────────────────────────────────────────
+  // Builds entity_persons rows for all PSCs (→ beneficial_owner + key_controller)
+  // and officers (→ corporate_officer).  Each person's child attributes are stored
+  // in the attributes jsonb using the full child-attribute name as key so that
+  // buildEntityDataJson() can reconstruct the nested entity_data.json format.
+
+  _mapToPersons(officers, pscs, sourceUrl) {
+    const fetchedAt = new Date().toISOString();
+    const SOURCE = 'Companies House';
+    const persons = [];
+
+    const lb = (value) => {
+      if (value === null || value === undefined) return null;
+      const val = String(value).trim();
+      if (!val || val.toLowerCase() === 'n/a') return null;
+      return {
+        id_flag: false, id_source: null, id_reasoning: null,
+        verification_flag: false, verification_source: [], verification_reasoning: null,
+        exception_flag: false, exception_type: null,
+        lineage: [{ value: val, source: SOURCE, source_url: sourceUrl, timestamp: fetchedAt, confidence_score: 1.0 }],
+      };
+    };
+
+    // PSCs → beneficial_owner rows (and mirrored as key_controller)
+    pscs.forEach((psc, i) => {
+      const isCorporate = psc.kind?.includes('corporate');
+      const dobStr      = this._formatDob(psc.date_of_birth);
+      const addrStr     = psc.address ? this._formatAddress(psc.address) : null;
+      const naturesStr  = (psc.natures_of_control ?? []).join('; ') || null;
+
+      const boAttrs = {};
+      const set = (k, v) => { const b = lb(v); if (b) boAttrs[k] = b; };
+      set('beneficial_owner_name',                 psc.name);
+      set('beneficial_owner_address',              addrStr);
+      set('beneficial_owner_date_of_birth',        dobStr);
+      set('beneficial_owner_nationality',          psc.nationality);
+      set('beneficial_owner_country_of_residence', psc.country_of_residence);
+      set('beneficial_owner_legal_structure',      isCorporate ? 'Corporate entity' : 'Individual');
+      set('beneficial_owner_nature_of_control',    naturesStr);
+
+      persons.push({
+        role: 'beneficial_owner', personIndex: i,
+        fullName: psc.name ?? null, ownershipPct: null,
+        nationality: psc.nationality ?? null, attributes: boAttrs,
+      });
+
+      // key_controller mirrors the same PSC data with kc_ prefix
+      const kcAttrs = {};
+      for (const [k, v] of Object.entries(boAttrs)) {
+        kcAttrs[k.replace('beneficial_owner_', 'key_controller_')] = v;
+      }
+      persons.push({
+        role: 'key_controller', personIndex: i,
+        fullName: psc.name ?? null, ownershipPct: null,
+        nationality: psc.nationality ?? null, attributes: kcAttrs,
+      });
+    });
+
+    // Officers → corporate_officer rows
+    officers.forEach((officer, i) => {
+      const dobStr  = this._formatDob(officer.date_of_birth);
+      const addrStr = officer.address ? this._formatAddress(officer.address) : null;
+
+      const coAttrs = {};
+      const set = (k, v) => { const b = lb(v); if (b) coAttrs[k] = b; };
+      set('corporate_officer_name',                   officer.name);
+      set('corporate_officer_date_of_birth',          dobStr);
+      set('corporate_officer_correspondence_address', addrStr);
+      set('corporate_officer_nationality',            officer.nationality);
+      set('corporate_officer_country_of_residence',   officer.country_of_residence);
+
+      persons.push({
+        role: 'corporate_officer', personIndex: i,
+        fullName: officer.name ?? null, ownershipPct: null,
+        nationality: officer.nationality ?? null, attributes: coAttrs,
+      });
+    });
+
+    return persons;
+  }
+
+  _formatDob(dob) {
+    if (!dob) return null;
+    const parts = [dob.year, dob.month ? String(dob.month).padStart(2, '0') : null].filter(Boolean);
+    return parts.length ? parts.join('-') : null;
   }
 
   // ── Phase 2: Filing history ─────────────────────────────────────────────────

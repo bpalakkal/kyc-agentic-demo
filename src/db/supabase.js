@@ -288,7 +288,7 @@ export async function saveSnapshot(kycRef, data, { agentId, runId } = {}) {
  * Optionally filter by group ('core', 'wgq').
  */
 export async function getAttributes(kycRef, { group } = {}) {
-  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage';
+  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, lineage';
 
   // ── Layer 1: latest Forge snapshot ──────────────────────────────────────────
   let snapshotAttrs = [];
@@ -385,7 +385,7 @@ export async function getAttributes(kycRef, { group } = {}) {
  * Used by the Tracing panel.
  */
 export async function getAttributeTrace(kycRef, attributeName) {
-  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage';
+  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, lineage';
 
   // Layer 1: latest Forge snapshot
   const { data: snap } = await sb
@@ -433,36 +433,108 @@ export async function getAttributeTrace(kycRef, attributeName) {
 
 // ─── Person queries ───────────────────────────────────────────────────────────
 
+const PERSON_SELECT = 'id, role, person_index, full_name, ownership_pct, nationality, attributes';
+
 /**
- * Return all person records for the latest snapshot, grouped by role.
+ * Return all person records for an entity, merging:
+ *   1. Latest Forge snapshot persons (base layer)
+ *   2. Agent-run persons (snapshot_id IS NULL — override layer, written by no-Forge API runners)
+ *
  * Shape: { beneficial_owner: [...], key_controller: [...], ... }
+ * Within each role, records are sorted by person_index ascending.
  */
 export async function getPersons(kycRef) {
-  const { data: snap, error: snapErr } = await sb
-    .from('entity_snapshots')
-    .select('id')
-    .eq('kyc_ref', kycRef)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (snapErr) throw snapErr;
-  if (!snap) return {};
+  // Layer 1: latest Forge snapshot persons.
+  let snapshotPersons = [];
+  {
+    const { data: snap, error: snapErr } = await sb
+      .from('entity_snapshots')
+      .select('id')
+      .eq('kyc_ref', kycRef)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (snapErr) throw snapErr;
 
-  const { data, error } = await sb
+    if (snap) {
+      const { data, error } = await sb
+        .from('entity_persons')
+        .select(PERSON_SELECT)
+        .eq('kyc_ref', kycRef)
+        .eq('snapshot_id', snap.id)
+        .order('role')
+        .order('person_index');
+      if (error) throw error;
+      snapshotPersons = data ?? [];
+    }
+  }
+
+  // Layer 2: agent-run persons (snapshot_id IS NULL).
+  const { data: agentPersons, error: apErr } = await sb
     .from('entity_persons')
-    .select('role, person_index, full_name, ownership_pct, nationality, attributes')
+    .select(PERSON_SELECT)
     .eq('kyc_ref', kycRef)
-    .eq('snapshot_id', snap.id)
+    .is('snapshot_id', null)
     .order('role')
     .order('person_index');
-  if (error) throw error;
+  if (apErr) throw apErr;
 
-  // Group by role.
+  // Merge: agent-run overrides snapshot for same role + person_index.
+  const merged = new Map();
+  for (const p of snapshotPersons)        merged.set(`${p.role}:${p.person_index}`, p);
+  for (const p of (agentPersons ?? []))   merged.set(`${p.role}:${p.person_index}`, p);
+
   const grouped = {};
-  for (const p of data ?? []) {
+  for (const p of merged.values()) {
     (grouped[p.role] ??= []).push(p);
   }
+  for (const role of Object.keys(grouped)) {
+    grouped[role].sort((a, b) => (a.person_index ?? 0) - (b.person_index ?? 0));
+  }
   return grouped;
+}
+
+/**
+ * Bulk-write agent-run person records for an entity (no Forge snapshot required).
+ * Replaces all existing agent-run persons (snapshot_id IS NULL) for this kyc_ref,
+ * then inserts the new rows.
+ *
+ * @param {string} kycRef
+ * @param {Array<{
+ *   role: string,
+ *   personIndex: number,
+ *   fullName?: string,
+ *   ownershipPct?: number,
+ *   nationality?: string,
+ *   attributes: object
+ * }>} personRows
+ * @returns {Promise<number>} count of rows inserted
+ */
+export async function savePersons(kycRef, personRows) {
+  if (!personRows?.length) return 0;
+
+  // Replace all current agent-run persons for this entity in one operation.
+  const { error: delErr } = await sb
+    .from('entity_persons')
+    .delete()
+    .eq('kyc_ref', kycRef)
+    .is('snapshot_id', null);
+  if (delErr) throw delErr;
+
+  const rows = personRows.map(p => ({
+    kyc_ref:      kycRef,
+    snapshot_id:  null,
+    role:         p.role,
+    person_index: p.personIndex,
+    full_name:    p.fullName    ?? null,
+    ownership_pct: p.ownershipPct ?? null,
+    nationality:  p.nationality ?? null,
+    attributes:   p.attributes ?? {},
+  }));
+
+  const { error } = await sb.from('entity_persons').insert(rows);
+  if (error) throw error;
+  return rows.length;
 }
 
 // ─── Exceptions ───────────────────────────────────────────────────────────────

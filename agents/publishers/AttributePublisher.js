@@ -48,20 +48,24 @@ export class AttributePublisher {
         ? attr.lineage.map(l => ({ ...l, value: normalizeValue(attr.attributeName, l.value).value }))
         : null;
       return {
-        kyc_ref:              kycRef,
-        snapshot_id:          null,          // no Forge snapshot; use agent_run_id instead
-        agent_run_id:         agentRunId,
-        attribute_name:       attr.attributeName,
-        attribute_group:      attr.attributeGroup,
-        display_value:        norm.value ?? null,
-        confidence:           attr.confidence  ?? null,
-        id_flag:              attr.idFlag ?? false,
-        id_source:            attr.source ?? null,
-        verification_flag:    attr.verificationFlag ?? false,
-        verification_source:  attr.verificationFlag ? [attr.source] : null,
+        kyc_ref:                kycRef,
+        snapshot_id:            null,          // no Forge snapshot; use agent_run_id instead
+        agent_run_id:           agentRunId,
+        attribute_name:         attr.attributeName,
+        attribute_group:        attr.attributeGroup,
+        display_value:          norm.value ?? null,
+        confidence:             attr.confidence  ?? null,
+        id_flag:                attr.idFlag ?? false,
+        id_source:              attr.source ?? null,
+        id_reasoning:           attr.idReasoning ?? null,
+        verification_flag:      attr.verificationFlag ?? false,
+        // DD runners supply verificationSources (Forge array); sourcing runners use [source].
+        verification_source:    attr.verificationSources
+                                  ?? (attr.verificationFlag ? [attr.source] : null),
+        verification_reasoning: attr.verificationReasoning ?? null,
         // Flag an unmapped enum value for analyst review (unless already flagged).
-        exception_flag:       attr.exceptionFlag || norm.unmapped || false,
-        exception_type:       attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null),
+        exception_flag:         attr.exceptionFlag || norm.unmapped || false,
+        exception_type:         attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null),
         lineage,
       };
     });
