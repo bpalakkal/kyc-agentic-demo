@@ -67,6 +67,7 @@ import { WgqTabContent } from "@/components/kyc/WgqTabContent";
 import { CollabPanel } from "@/components/kyc/CollabPanel";
 import { EntityFiles } from "@/components/kyc/EntityFiles";
 import { SimpleFieldRow, InlineTraceDrawer, NestedObjectBlock } from "@/components/kyc/SimpleFieldRow";
+import Screening from "@/pages/Screening";
 
 
 
@@ -1068,7 +1069,7 @@ const ExceptionReview = () => {
   const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"locker" | "collab" | "files">("locker");
-  const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes">("exception");
+  const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes" | "screening">("exception");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
   const [reachOutOpen, setReachOutOpen] = useState(false);
@@ -1243,6 +1244,18 @@ const ExceptionReview = () => {
                 <span className="bg-secondary text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border">{n}</span>
               ) : null;
             })()}
+          </button>
+          <button
+            onClick={() => setAttrViewMode("screening")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all",
+              attrViewMode === "screening"
+                ? "bg-card shadow-sm border border-border text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ShieldCheck className={cn("size-4", attrViewMode === "screening" ? "text-primary" : "text-muted-foreground")} />
+            Screening Results
           </button>
         </div>
         {attrViewMode === "attributes" && (
@@ -1872,6 +1885,13 @@ const ExceptionReview = () => {
         </ErrorBoundary>
       )}
 
+      {attrViewMode === "screening" && (
+        <ErrorBoundary label="Screening">
+          {selectedEntities[0]?.kyc
+            ? <Screening kycRef={selectedEntities[0].kyc} embedded />
+            : <p className="text-sm text-muted-foreground py-6">Select a case to view screening results.</p>}
+        </ErrorBoundary>
+      )}
 
       {openAgent && <AgentReviewModal onClose={() => setOpenAgent(false)} />}
       {evidenceDoc && (

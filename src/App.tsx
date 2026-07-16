@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import WorkQueue from "./pages/WorkQueue";
 import ExceptionReview from "./pages/ExceptionReview";
+import Screening from "./pages/Screening";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ function AppRoutes() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/work-queue" element={<WorkQueue />} />
           <Route path="/work-queue/review/:kycRef" element={<ExceptionReview />} />
+          <Route path="/work-queue/review/:kycRef/screening" element={<Screening />} />
           <Route path="/work-queue/review" element={<Navigate to="/work-queue" replace />} />
           <Route path="/reports" element={<Reports />} />
         </Route>

@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import {
   Bot, Play, Zap, Sparkles, ClipboardList, Database, ShieldCheck,
-  ChevronRight, FileText, Paperclip, GitMerge,
+  ChevronRight, FileText, Paperclip, GitMerge, Pencil,
 } from "lucide-react";
 import type { ForgeLineageEntry } from "@/types/forgeTypes";
 import { cn } from "@/lib/utils";
@@ -175,20 +175,34 @@ export const SimpleFieldRow = ({
             >
               <ClipboardList className="size-3" />{isOpen ? "▲" : "Audit"}
             </button>
-          ) : (
+          ) : hasTrace ? (
             <button
-              disabled={!hasTrace}
               onClick={() => setOpenTraceFor(isOpen ? null : { label, entity })}
               className={cn(
                 "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
                 isOpen
                   ? "bg-primary text-primary-foreground border-primary"
-                  : hasTrace
-                  ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
-                  : "border-border/30 text-muted-foreground/30 cursor-not-allowed bg-transparent"
+                  : "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
               )}
             >
               <Bot className="size-3" />{isOpen ? "▲" : "Trace"}
+            </button>
+          ) : (
+            // No DB data for this attribute yet — offer a direct manual entry shortcut.
+            <button
+              onClick={() => {
+                setOverrideDraft("");
+                setOverrideNote("");
+                setOpenOverrideFor(isOverrideOpen ? null : { label, entity });
+              }}
+              className={cn(
+                "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors shrink-0",
+                isOverrideOpen
+                  ? "bg-primary/10 text-primary border-primary/40"
+                  : "border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary bg-card"
+              )}
+            >
+              <Pencil className="size-3" />{isOverrideOpen ? "▲" : "Add"}
             </button>
           )}
         </div>

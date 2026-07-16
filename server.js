@@ -342,6 +342,7 @@ const apiRunnerOutput = new Map(); // runId → { output, kycRef, initiatedBy }
 async function loadRunnerClass(slug) {
   const runners = await import('./agents/runners/api/index.js');
   const map = {
+    // Sourcing runners
     'companies-house':  runners.CompaniesHouseRunner,
     'fca':              runners.FCARunner,
     'gleif':            runners.GLEIFRunner,
@@ -351,6 +352,26 @@ async function loadRunnerClass(slug) {
     'sec':              runners.SECEDGARRunner,
     'uk-sourcing-flow': runners.UKSourcingFlowRunner,
     'us-sourcing-flow': runners.USSourcingFlowRunner,
+    // DD runners (Claude-based, no Forge)
+    'dd-all-in-one':                          runners.DdAllInOneRunner,
+    'ria-authorized-signatory-idv':           runners.RiaAuthorizedSignatoryIdvRunner,
+    'ria-beneficial-owner-idv':               runners.RiaBeneficialOwnerIdvRunner,
+    'ria-cip-classification-id':              runners.RiaCipClassificationIdRunner,
+    'ria-commodities-indicator-id':           runners.RiaCommoditiesIndicatorIdRunner,
+    'ria-corporate-officer-idv':              runners.RiaCorporateOfficerIdvRunner,
+    'ria-evidence-of-existence-idv':          runners.RiaEvidenceOfExistenceIdvRunner,
+    'ria-government-identification-idv':      runners.RiaGovernmentIdentificationIdvRunner,
+    'ria-legal-structure-idv':                runners.RiaLegalStructureIdvRunner,
+    'ria-parent-publicly-listed-id':          runners.RiaParentPubliclyListedIdRunner,
+    'ria-principal-business-address-idv':     runners.RiaPrincipalBusinessAddressIdvRunner,
+    'ria-proxy-bo-idv':                       runners.RiaProxyBoIdvRunner,
+    'ria-registered-address-idv':             runners.RiaRegisteredAddressIdvRunner,
+    'ria-regulator-idv':                      runners.RiaRegulatorIdvRunner,
+    'ria-securities-exchange-act-id':         runners.RiaSecuritiesExchangeActIdRunner,
+    'ria-sole-proprietorship-id':             runners.RiaSoleProprietorshipIdRunner,
+    'ria-source-of-wealth-idv':               runners.RiaSourceOfWealthIdvRunner,
+    'ria-transacting-funds-id':               runners.RiaTransactingFundsIdRunner,
+    'ria-entity-name-idv':                    runners.RiaEntityNameIdvRunner,
   };
   return map[slug] ?? null;
 }
@@ -800,6 +821,54 @@ Always use tools to retrieve live data before answering. Then respond with analy
     send({ type: "error", message: err.message });
     res.end();
   }
+});
+
+// ─── Screening — analyst-initiated ───────────────────────────────────────────
+
+// POST /api/entity/:kycRef/screening/run — read parties from DB, call OpenSanctions,
+// discount with Claude, persist results (incremental merge over prior run).
+app.post('/api/entity/:kycRef/screening/run', requireAuth, async (req, res) => {
+  try {
+    const { runScreening } = getSb();
+    const initiatedBy = req.user.email ?? req.user.id;
+    res.json(await runScreening(req.params.kycRef, { ...req.body, initiatedBy }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/entity/:kycRef/screening — latest screening run + analyst dispositions
+app.get('/api/entity/:kycRef/screening', requireAuth, async (req, res) => {
+  try {
+    const { getScreening } = getSb();
+    res.json(await getScreening(req.params.kycRef));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/entity/:kycRef/screening/disposition — set a hit's analyst disposition
+// Body: { partyRole, partyIndex, matchId, disposition: 'true_match'|'false_positive'|'escalated', notes? }
+app.patch('/api/entity/:kycRef/screening/disposition', requireAuth, async (req, res) => {
+  try {
+    const { setScreeningDisposition } = getSb();
+    const analyst = req.user.email ?? req.user.id;
+    res.json(await setScreeningDisposition(req.params.kycRef, { ...req.body, analyst }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Due Diligence stubs (DD agent coming separately) ────────────────────────
+
+// POST /api/entity/:kycRef/dd/run — placeholder: DD agents not yet implemented
+app.post('/api/entity/:kycRef/dd/run', requireAuth, (_req, res) => {
+  res.status(501).json({ error: 'DD agents coming soon' });
+});
+
+// GET /api/entity/:kycRef/dd/plan — placeholder: DD plan not yet implemented
+app.get('/api/entity/:kycRef/dd/plan', requireAuth, (_req, res) => {
+  res.status(501).json({ error: 'DD agents coming soon' });
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────

@@ -74,13 +74,50 @@ const PERSON_PREFIXES = new Set([
   'board_director', 'trustee', 'investment_advisor', 'power_of_attorney', 'acting_person',
 ]);
 
+// Flattened, field-level person attributes: corporate_officer_1_full_name, key_controller_2_date_of_birth, …
+const PERSON_ATTR_RE = /^(acting_person|authorized_signatory|beneficial_owner|board_director|corporate_officer|investment_advisor|key_controller|power_of_attorney|trustee)_(\d+)_(.+)$/;
+
 // Strip trailing role/title suffix: "SMITH, John (Chief Compliance Officer)" → "SMITH, John"
 function stripRole(s: string): string {
   return s.replace(/\s*\([^)]*\)/g, '').trim();
 }
 
+// Common abbreviation expansions for address fields and business entity suffixes.
+// Pre-compiled for performance — applied in order, so put shorter forms first.
+const ABBREV_MAP: [RegExp, string][] = [
+  [/\bst\b/g,   'street'],
+  [/\bave\b/g,  'avenue'],
+  [/\brd\b/g,   'road'],
+  [/\bdr\b/g,   'drive'],
+  [/\bblvd\b/g, 'boulevard'],
+  [/\bln\b/g,   'lane'],
+  [/\bct\b/g,   'court'],
+  [/\bpl\b/g,   'place'],
+  [/\bhwy\b/g,  'highway'],
+  [/\bpkwy\b/g, 'parkway'],
+  [/\bltd\b/g,  'limited'],
+  [/\binc\b/g,  'incorporated'],
+  [/\bcorp\b/g, 'corporation'],
+];
+
+// Normalize a value for diff comparison: lowercase, strip abbreviation periods,
+// expand known abbreviations, collapse whitespace.
+function normaliseForDiff(s: string): string {
+  let v = (s ?? '').toLowerCase().trim();
+  // "St." → "st", "Ave." → "ave", etc.
+  v = v.replace(/\b([a-z]{1,6})\./g, '$1');
+  for (const [pattern, full] of ABBREV_MAP) {
+    v = v.replace(pattern, full);
+  }
+  return v.replace(/\s+/g, ' ').trim();
+}
+
+// normalise is used for multi-value set membership checks and per-source agreement.
+// Person attributes skip abbreviation expansion (Dr., Ln., etc. differ in names).
 function normalise(s: string, isPersonAttr: boolean): string {
-  return (isPersonAttr ? stripRole(s) : s).toLowerCase();
+  const stripped = isPersonAttr ? stripRole(s) : s;
+  if (isPersonAttr) return stripped.toLowerCase().trim().replace(/\s+/g, ' ');
+  return normaliseForDiff(stripped);
 }
 
 function buildDiffRows(data: DiffData): DiffRow[] {
@@ -99,7 +136,7 @@ function buildDiffRows(data: DiffData): DiffRow[] {
     }
   }
 
-  return data.newAttributes.map(attr => {
+  return data.newAttributes.filter(a => !PERSON_ATTR_RE.test(a.attributeName)).map(attr => {
     // Deduplicate lineage entries by source name for the per-source strip.
     const sources: { source: string; value: string }[] = [];
     for (const entry of (attr.lineage ?? [])) {
@@ -126,7 +163,7 @@ function buildDiffRows(data: DiffData): DiffRow[] {
     }
 
     const current = currentMap.get(attr.attributeName) ?? null;
-    const changed  = current !== null && current.toLowerCase() !== attr.displayValue.toLowerCase();
+    const changed  = current !== null && normaliseForDiff(current) !== normaliseForDiff(attr.displayValue ?? "");
     return {
       attributeName:  attr.attributeName,
       attributeGroup: attr.attributeGroup,

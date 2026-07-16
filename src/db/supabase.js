@@ -635,3 +635,151 @@ export async function deleteFile(fileId) {
   const { error: dbErr } = await sb.from('case_files').delete().eq('id', fileId);
   if (dbErr) throw dbErr;
 }
+
+// ─── Screening ────────────────────────────────────────────────────────────────
+// Results stored as a jsonb blob in screening_runs; analyst dispositions live in
+// screening_dispositions and are re-applied on every read so they survive re-screens.
+// Matches use the same schema as the Forge version: screening_results_schema.json.
+
+const _dispKey = (role, idx, matchId) => `${role}::${idx ?? -1}::${matchId}`;
+const _partyRefKey = (r) => `${r.party_role}::${r.party_index ?? -1}`;
+
+/**
+ * Overlay analyst dispositions from screening_dispositions onto a screening_runs row.
+ * Returns the normalised screening object the UI and routes consume.
+ * @param {string} kycRef
+ * @param {object} runRow  — row from screening_runs (id, screened_at, data)
+ */
+async function _applyDispositions(kycRef, runRow) {
+  const { data: disps } = await sb
+    .from('screening_dispositions')
+    .select('*')
+    .eq('kyc_ref', kycRef);
+  const map = {};
+  for (const d of (disps ?? [])) {
+    map[_dispKey(d.party_role, d.party_index, d.match_id)] = d;
+  }
+  const data = runRow.data ?? {};
+  for (const r of (data.screening_results ?? [])) {
+    for (const m of (r.matches ?? [])) {
+      const d = map[_dispKey(r.party_role, r.party_index, m.id)];
+      if (d) {
+        m.disposition_status  = d.disposition;
+        m.analyst_decision    = d.disposition;
+        m.analyst_notes       = d.notes;
+        m.decision_timestamp  = d.decided_at;
+      }
+    }
+  }
+  return { id: runRow.id, kyc_ref: kycRef, screened_at: runRow.screened_at, ...data };
+}
+
+/**
+ * Initiate a screening run for a case.
+ *
+ * No Forge version — reads parties directly from Supabase, calls OpenSanctions,
+ * then calls Claude for discounting analysis on hits above the score threshold.
+ * Results are merged over any prior run (incremental: parties not re-screened
+ * this time are preserved from the previous run).
+ *
+ * @param {string} kycRef
+ * @param {{ initiatedBy?: string }} opts
+ * @returns {Promise<object>}  screening result with dispositions overlaid
+ */
+export async function runScreening(kycRef, { initiatedBy } = {}) {
+  const { ScreeningRunner } = await import('../../agents/runners/api/ScreeningRunner.js');
+  const runner = new ScreeningRunner();
+  const newResults = await runner.screen(kycRef);
+
+  // Fetch the entity for metadata fields
+  const ent = await getEntity(kycRef).catch(() => null);
+
+  // Merge over prior run so parties not re-screened this time are kept
+  const { data: prevRows } = await sb
+    .from('screening_runs')
+    .select('data')
+    .eq('kyc_ref', kycRef)
+    .order('screened_at', { ascending: false })
+    .limit(1);
+  const prev = prevRows?.[0]?.data?.screening_results ?? [];
+  const byRef = new Map(prev.map((r) => [_partyRefKey(r), r]));
+  for (const r of newResults) byRef.set(_partyRefKey(r), r);
+
+  const data = {
+    entity_id:           ent?.entity_id ?? kycRef,
+    case_id:             ent?.case_id ?? kycRef,
+    screening_timestamp: new Date().toISOString(),
+    screening_config: {
+      dataset_scope:   'default',
+      score_threshold: 0.7,
+      algorithm:       'opensanctions-direct',
+      topics_filter:   [],
+    },
+    screening_results: Array.from(byRef.values()),
+  };
+
+  const { data: row, error } = await sb
+    .from('screening_runs')
+    .insert({ kyc_ref: kycRef, data, initiated_by: initiatedBy ?? null })
+    .select()
+    .single();
+  if (error) throw error;
+  return _applyDispositions(kycRef, row);
+}
+
+/**
+ * Return the latest screening run for a case, with analyst dispositions overlaid.
+ * Returns null if no run exists yet.
+ * @param {string} kycRef
+ */
+export async function getScreening(kycRef) {
+  const { data: rows, error } = await sb
+    .from('screening_runs')
+    .select('*')
+    .eq('kyc_ref', kycRef)
+    .order('screened_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  if (!rows?.length) return null;
+  return _applyDispositions(kycRef, rows[0]);
+}
+
+/**
+ * Set an analyst disposition for a matched entity (survives re-screens).
+ * Valid analyst dispositions: true_match | false_positive | escalated
+ * Passing any other value (or omitting) clears the override so the
+ * runner-provided disposition_status (pending_review / discounted) shows through.
+ *
+ * @param {string} kycRef
+ * @param {{ partyRole: string, partyIndex: number|null, matchId: string,
+ *           disposition: string, notes?: string, analyst?: string }} opts
+ */
+export async function setScreeningDisposition(kycRef, { partyRole, partyIndex, matchId, disposition, notes, analyst }) {
+  const idx = partyIndex ?? -1;
+  const ANALYST_SET = new Set(['true_match', 'false_positive', 'escalated']);
+  if (!ANALYST_SET.has(disposition)) {
+    // Clear the override — revert to runner-provided disposition
+    const { error } = await sb
+      .from('screening_dispositions')
+      .delete()
+      .match({ kyc_ref: kycRef, party_role: partyRole, party_index: idx, match_id: matchId });
+    if (error) throw error;
+    return { cleared: true };
+  }
+  const { data, error } = await sb
+    .from('screening_dispositions')
+    .upsert({
+      kyc_ref:    kycRef,
+      party_role: partyRole,
+      party_index: idx,
+      match_id:   matchId,
+      disposition,
+      notes:      notes ?? null,
+      analyst:    analyst ?? null,
+      decided_at: new Date().toISOString(),
+    }, { onConflict: 'kyc_ref,party_role,party_index,match_id' })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
