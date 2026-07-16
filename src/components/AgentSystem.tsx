@@ -52,7 +52,17 @@ export type AgentId =
   | "identity" | "document" | "regulatory" | "audit" | "outreach"
   | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
   | "companies-house" | "jersey-fsc" | "fca" | "uk-sourcing-flow"
-  | "gleif" | "sec" | "iapd" | "nyse" | "us-sourcing-flow";
+  | "gleif" | "sec" | "iapd" | "nyse" | "us-sourcing-flow"
+  | "dd-all-in-one"
+  | "ria-authorized-signatory-idv" | "ria-beneficial-owner-idv"
+  | "ria-cip-classification-id" | "ria-commodities-indicator-id"
+  | "ria-corporate-officer-idv" | "ria-entity-name-idv"
+  | "ria-evidence-of-existence-idv" | "ria-government-identification-idv"
+  | "ria-legal-structure-idv" | "ria-parent-publicly-listed-id"
+  | "ria-principal-business-address-idv" | "ria-proxy-bo-idv"
+  | "ria-registered-address-idv" | "ria-regulator-idv"
+  | "ria-securities-exchange-act-id" | "ria-sole-proprietorship-id"
+  | "ria-source-of-wealth-idv" | "ria-transacting-funds-id";
 
 export type Agent = {
   id: AgentId;
@@ -121,6 +131,64 @@ export const AGENTS: Agent[] = [
   { id: "us-sourcing-flow", name: "US Data Sourcing — All Sources", short: "US All", icon: Database,
     description: "Triggers GLEIF, SEC EDGAR, IAPD, and NYSE in parallel — merges all four sources with priority ordering.",
     defaultThoughts: ["Querying GLEIF, SEC EDGAR, IAPD, and NYSE in parallel…", "Merging attributes across 4 sources…", "Ready for review"] },
+  // ── DD agents (Claude-based, all via /api/agent-run/api/:slug) ──────────────
+  { id: "dd-all-in-one", name: "Full DD Review (All-in-One)", short: "DD All", icon: Brain,
+    description: "Runs all 18 DD checks in a single Claude call — entity name, legal structure, addresses, BO, officers, signatories, CIP, indicators, and more.",
+    defaultThoughts: ["Building entity context from database…", "Running full DD analysis with Claude…", "Reviewing all 18 attribute groups…", "Ready for review"] },
+  { id: "ria-entity-name-idv", name: "Entity Name IDV", short: "Name IDV", icon: FileCheck2,
+    description: "Verifies the legal entity name against sourced records and flags discrepancies.",
+    defaultThoughts: ["Loading entity name lineage…", "Comparing across sources…", "Generating name verification result…"] },
+  { id: "ria-legal-structure-idv", name: "Legal Structure IDV", short: "Legal Structure", icon: Scale,
+    description: "Identifies and verifies the legal structure (LLC, LP, Corp, etc.) and CIP classification.",
+    defaultThoughts: ["Reviewing legal structure lineage…", "Applying CIP classification rules…", "Writing result…"] },
+  { id: "ria-evidence-of-existence-idv", name: "Evidence of Existence IDV", short: "Existence", icon: FileCheck2,
+    description: "Confirms documentary evidence of formation — certificates, registrations, SEC filings.",
+    defaultThoughts: ["Checking evidence of existence documents…", "Validating against registration data…", "Writing verification result…"] },
+  { id: "ria-registered-address-idv", name: "Registered Address IDV", short: "Reg. Address", icon: Landmark,
+    description: "Verifies the registered address against official filings and registry records.",
+    defaultThoughts: ["Comparing registered address across sources…", "Checking for address conflicts…", "Writing result…"] },
+  { id: "ria-principal-business-address-idv", name: "Principal Business Address IDV", short: "Principal Address", icon: Landmark,
+    description: "Verifies the principal place of business address.",
+    defaultThoughts: ["Checking principal address lineage…", "Cross-referencing regulatory filings…", "Writing result…"] },
+  { id: "ria-regulator-idv", name: "Regulator IDV", short: "Regulator", icon: Scale,
+    description: "Confirms the primary regulator (SEC, FCA, CFTC, etc.) from regulatory registry data.",
+    defaultThoughts: ["Identifying regulatory body from filings…", "Validating regulator against registry…", "Writing result…"] },
+  { id: "ria-government-identification-idv", name: "Government Identification IDV", short: "Govt ID", icon: ShieldCheck,
+    description: "Verifies government-issued identifiers (EIN, CRD, CIK, FRN) for the entity.",
+    defaultThoughts: ["Checking government identifiers…", "Validating EIN / CRD / CIK / FRN…", "Writing result…"] },
+  { id: "ria-cip-classification-id", name: "CIP Classification", short: "CIP", icon: UserCheck,
+    description: "Applies FinCEN CIP rules to classify the entity type and confirm the correct KYC program applies.",
+    defaultThoughts: ["Loading CIP classification rules…", "Applying entity type classification…", "Writing CIP determination…"] },
+  { id: "ria-beneficial-owner-idv", name: "Beneficial Owner IDV", short: "BO IDV", icon: Database,
+    description: "Identifies and verifies 25%+ beneficial owners per FinCEN CDD Rule.",
+    defaultThoughts: ["Loading beneficial owner records…", "Verifying ownership ≥ 25% threshold…", "Writing BO verification result…"] },
+  { id: "ria-proxy-bo-idv", name: "Proxy BO IDV", short: "Proxy BO", icon: Database,
+    description: "Identifies and verifies control persons (proxy BOs) where direct ownership is below threshold.",
+    defaultThoughts: ["Loading proxy BO records…", "Verifying control person status…", "Writing result…"] },
+  { id: "ria-authorized-signatory-idv", name: "Authorized Signatory IDV", short: "Auth. Signatory", icon: UserCheck,
+    description: "Verifies identity documents and authority of all authorized signatories.",
+    defaultThoughts: ["Loading authorized signatory records…", "Verifying signatory identity data…", "Writing result…"] },
+  { id: "ria-corporate-officer-idv", name: "Corporate Officer IDV", short: "Officers", icon: UserCheck,
+    description: "Verifies the identity and role of corporate officers (CEO, CFO, Directors).",
+    defaultThoughts: ["Loading corporate officer records…", "Verifying officer identity data…", "Writing result…"] },
+  { id: "ria-source-of-wealth-idv", name: "Source of Wealth IDV", short: "SOW", icon: BarChart2,
+    description: "Evaluates and verifies the declared source of wealth for the entity.",
+    defaultThoughts: ["Reviewing source of wealth declaration…", "Cross-checking with regulatory filings…", "Writing SOW verification…"] },
+  { id: "ria-transacting-funds-id", name: "Transacting Funds", short: "Trans. Funds", icon: BarChart2,
+    description: "Identifies and verifies the source of transacting funds.",
+    defaultThoughts: ["Reviewing transacting funds information…", "Assessing fund source evidence…", "Writing result…"] },
+  { id: "ria-parent-publicly-listed-id", name: "Parent Publicly Listed", short: "Parent Listed", icon: Network,
+    description: "Determines whether the entity has a publicly listed parent and confirms exchange listing.",
+    defaultThoughts: ["Checking parent company status…", "Verifying exchange listing…", "Writing result…"] },
+  { id: "ria-sole-proprietorship-id", name: "Sole Proprietorship", short: "Sole Prop.", icon: UserCheck,
+    description: "Determines and verifies sole proprietorship status where applicable.",
+    defaultThoughts: ["Checking entity structure for sole proprietorship…", "Applying CIP rules…", "Writing result…"] },
+  { id: "ria-commodities-indicator-id", name: "Commodities Indicator", short: "Commodities", icon: BarChart2,
+    description: "Determines whether the entity is registered with the CFTC or trades commodities.",
+    defaultThoughts: ["Checking CFTC registration status…", "Reviewing commodities trading indicators…", "Writing result…"] },
+  { id: "ria-securities-exchange-act-id", name: "Securities Exchange Act", short: "SEA §13/15d", icon: Scale,
+    description: "Determines whether the entity is subject to SEC reporting obligations under Exchange Act §13 or §15d.",
+    defaultThoughts: ["Checking SEC reporting obligations…", "Reviewing Exchange Act indicators…", "Writing result…"] },
 ];
 
 const AGENTS_BY_ID = Object.fromEntries(AGENTS.map((a) => [a.id, a])) as Record<AgentId, Agent>;
@@ -166,7 +234,16 @@ const AGENT_CATEGORIES: AgentCategoryDef[] = [
   {
     id: "due-diligence",
     label: "Due Diligence",
-    agentIds: ["identity", "document", "beneficial-owner", "risk-scoring", "outreach", "audit"],
+    triggerAllId: "dd-all-in-one",
+    agentIds: [
+      "ria-entity-name-idv", "ria-legal-structure-idv", "ria-evidence-of-existence-idv",
+      "ria-registered-address-idv", "ria-principal-business-address-idv", "ria-regulator-idv",
+      "ria-government-identification-idv", "ria-cip-classification-id",
+      "ria-beneficial-owner-idv", "ria-proxy-bo-idv", "ria-authorized-signatory-idv",
+      "ria-corporate-officer-idv", "ria-source-of-wealth-idv", "ria-transacting-funds-id",
+      "ria-parent-publicly-listed-id", "ria-sole-proprietorship-id",
+      "ria-commodities-indicator-id", "ria-securities-exchange-act-id",
+    ],
   },
 ];
 
@@ -279,6 +356,29 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
     apiRunner: true,
     skipSnapshot: true,
   },
+  // ── DD agents ────────────────────────────────────────────────────────────────
+  ...Object.fromEntries(
+    [
+      "dd-all-in-one",
+      "ria-authorized-signatory-idv", "ria-beneficial-owner-idv",
+      "ria-cip-classification-id", "ria-commodities-indicator-id",
+      "ria-corporate-officer-idv", "ria-entity-name-idv",
+      "ria-evidence-of-existence-idv", "ria-government-identification-idv",
+      "ria-legal-structure-idv", "ria-parent-publicly-listed-id",
+      "ria-principal-business-address-idv", "ria-proxy-bo-idv",
+      "ria-registered-address-idv", "ria-regulator-idv",
+      "ria-securities-exchange-act-id", "ria-sole-proprietorship-id",
+      "ria-source-of-wealth-idv", "ria-transacting-funds-id",
+    ].map((slug) => [slug, {
+      slug,
+      endpoint: `/api/agent-run/api/${slug}`,
+      buildBody: (ctx: EntityCtx | null) => ({ kycRef: ctx?.kyc ?? "", entityName: ctx?.name ?? "" }),
+      fetchSteps: true,
+      asyncMode: true,
+      apiRunner: true,
+      skipSnapshot: true,
+    }])
+  ),
 };
 
 // ─── Step parsing ─────────────────────────────────────────────────────────────
