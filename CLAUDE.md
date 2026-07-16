@@ -279,10 +279,7 @@ NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 COMPANIES_HOUSE_API_KEY                   — developer.company-information.service.gov.uk
 FCA_AUTH_EMAIL, FCA_API_KEY               — FCA Register API (set in Railway Variables, not .env)
 VITE_AGENT_API_BASE                       — Express server URL (default: http://localhost:3001)
-DD_API_KEY                                — auth for GET /api/forge/entity-data/:ref (Forge → server)
-DD_UPLOAD_SLUG                            — Forge flow that writes entity_data to the datastore (default: upload-entity-data)
-DD_ALL_IN_ONE_SLUG                        — all-DD orchestrator flow (default: ria-idv-allinone)
-SCREENING_SLUG                            — sanctions/PEP flow (default: sanctions-screening-pep); flow is SYNCHRONOUS (~3 min)
+OPENSANCTIONS_API_KEY                     — OpenSanctions /match/default batch API (screening agent)
 ```
 
 ## Dev Commands
