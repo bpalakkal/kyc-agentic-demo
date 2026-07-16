@@ -1,3 +1,15 @@
+import { normalizeForAttribute } from '../dd/enumNormalizer.js';
+
+/** Normalize an enum-backed value to its canonical form; passthrough otherwise.
+ * Single choke point: EVERY runner (sourcing, DD, future) writes through the
+ * publisher, so all attribute values are canonicalized here. */
+function normalizeValue(attributeName, value) {
+  if (value == null) return { value, unmapped: false };
+  const r = normalizeForAttribute(value, attributeName);
+  if (!r.enumName) return { value, unmapped: false };
+  return { value: r.value, unmapped: !r.matched };
+}
+
 /**
  * AttributePublisher — writes agent-run attribute data to entity_attributes.
  *
@@ -5,9 +17,9 @@
  *   - snapshot_id is NULL  (no Forge JSON was produced)
  *   - agent_run_id is set  (links back to the agent_runs row)
  *
- * The existing getAttributes() function filters by snapshot_id, so these rows
- * are invisible to the current attribute view until Phase 6 adds the UI layer.
- * Use getAttributesByRunId() (added to supabase.js in Phase 2) to query them.
+ * getAttributes() merges these into the attribute view as its "Layer 2" override
+ * (completed runs only, most recent run wins per attribute_name). Use
+ * getAttributesByRunId() to query the rows for a single run in isolation.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} sb  Service-key client
  */
@@ -28,22 +40,31 @@ export class AttributePublisher {
   async publish(kycRef, agentRunId, attributes) {
     if (!attributes?.length) return 0;
 
-    const rows = attributes.map(attr => ({
-      kyc_ref:              kycRef,
-      snapshot_id:          null,          // no Forge snapshot; use agent_run_id instead
-      agent_run_id:         agentRunId,
-      attribute_name:       attr.attributeName,
-      attribute_group:      attr.attributeGroup,
-      display_value:        attr.displayValue ?? null,
-      confidence:           attr.confidence  ?? null,
-      id_flag:              attr.idFlag ?? false,
-      id_source:            attr.source ?? null,
-      verification_flag:    attr.verificationFlag ?? false,
-      verification_source:  attr.verificationFlag ? [attr.source] : null,
-      exception_flag:       attr.exceptionFlag ?? false,
-      exception_type:       attr.exceptionType ?? null,
-      lineage:              attr.lineage?.length ? attr.lineage : null,
-    }));
+    const rows = attributes.map(attr => {
+      // Canonicalize enum-backed values (Country, etc.) for EVERY runner. Also
+      // normalize each lineage entry's value so the audit trail matches.
+      const norm = normalizeValue(attr.attributeName, attr.displayValue);
+      const lineage = attr.lineage?.length
+        ? attr.lineage.map(l => ({ ...l, value: normalizeValue(attr.attributeName, l.value).value }))
+        : null;
+      return {
+        kyc_ref:              kycRef,
+        snapshot_id:          null,          // no Forge snapshot; use agent_run_id instead
+        agent_run_id:         agentRunId,
+        attribute_name:       attr.attributeName,
+        attribute_group:      attr.attributeGroup,
+        display_value:        norm.value ?? null,
+        confidence:           attr.confidence  ?? null,
+        id_flag:              attr.idFlag ?? false,
+        id_source:            attr.source ?? null,
+        verification_flag:    attr.verificationFlag ?? false,
+        verification_source:  attr.verificationFlag ? [attr.source] : null,
+        // Flag an unmapped enum value for analyst review (unless already flagged).
+        exception_flag:       attr.exceptionFlag || norm.unmapped || false,
+        exception_type:       attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null),
+        lineage,
+      };
+    });
 
     const { error } = await this.sb.from('entity_attributes').insert(rows);
     if (error) throw Object.assign(error, { context: 'AttributePublisher.publish' });
