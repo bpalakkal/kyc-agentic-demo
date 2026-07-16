@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "imports": {
+    "#schema": "./schema/index.js",
+    "@schema": "./schema/index.js"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
@@ -11,8 +15,8 @@
     "dev": "vite",
     "server": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 node server.js",
     "start": "concurrently \"npm run dev\" \"npm run server\"",
-    "generate": "node scripts/parse-entities.cjs",
-    "prebuild": "node scripts/parse-entities.cjs",
+    "generate": "node scripts/parse-entities.cjs && node scripts/build-schema-meta.mjs",
+    "prebuild": "node scripts/parse-entities.cjs && node scripts/build-schema-meta.mjs",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

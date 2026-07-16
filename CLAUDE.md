@@ -279,6 +279,10 @@ NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 COMPANIES_HOUSE_API_KEY                   — developer.company-information.service.gov.uk
 FCA_AUTH_EMAIL, FCA_API_KEY               — FCA Register API (set in Railway Variables, not .env)
 VITE_AGENT_API_BASE                       — Express server URL (default: http://localhost:3001)
+DD_API_KEY                                — auth for GET /api/forge/entity-data/:ref (Forge → server)
+DD_UPLOAD_SLUG                            — Forge flow that writes entity_data to the datastore (default: upload-entity-data)
+DD_ALL_IN_ONE_SLUG                        — all-DD orchestrator flow (default: ria-idv-allinone)
+SCREENING_SLUG                            — sanctions/PEP flow (default: sanctions-screening-pep); flow is SYNCHRONOUS (~3 min)
 ```
 
 ## Dev Commands
@@ -298,6 +302,8 @@ Migrations — paste each into Supabase SQL Editor and run once, in order:
 scripts/migrations/001_agent_runs_and_case_files.sql
 scripts/migrations/002_agent_runs_status_constraint.sql
 scripts/migrations/003_entity_attributes_confidence.sql
+scripts/migrations/006_screening.sql
+scripts/migrations/007_kyc_ref_from_ids.sql    ← WIPES all case data (TRUNCATE entities CASCADE)
 ```
 
 ## API Authentication & Connectivity
@@ -339,8 +345,29 @@ Set these in Railway dashboard variables (not `.env`):
 
 Tailwind is compiled into `dist/assets/index-*.css`. If the UI looks unstyled, check that file is ~107 kB. A ~0.3 kB file means `index.css` was clobbered. Custom Tailwind colors: `alert`, `warning`, `success`, `info`, `risk-rating` variants (all with `.soft` and `.soft-border` sub-tokens).
 
+## Schema
+
+`schema/` is the anti-drift contract shared by frontend + backend.
+
+| File | Purpose |
+|------|---------|
+| `schema/kyc_master_attribute_schema.json` | Canonical master (RIA entity type). Owns attribute definitions, per-attribute value-enums (`$defs`, e.g. `Country`), and `x-entity-type-applicability` (per-cip-classification: `required` / `optional` / `not_applicable`). |
+| `schema/dd-registry.json` | 18 DD agents → attributes (party + verifiable flags). |
+| `schema/schema-meta.json` + `schema/schema-meta.js` | **Generated** by `scripts/build-schema-meta.mjs`. Never hand-edit. |
+| `schema/index.js` + `schema/index.d.ts` | Typed accessor: `getVisibleAttributes(entityType)`, `applicability`, `enumFor`, `isVerifiable`, `arrayAttributes`, `entityTypeByAlias('RIA')`. Import via the `@schema` alias. |
+
+To regenerate `schema-meta.*` after editing the canonical master:
+```bash
+npm run generate
+```
+
+Import the schema accessor in Node or Vite:
+```js
+import { getVisibleAttributes, enumFor } from '@schema';
+```
+
 ## Deployment
 
 - **Frontend**: GitHub Pages (`npm run deploy`)
 - **Backend**: Railway (`Procfile`: `web: npm run server`) — auto-deploys on `git push origin main`
-- **Migrations**: paste all three SQL files into Supabase SQL Editor in order (001 → 002 → 003) before first deploy
+- **Migrations**: paste all SQL files into Supabase SQL Editor in order (001 → 007) before first deploy. **Migration 007 wipes all case data (TRUNCATE entities CASCADE).**

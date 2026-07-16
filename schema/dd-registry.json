@@ -1,0 +1,570 @@
+{
+  "parties": [
+    "authorized_signatory",
+    "beneficial_owner",
+    "corporate_officer",
+    "Proxy_BO"
+  ],
+  "agents": {
+    "ria_authorized_signatory_idv": {
+      "flow": "RIA_Authorized_Signatory_IDV",
+      "persona": "RIA_IDV_Authorized_Signatory",
+      "personaId": "6e8e0577576f4e19a4d1a7bda7bab8ec",
+      "party": "authorized_signatory",
+      "attributes": [
+        "authorized_signatory_address",
+        "authorized_signatory_country",
+        "authorized_signatory_date_of_birth",
+        "authorized_signatory_government_identification_number",
+        "authorized_signatory_legal_structure",
+        "authorized_signatory_name",
+        "authorized_signatory_nationality",
+        "authorized_signatory_signatory_date",
+        "authorized_signatory_signature",
+        "authorized_signatory_title"
+      ]
+    },
+    "ria_beneficial_owner_idv": {
+      "flow": "RIA_Beneficial_Owner_IDV",
+      "persona": "RIA_IDV_Beneficial_Owner",
+      "personaId": "47c07ddd113b4705a8d1209dff7ce3e2",
+      "party": "beneficial_owner",
+      "attributes": [
+        "beneficial_owner_address",
+        "beneficial_owner_cip_classification",
+        "beneficial_owner_country_of_incorporation",
+        "beneficial_owner_country_of_residence",
+        "beneficial_owner_date_of_birth",
+        "beneficial_owner_evidence_of_existence",
+        "beneficial_owner_legal_structure",
+        "beneficial_owner_name",
+        "beneficial_owner_nationality",
+        "beneficial_owner_nature_of_business",
+        "beneficial_owner_past_nationality",
+        "beneficial_owner_percentage_of_ownership",
+        "beneficial_owner_source_of_wealth"
+      ]
+    },
+    "ria_cip_classification_id": {
+      "flow": "RIA_CIP_Classification_ID",
+      "persona": "RIA_ID_CIP_Classification",
+      "personaId": "724bb0a331484b0a93d51807936d3a18",
+      "party": null,
+      "attributes": [
+        "cip_classification",
+        "entity_nature_of_business"
+      ]
+    },
+    "ria_commodities_indicator_id": {
+      "flow": "RIA_Commodities_Indicator_ID",
+      "persona": "RIA_ID_Commodities_Indicator",
+      "personaId": "c525b3eda33549958f23da6a8999afb0",
+      "party": null,
+      "attributes": [
+        "commodities_future_trading_commission_registered_indicator"
+      ]
+    },
+    "ria_corporate_officer_idv": {
+      "flow": "RIA_Corporate_Officer_IDV",
+      "persona": "RIA_IDV_Corporate_Officer",
+      "personaId": "9e7785ba2b0c47e4ad84e141204a8f32",
+      "party": "corporate_officer",
+      "attributes": [
+        "corporate_officer_correspondence_address",
+        "corporate_officer_country",
+        "corporate_officer_country_of_incorporation",
+        "corporate_officer_country_of_residence",
+        "corporate_officer_date_of_birth",
+        "corporate_officer_cip_classification",
+        "corporate_officer_legal_structure",
+        "corporate_officer_name",
+        "corporate_officer_nationality",
+        "corporate_officer_regulator",
+        "corporate_officer_role"
+      ]
+    },
+    "ria_evidence_of_existence_idv": {
+      "flow": "RIA_Evidence_of_Existence_IDV",
+      "persona": "RIA_IDV_Evidence_of_Existence",
+      "personaId": "6e1f15e758644a59b6b38a656bd5a211",
+      "party": null,
+      "attributes": [
+        "country_of_incorporation",
+        "date_of_incorporation",
+        "entity_status",
+        "listed_exchange",
+        "listing_status",
+        "registration_number",
+        "verification_of_existence"
+      ]
+    },
+    "ria_government_identification_idv": {
+      "flow": "RIA_Government_Identification_IDV",
+      "persona": "RIA_IDV_Government_Identification",
+      "personaId": "c82fee13b5d843238fbe8429f037d683",
+      "party": null,
+      "attributes": [
+        "tax_identification_number"
+      ]
+    },
+    "ria_legal_structure_idv": {
+      "flow": "RIA_Legal_Structure_IDV",
+      "persona": "RIA_IDV_Legal_Structure",
+      "personaId": "7f7af95dfadf4b84acdb8918410b8945",
+      "party": null,
+      "attributes": [
+        "legal_structure"
+      ]
+    },
+    "ria_parent_publicly_listed_id": {
+      "flow": "RIA_Parent_Publicly_Listed_ID",
+      "persona": "RIA_ID_Parent_Publicly_Listed",
+      "personaId": "8a5811bb4b4e46eebff21f6c021133d6",
+      "party": null,
+      "attributes": [
+        "parent_publicly_listed_on_united_states_exchange_indicator"
+      ]
+    },
+    "ria_principal_business_address_idv": {
+      "flow": "RIA_Principal_Business_Address_IDV",
+      "persona": "RIA_IDV_Principal_Business_Address",
+      "personaId": "e285e6d1b243498888a8cb655484b355",
+      "party": null,
+      "attributes": [
+        "principal_place_of_business"
+      ]
+    },
+    "ria_proxy_bo_idv": {
+      "flow": "RIA_Proxy_BO_IDV",
+      "persona": "RIA_IDV_Proxy_BO",
+      "personaId": "d2a75577a8954cef87761965cffe0547",
+      "party": "Proxy_BO",
+      "attributes": [
+        "Proxy_BO_address",
+        "Proxy_BO_cip_classification",
+        "Proxy_BO_country_of_incorporation",
+        "Proxy_BO_country_of_residence",
+        "Proxy_BO_date_of_birth",
+        "Proxy_BO_evidence_of_existence",
+        "Proxy_BO_legal_structure",
+        "Proxy_BO_name",
+        "Proxy_BO_nationality",
+        "Proxy_BO_nature_of_business",
+        "Proxy_BO_past_nationality",
+        "Proxy_BO_percentage_of_ownership"
+      ]
+    },
+    "ria_registered_address_idv": {
+      "flow": "RIA_Registered_Address_IDV",
+      "persona": "RIA_IDV_Registered_Address",
+      "personaId": "78a172e4aae04c8a8c0e7a378d227d79",
+      "party": null,
+      "attributes": [
+        "legal_registered_address"
+      ]
+    },
+    "ria_regulator_idv": {
+      "flow": "RIA_Regulator_IDV",
+      "persona": "RIA_IDV_Regulator",
+      "personaId": "def068f181dc4b9796e843d91dd95ce9",
+      "party": null,
+      "attributes": [
+        "regulator"
+      ]
+    },
+    "ria_securities_exchange_act_id": {
+      "flow": "RIA_Securities_Exchange_Act_ID",
+      "persona": "RIA_ID_Securities_Exchange_Act",
+      "personaId": "d560f33cd85948af9760d82a1cb7d25c",
+      "party": null,
+      "attributes": [
+        "securities_exchange_act_of_1934_section_13_or_15d_indicator"
+      ]
+    },
+    "ria_sole_proprietorship_id": {
+      "flow": "RIA_Sole_Proprietorship_ID",
+      "persona": "RIA_ID_Sole_Proprietorship",
+      "personaId": "06f66e168dd04345b2880edb788e56b9",
+      "party": null,
+      "attributes": [
+        "sole_proprietorship_indicator"
+      ]
+    },
+    "ria_source_of_wealth_idv": {
+      "flow": "RIA_Source_of_Wealth_IDV",
+      "persona": "RIA_IDV_Source_of_Wealth",
+      "personaId": "2593408b89ac4692bef853a43868b13f",
+      "party": null,
+      "attributes": [
+        "source_of_wealth"
+      ]
+    },
+    "ria_transacting_funds_id": {
+      "flow": "RIA_Transacting_Funds_ID",
+      "persona": "RIA_ID_Transacting_Funds",
+      "personaId": "2886cb988edb4d38a3319fba7fb43917",
+      "party": null,
+      "attributes": [
+        "transacting_with_own_or_third_party_funds_indicator"
+      ]
+    },
+    "ria_entity_name_idv": {
+      "flow": "RIA_entity_name_IDV",
+      "persona": "RIA_ID_Entity_Name",
+      "personaId": "a04ee8a9d48a97dfdc04782b5f27aa78",
+      "party": null,
+      "attributes": [
+        "entity_name",
+        "previous_names",
+        "trading_names"
+      ]
+    }
+  },
+  "attributes": {
+    "authorized_signatory_address": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_country": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_date_of_birth": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_government_identification_number": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_legal_structure": {
+      "party": "authorized_signatory",
+      "verifiable": false,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_name": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_nationality": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_signatory_date": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_signature": {
+      "party": "authorized_signatory",
+      "verifiable": true,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "authorized_signatory_title": {
+      "party": "authorized_signatory",
+      "verifiable": false,
+      "agent": "ria_authorized_signatory_idv"
+    },
+    "beneficial_owner_address": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_cip_classification": {
+      "party": "beneficial_owner",
+      "verifiable": false,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_country_of_incorporation": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_country_of_residence": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_date_of_birth": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_evidence_of_existence": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_legal_structure": {
+      "party": "beneficial_owner",
+      "verifiable": false,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_name": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_nationality": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_nature_of_business": {
+      "party": "beneficial_owner",
+      "verifiable": false,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_past_nationality": {
+      "party": "beneficial_owner",
+      "verifiable": false,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_percentage_of_ownership": {
+      "party": "beneficial_owner",
+      "verifiable": false,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "beneficial_owner_source_of_wealth": {
+      "party": "beneficial_owner",
+      "verifiable": true,
+      "agent": "ria_beneficial_owner_idv"
+    },
+    "cip_classification": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_cip_classification_id"
+    },
+    "entity_nature_of_business": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_cip_classification_id"
+    },
+    "commodities_future_trading_commission_registered_indicator": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_commodities_indicator_id"
+    },
+    "corporate_officer_correspondence_address": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_country": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_country_of_incorporation": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_country_of_residence": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_date_of_birth": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_cip_classification": {
+      "party": "corporate_officer",
+      "verifiable": false,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_legal_structure": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_name": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_nationality": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_regulator": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "corporate_officer_role": {
+      "party": "corporate_officer",
+      "verifiable": true,
+      "agent": "ria_corporate_officer_idv"
+    },
+    "country_of_incorporation": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "date_of_incorporation": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "entity_status": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "listed_exchange": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "listing_status": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "registration_number": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "verification_of_existence": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_evidence_of_existence_idv"
+    },
+    "tax_identification_number": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_government_identification_idv"
+    },
+    "legal_structure": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_legal_structure_idv"
+    },
+    "parent_publicly_listed_on_united_states_exchange_indicator": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_parent_publicly_listed_id"
+    },
+    "principal_place_of_business": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_principal_business_address_idv"
+    },
+    "Proxy_BO_address": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_cip_classification": {
+      "party": "Proxy_BO",
+      "verifiable": false,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_country_of_incorporation": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_country_of_residence": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_date_of_birth": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_evidence_of_existence": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_legal_structure": {
+      "party": "Proxy_BO",
+      "verifiable": false,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_name": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_nationality": {
+      "party": "Proxy_BO",
+      "verifiable": true,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_nature_of_business": {
+      "party": "Proxy_BO",
+      "verifiable": false,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_past_nationality": {
+      "party": "Proxy_BO",
+      "verifiable": false,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "Proxy_BO_percentage_of_ownership": {
+      "party": "Proxy_BO",
+      "verifiable": false,
+      "agent": "ria_proxy_bo_idv"
+    },
+    "legal_registered_address": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_registered_address_idv"
+    },
+    "regulator": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_regulator_idv"
+    },
+    "securities_exchange_act_of_1934_section_13_or_15d_indicator": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_securities_exchange_act_id"
+    },
+    "sole_proprietorship_indicator": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_sole_proprietorship_id"
+    },
+    "source_of_wealth": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_source_of_wealth_idv"
+    },
+    "transacting_with_own_or_third_party_funds_indicator": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_transacting_funds_id"
+    },
+    "entity_name": {
+      "party": null,
+      "verifiable": true,
+      "agent": "ria_entity_name_idv"
+    },
+    "previous_names": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_entity_name_idv"
+    },
+    "trading_names": {
+      "party": null,
+      "verifiable": false,
+      "agent": "ria_entity_name_idv"
+    }
+  }
+}
