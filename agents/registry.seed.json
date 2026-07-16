@@ -1,0 +1,101 @@
+[
+  {
+    "slug": "fca",
+    "name": "FCA Register",
+    "description": "UK Financial Conduct Authority register — firm status, FRN, principals, regulators",
+    "category": "sourcing",
+    "jurisdiction": "UK",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "companies-house",
+    "name": "Companies House",
+    "description": "UK Companies House — company details, officers, PSCs, incorporation documents",
+    "category": "sourcing",
+    "jurisdiction": "UK",
+    "runner_type": "api",
+    "output_type": "both",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "jersey-fsc",
+    "name": "Jersey FSC",
+    "description": "Jersey Financial Services Commission — entity registration, status, legal structure",
+    "category": "sourcing",
+    "jurisdiction": "UK",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "uk-sourcing-flow",
+    "name": "UK Data Sourcing",
+    "description": "Orchestrates FCA Register and Companies House in parallel — merges all sources with multi-lineage tracking",
+    "category": "sourcing",
+    "jurisdiction": "UK",
+    "runner_type": "api",
+    "output_type": "both",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "gleif",
+    "name": "GLEIF",
+    "description": "Global Legal Entity Identifier Foundation — LEI, entity status, jurisdiction, addresses",
+    "category": "sourcing",
+    "jurisdiction": "Global",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "sec",
+    "name": "SEC EDGAR",
+    "description": "SEC EDGAR public company filings — CIK, EIN, entity type, ticker, address",
+    "category": "sourcing",
+    "jurisdiction": "US",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "iapd",
+    "name": "IAPD",
+    "description": "Investment Adviser Public Disclosure — CRD number, AUM, registration status, address",
+    "category": "sourcing",
+    "jurisdiction": "US",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "nyse",
+    "name": "NYSE / NASDAQ",
+    "description": "NYSE and NASDAQ exchange listings — ticker symbol, listing status, exchange",
+    "category": "sourcing",
+    "jurisdiction": "US",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  },
+  {
+    "slug": "us-sourcing-flow",
+    "name": "US Data Sourcing",
+    "description": "Orchestrates GLEIF, SEC EDGAR, IAPD, and NYSE in parallel — merges all sources with multi-lineage tracking",
+    "category": "sourcing",
+    "jurisdiction": "US",
+    "runner_type": "api",
+    "output_type": "attributes",
+    "enabled": true,
+    "updated_at": "2026-07-16T00:00:00Z"
+  }
+]

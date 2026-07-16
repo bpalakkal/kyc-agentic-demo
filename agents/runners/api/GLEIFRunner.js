@@ -2,7 +2,7 @@ import { ApiRunner } from '../../base/ApiRunner.js';
 
 const BASE       = 'https://api.gleif.org/api/v1';
 const SOURCE     = 'GLEIF (Global Legal Entity Identifier Foundation)';
-const CONFIDENCE = 95;
+const CONFIDENCE = 100;
 
 export class GLEIFRunner extends ApiRunner {
   get slug()       { return 'gleif'; }
@@ -52,8 +52,9 @@ export class GLEIFRunner extends ApiRunner {
   }
 
   _toAttributes(lei, entity) {
-    const sourceUrl = `https://search.gleif.org/#/record/${lei}`;
-    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: null, confidence_score: CONFIDENCE / 100 }];
+    const sourceUrl  = `https://search.gleif.org/#/record/${lei}`;
+    const fetchedAt  = new Date().toISOString();
+    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }];
     const attr = (name, value, opts = {}) => {
       if (value == null || value === '') return null;
       return {
@@ -96,13 +97,14 @@ export class GLEIFRunner extends ApiRunner {
   }
 
   _emptyResult(kycRef, startedAt) {
+    const fetchedAt = new Date().toISOString();
     return {
       agentSlug: this.slug, kycRef, outputType: 'attributes',
       attributes: [{
         attributeName: 'verification_of_existence', attributeGroup: 'core',
         displayValue: 'No', source: SOURCE, confidence: CONFIDENCE,
         idFlag: false, verificationFlag: true, exceptionFlag: false,
-        lineage: [{ source: SOURCE, value: 'No', source_url: BASE, timestamp: null }],
+        lineage: [{ source: SOURCE, value: 'No', source_url: BASE, timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }],
       }],
       files: [],
       metadata: { completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: [BASE] },

@@ -2,7 +2,7 @@ import { ApiRunner } from '../../base/ApiRunner.js';
 
 const API_URL    = 'https://api.sec-api.io/form-adv/firm';
 const SOURCE     = 'IAPD (Investment Adviser Public Disclosure)';
-const CONFIDENCE = 90;
+const CONFIDENCE = 100;
 
 export class IAPDRunner extends ApiRunner {
   get slug()       { return 'iapd'; }
@@ -64,7 +64,8 @@ export class IAPDRunner extends ApiRunner {
       ? `https://adviserinfo.sec.gov/firm/summary/${crd}`
       : 'https://adviserinfo.sec.gov';
 
-    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: null, confidence_score: CONFIDENCE / 100 }];
+    const fetchedAt = new Date().toISOString();
+    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }];
     const attr = (name, value, opts = {}) => {
       if (value == null || value === '') return null;
       return {
@@ -82,12 +83,12 @@ export class IAPDRunner extends ApiRunner {
 
     return [
       attr('entity_name',                      info.FirmName),
-      attr('registration_number',              crd ? String(crd) : null, { idFlag: true, verificationFlag: true }),
+      attr('us_registration_number',           crd ? String(crd) : null, { idFlag: true, verificationFlag: true }),
       attr('entity_status',                    regStatus),
       attr('legal_structure',                  formInfo.Item1?.OrgFm),
       attr('regulator',                        'SEC (Securities and Exchange Commission)'),
       attr('principal_place_of_business',      addrParts.join(', ') || null),
-      attr('entity_website_address',           info.Website),
+      attr('website_address',                  info.Website),
       attr('assets_under_management_aum',      aumStr),
       attr('verification_of_existence',        'Yes', { verificationFlag: true }),
       attr('entity_source_url',                sourceUrl),
@@ -95,13 +96,14 @@ export class IAPDRunner extends ApiRunner {
   }
 
   _notFoundResult(kycRef, startedAt) {
+    const fetchedAt = new Date().toISOString();
     return {
       agentSlug: this.slug, kycRef, outputType: 'attributes',
       attributes: [{
         attributeName: 'verification_of_existence', attributeGroup: 'core',
         displayValue: 'No', source: SOURCE, confidence: CONFIDENCE,
         idFlag: false, verificationFlag: true, exceptionFlag: false,
-        lineage: [{ source: SOURCE, value: 'No', source_url: 'https://adviserinfo.sec.gov', timestamp: null }],
+        lineage: [{ source: SOURCE, value: 'No', source_url: 'https://adviserinfo.sec.gov', timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }],
       }],
       files: [],
       metadata: { completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: ['https://adviserinfo.sec.gov'] },

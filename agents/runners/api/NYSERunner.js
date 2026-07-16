@@ -2,7 +2,7 @@ import { ApiRunner } from '../../base/ApiRunner.js';
 
 const API_URL    = 'https://www.nyse.com/api/quotes/filter';
 const SOURCE     = 'NYSE (New York Stock Exchange / NASDAQ)';
-const CONFIDENCE = 95;
+const CONFIDENCE = 100;
 
 // MIC code → exchange display name
 const MIC_EXCHANGE = {
@@ -62,7 +62,8 @@ export class NYSERunner extends ApiRunner {
   }
 
   _toAttributes(listing, exchange, sourceUrl) {
-    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: null, confidence_score: CONFIDENCE / 100 }];
+    const fetchedAt = new Date().toISOString();
+    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }];
     const attr = (name, value, opts = {}) => ({
       attributeName: name, attributeGroup: 'core', displayValue: String(value),
       source: SOURCE, confidence: CONFIDENCE,
@@ -80,7 +81,8 @@ export class NYSERunner extends ApiRunner {
   }
 
   _notListedResult(kycRef, startedAt) {
-    const lin = v => [{ source: SOURCE, value: String(v), source_url: 'https://www.nyse.com', timestamp: null }];
+    const fetchedAt = new Date().toISOString();
+    const lin = v => [{ source: SOURCE, value: String(v), source_url: 'https://www.nyse.com', timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }];
     return {
       agentSlug: this.slug, kycRef, outputType: 'attributes',
       attributes: [

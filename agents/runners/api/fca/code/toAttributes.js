@@ -41,15 +41,15 @@ export function fcaToAttributes(merged, frn) {
   }
 
   // ── Entity Information ────────────────────────────────────────────────────
-  push('entity_name',                        'core', merged.entity_name);
-  push('entity_status',                      'core', merged.entity_status);
-  push('entity_principal_place_of_business', 'core', merged.entity_principal_place_of_business);
-  push('entity_website_address',             'core', merged.entity_website_address);
-  push('entity_source_url',                  'core', merged.entity_source_url);
-  push('entity_activity_type',               'core', merged.entity_activity_type);
+  push('entity_name',                'core', merged.entity_name);
+  push('entity_status',              'core', merged.entity_status);
+  push('principal_place_of_business','core', merged.entity_principal_place_of_business);
+  push('website_address',            'core', merged.entity_website_address);
+  push('entity_source_url',          'core', merged.entity_source_url);
+  push('other_business_activity',    'core', merged.entity_activity_type);
 
-  // FCA registration number — marks as identification AND verification attribute
-  push('entity_registration_number', 'core', merged.entity_registration_number, {
+  // FCA registration number (FRN) — maps to uk_registration_number per master schema
+  push('uk_registration_number', 'core', merged.entity_registration_number, {
     idFlag: true,
     verificationFlag: true,
   });
@@ -57,7 +57,7 @@ export function fcaToAttributes(merged, frn) {
   // ── Regulatory ────────────────────────────────────────────────────────────
   if (Array.isArray(merged.entity_regulator) && merged.entity_regulator.length > 0) {
     const regulatorStr = merged.entity_regulator.map(r => r.regulator_name).join('; ');
-    push('entity_regulator', 'core', regulatorStr, { verificationFlag: true });
+    push('regulator', 'core', regulatorStr, { verificationFlag: true });
   }
 
   // ── Corporate Structure ───────────────────────────────────────────────────

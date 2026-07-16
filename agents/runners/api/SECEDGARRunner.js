@@ -3,7 +3,7 @@ import { ApiRunner } from '../../base/ApiRunner.js';
 const SEARCH_BASE      = 'https://efts.sec.gov/LATEST/search-index';
 const SUBMISSIONS_BASE = 'https://data.sec.gov/submissions';
 const SOURCE           = 'SEC EDGAR';
-const CONFIDENCE       = 95;
+const CONFIDENCE       = 100;
 // SEC requires a descriptive User-Agent: https://www.sec.gov/os/accessing-edgar-data
 const USER_AGENT       = `KYC-Platform/1.0 (${process.env.SUPPORT_EMAIL ?? 'support@example.com'})`;
 
@@ -59,8 +59,9 @@ export class SECEDGARRunner extends ApiRunner {
   }
 
   _toAttributes(c, paddedCik) {
-    const sourceUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${paddedCik}&type=10-K`;
-    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: null, confidence_score: CONFIDENCE / 100 }];
+    const sourceUrl  = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${paddedCik}&type=10-K`;
+    const fetchedAt  = new Date().toISOString();
+    const lin = v => [{ source: SOURCE, value: String(v), source_url: sourceUrl, timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }];
     const attr = (name, value, opts = {}) => {
       if (value == null || value === '') return null;
       return {
@@ -79,32 +80,33 @@ export class SECEDGARRunner extends ApiRunner {
     const prevNames   = (c.formerNames ?? []).map(n => n.name).join('; ') || null;
 
     return [
-      attr('entity_name',             c.name),
-      attr('registration_number',     cikDisplay,              { idFlag: true, verificationFlag: true }),
-      attr('entity_status',           c.entityType === 'operating' ? 'Active' : c.entityType),
+      attr('entity_name',               c.name),
+      attr('us_registration_number',    cikDisplay,              { idFlag: true, verificationFlag: true }),
+      attr('entity_status',             c.entityType === 'operating' ? 'Active' : c.entityType),
       attr('entity_nature_of_business', c.sicDescription),
-      attr('sic_code',                c.sic),
-      attr('ein',                     c.ein,                   { idFlag: true }),
-      attr('lei_code',                c.lei),
-      attr('state_of_incorporation',  c.stateOfIncorporationDescription),
-      attr('legal_registered_address', fmtAddr(bizAddr)),
-      attr('ticker_symbol',           tickers,                 { idFlag: !!tickers }),
-      attr('listed_exchange',         exchanges),
-      attr('previous_names',          prevNames),
-      attr('entity_phone',            c.phone),
-      attr('verification_of_existence', 'Yes',                 { verificationFlag: true }),
-      attr('entity_source_url',       sourceUrl),
+      attr('other_business_activity',   c.sic ? `SIC ${c.sic}` : null),
+      attr('us_entity_tax_id_number',   c.ein,                   { idFlag: true }),
+      attr('lei_code',                  c.lei),
+      attr('country_of_incorporation',  c.stateOfIncorporationDescription),
+      attr('legal_registered_address',  fmtAddr(bizAddr)),
+      attr('ticker_symbol',             tickers,                 { idFlag: !!tickers }),
+      attr('listed_exchange',           exchanges),
+      attr('previous_names',            prevNames),
+      attr('website_address',           c.website),
+      attr('verification_of_existence', 'Yes',                   { verificationFlag: true }),
+      attr('entity_source_url',         sourceUrl),
     ].filter(Boolean);
   }
 
   _notFoundResult(kycRef, startedAt) {
+    const fetchedAt = new Date().toISOString();
     return {
       agentSlug: this.slug, kycRef, outputType: 'attributes',
       attributes: [{
         attributeName: 'verification_of_existence', attributeGroup: 'core',
         displayValue: 'No', source: SOURCE, confidence: CONFIDENCE,
         idFlag: false, verificationFlag: true, exceptionFlag: false,
-        lineage: [{ source: SOURCE, value: 'No', source_url: 'https://efts.sec.gov', timestamp: null }],
+        lineage: [{ source: SOURCE, value: 'No', source_url: 'https://efts.sec.gov', timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }],
       }],
       files: [],
       metadata: { completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: ['https://efts.sec.gov'] },
