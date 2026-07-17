@@ -1,134 +1,113 @@
-import { useState } from "react";
+/**
+ * AgentTriggers — three category dropdowns (Sourcing / Due Diligence / Screening).
+ * All agents and all trigger actions come exclusively from the agent registry.
+ * The registry entry with trigger_all:true in each category powers the "Trigger All"
+ * button; every other entry in that category appears as an individual item.
+ * No hardcoded agent lists, no schema-derived lists — registry is the single source.
+ *
+ * Agents with a cip_classification field are only shown when the current entity's
+ * CIP classification attribute matches. Agents without it (or set to "all") always show.
+ */
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, Zap, Database, ClipboardList, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useAgents } from "@/components/AgentSystem";
 import { useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
-import { useAgents, AGENT_API_BASE, type AgentId } from "@/components/AgentSystem";
 import { apiFetch } from "@/lib/apiFetch";
 
-const CATEGORIES = [
-  { key: "sourcing",       label: "Sourcing" },
-  { key: "due_diligence",  label: "Due Diligence" },
-  { key: "screening",      label: "Screening" },
-] as const;
+const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
-type Category = typeof CATEGORIES[number]["key"];
-
-function cipFilter(agent: RegistryAgent, entityCip: string | null): boolean {
-  if (!agent.cip_classification) return true;
-  if (!entityCip) return true;
-  return agent.cip_classification === entityCip;
-}
-
-function CategorySection({
-  category,
-  label,
-  agents,
-  onRun,
-}: {
-  category: string;
-  label: string;
-  agents: RegistryAgent[];
-  onRun: (slugs: string[], displayName: string) => void;
+function TriggerButton({ icon: Icon, label, children }: {
+  icon: typeof Zap; label: string; children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
-
-  const triggerAll = agents.find((a) => a.trigger_all);
-  const individual = agents.filter((a) => !a.trigger_all && a.enabled !== false);
-
-  if (!agents.length) return null;
-
   return (
-    <div className="relative inline-block">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-sm font-medium text-gray-700 border border-gray-200 bg-white rounded-md px-3 py-1.5 hover:bg-gray-50 shadow-sm"
-      >
-        {label}
-        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 16 16">
-          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <>
-          {/* backdrop */}
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 z-20 min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-            {triggerAll && (
-              <>
-                <button
-                  className="w-full text-left px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                  onClick={() => {
-                    onRun(
-                      individual.map((a) => a.slug),
-                      `All ${label}`
-                    );
-                    setOpen(false);
-                  }}
-                >
-                  Trigger All {label}
-                </button>
-                {individual.length > 0 && <hr className="my-1 border-gray-100" />}
-              </>
-            )}
-            {individual.map((agent) => (
-              <button
-                key={agent.slug}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                onClick={() => {
-                  onRun([agent.slug], agent.display_name);
-                  setOpen(false);
-                }}
-              >
-                {agent.display_name}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border">
+          <Icon className="size-3" />
+          {label} <ChevronDown className="size-3 opacity-60" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-// ─── AgentTriggers ────────────────────────────────────────────────────────────
+function CategorySection({
+  icon, label, agents,
+}: {
+  icon: typeof Database;
+  label: string;
+  agents: RegistryAgent[];
+}) {
+  const { runAgents } = useAgents();
+  const triggerAll = agents.find((a) => a.trigger_all);
+  const individual = agents.filter((a) => !a.trigger_all);
 
-export function AgentTriggers({ caseKyc, entityName }: { caseKyc: string; entityName?: string }) {
-  const registry = useAgentRegistry();
-  const { runAgents, setEntityContext } = useAgents();
+  if (agents.length === 0) return null;
 
-  // Fetch entity CIP for filtering
-  const { data: attrRows } = useQuery<{ attribute_name: string; display_value: string | null }[]>({
-    queryKey: ["entity-attrs-cip", caseKyc],
+  return (
+    <TriggerButton icon={icon} label={label}>
+      <DropdownMenuLabel>{label}</DropdownMenuLabel>
+      {triggerAll && (
+        <DropdownMenuItem onClick={() => runAgents([triggerAll.slug], triggerAll.display_name)}>
+          <Zap className="size-3 mr-2" /> {triggerAll.display_name}
+        </DropdownMenuItem>
+      )}
+      {individual.length > 0 && <DropdownMenuSeparator />}
+      {individual.map((a) => (
+        <DropdownMenuItem key={a.slug} onClick={() => runAgents([a.slug], a.display_name)}>
+          {a.display_name}
+        </DropdownMenuItem>
+      ))}
+      {agents.length === 0 && (
+        <div className="px-2 py-1.5 text-[11px] text-muted-foreground italic">
+          No agents registered for this category.
+        </div>
+      )}
+    </TriggerButton>
+  );
+}
+
+export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: string; entityName: string }) {
+  const { data: registry = [] } = useAgentRegistry();
+
+  // Fetch this entity's attributes to determine CIP classification.
+  // TanStack Query caches the result — other components fetching the same key share it.
+  const { data: attributes = [] } = useQuery<Array<{ attribute_name: string; display_value: string | null }>>({
+    queryKey: ["entity-attributes", caseKyc],
     queryFn: () =>
-      apiFetch(`${AGENT_API_BASE}/api/entity/${caseKyc}/attributes`)
+      apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(caseKyc)}/attributes`)
         .then((r) => r.json()),
-    enabled: Boolean(caseKyc),
-    staleTime: 2 * 60 * 1000,
+    enabled: !!caseKyc,
+    staleTime: 60_000,
   });
 
-  const entityCip =
-    attrRows?.find((a) => a.attribute_name === "cip_classification")?.display_value ?? null;
+  const entityCip = attributes.find((a) => a.attribute_name === "cip_classification")?.display_value ?? null;
 
-  const agents = registry.data ?? [];
+  // Show agents that are scoped to this entity's CIP type, plus any that have no
+  // CIP restriction. If the entity has no CIP set yet, show everything.
+  function cipFilter(a: RegistryAgent) {
+    const agentCip = a.cip_classification;
+    if (!agentCip || agentCip === "all") return true;
+    if (!entityCip) return true;
+    return agentCip === entityCip;
+  }
 
-  const handleRun = (slugs: string[], displayName: string) => {
-    setEntityContext({ name: entityName ?? caseKyc, kyc: caseKyc });
-    runAgents(slugs as AgentId[], displayName);
-  };
-
-  const agentsFor = (cat: Category) =>
-    agents.filter((a) => a.category === cat && cipFilter(a, entityCip));
+  const sourcing     = registry.filter((a) => a.category?.toLowerCase() === "sourcing").filter(cipFilter);
+  const dueDiligence = registry.filter((a) => a.category?.toLowerCase() === "due_diligence").filter(cipFilter);
+  const screening    = registry.filter((a) => a.category?.toLowerCase() === "screening").filter(cipFilter);
 
   return (
     <div className="flex items-center gap-2">
-      {CATEGORIES.map(({ key, label }) => (
-        <CategorySection
-          key={key}
-          category={key}
-          label={label}
-          agents={agentsFor(key)}
-          onRun={handleRun}
-        />
-      ))}
+      <CategorySection icon={Database}      label="Sourcing"        agents={sourcing} />
+      <CategorySection icon={ClipboardList} label="Due Diligence"   agents={dueDiligence} />
+      <CategorySection icon={ShieldCheck}   label="Screening"       agents={screening} />
     </div>
   );
 }

@@ -1,199 +1,217 @@
-import { useState, useEffect, useCallback } from "react";
-import { useAgentRegistry } from "@/hooks/useAgentRegistry";
-import { AGENT_API_BASE } from "@/components/AgentSystem";
+/**
+ * AgentRunsPanel — right-panel tab showing the LATEST run per agent (all stages:
+ * sourcing, due diligence, screening) for a case. Each run expands into two
+ * sections:
+ *   - Thinking    — the persisted step/thinking log (agent_runs.steps, migration 009)
+ *   - Attributes  — the values the run returned, pivoted by lineage source
+ *                   (from agent_runs.raw_output, migration 008)
+ */
+import { useEffect, useMemo, useState } from "react";
+import { Database, ChevronDown, Clock, Loader2, Inbox, Brain, ListTree } from "lucide-react";
 import { apiFetch } from "@/lib/apiFetch";
+import { AGENT_API_BASE } from "@/components/AgentSystem";
+import { useAgentRegistry } from "@/hooks/useAgentRegistry";
+import { cn } from "@/lib/utils";
 
+type LineageEntry = { source?: string; value?: unknown };
+type RawAttr = {
+  attributeName?: string; attribute_name?: string;
+  displayValue?: string;  display_value?: string;
+  attributeGroup?: string; attribute_group?: string;
+  lineage?: LineageEntry[];
+};
 type AgentRun = {
   id: string;
   agent_slug: string;
-  status: "running" | "pending_review" | "complete" | "failed";
-  started_at: string;
+  status: string;
   completed_at?: string | null;
-  error?: string | null;
+  started_at?: string | null;
   steps?: string[] | null;
-  raw_output?: Record<string, unknown> | null;
+  raw_output?: { agentSlug?: string; attributes?: RawAttr[]; metadata?: Record<string, unknown> } | null;
 };
 
-type AttrGroup = {
-  source: string;
-  attributes: { attribute_name: string; display_value: string | null }[];
-};
+const fmtLabel = (s: string) => s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const fmtTime = (t?: string | null) => (t ? new Date(t).toLocaleString() : "");
+const attrName = (a: RawAttr) => a.attributeName ?? a.attribute_name ?? "";
+const attrValue = (a: RawAttr) => a.displayValue ?? a.display_value ?? "";
+const attrGroup = (a: RawAttr) => a.attributeGroup ?? a.attribute_group ?? "core";
 
-function groupBySource(attrs: { attribute_name: string; display_value?: string | null; lineage?: { source?: string }[] }[]): AttrGroup[] {
-  const map = new Map<string, { attribute_name: string; display_value: string | null }[]>();
-  for (const attr of attrs) {
-    const src = attr.lineage?.[0]?.source ?? "Agent";
-    if (!map.has(src)) map.set(src, []);
-    map.get(src)!.push({ attribute_name: attr.attribute_name, display_value: attr.display_value ?? null });
-  }
-  return Array.from(map.entries()).map(([source, attributes]) => ({ source, attributes }));
-}
-
-function StatusBadge({ status }: { status: AgentRun["status"] }) {
-  const map: Record<AgentRun["status"], { label: string; className: string }> = {
-    running:        { label: "Running",         className: "bg-blue-100 text-blue-700" },
-    pending_review: { label: "Awaiting Review", className: "bg-purple-100 text-purple-700" },
-    complete:       { label: "Complete",        className: "bg-emerald-100 text-emerald-700" },
-    failed:         { label: "Failed",          className: "bg-red-100 text-red-700" },
+// Pivot a run's attributes by lineage source: source → [{ name, value it gave }].
+function groupBySource(attrs: RawAttr[]): { source: string; items: { name: string; value: string }[] }[] {
+  const bySource = new Map<string, { name: string; value: string }[]>();
+  const push = (source: string, name: string, value: string) => {
+    const arr = bySource.get(source) ?? [];
+    arr.push({ name, value });
+    bySource.set(source, arr);
   };
-  const b = map[status] ?? map.running;
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${b.className}`}>
-      {b.label}
-    </span>
-  );
+  for (const a of attrs) {
+    const name = attrName(a);
+    if (!name || attrGroup(a) === "wgq") continue;
+    const lineage = Array.isArray(a.lineage) ? a.lineage : [];
+    if (lineage.length) {
+      const seen = new Set<string>();
+      for (const e of lineage) {
+        const src = e.source || "Unattributed";
+        if (seen.has(src)) continue;
+        seen.add(src);
+        push(src, name, String(e.value ?? ""));
+      }
+    } else {
+      push("Merged value", name, attrValue(a));
+    }
+  }
+  return [...bySource.entries()].map(([source, items]) => ({ source, items }));
 }
-
-// ─── AgentRunsPanel ───────────────────────────────────────────────────────────
 
 export function AgentRunsPanel({ kycRef }: { kycRef: string }) {
-  const registry = useAgentRegistry();
   const [runs, setRuns] = useState<AgentRun[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [openRun, setOpenRun] = useState<Record<string, boolean>>({});
+  const [section, setSection] = useState<Record<string, "thinking" | "attributes" | null>>({});
+  const { data: registry = [] } = useAgentRegistry();
 
-  const fetchRuns = useCallback(async () => {
+  const displayName = (slug: string) => registry.find((a) => a.slug === slug)?.display_name ?? fmtLabel(slug);
+
+  useEffect(() => {
     if (!kycRef) return;
+    let cancelled = false;
     setLoading(true);
-    try {
-      const r = await apiFetch(`${AGENT_API_BASE}/api/entity/${kycRef}/runs`);
-      const data = await r.json();
-      setRuns(Array.isArray(data) ? data : []);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+    apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/runs`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: AgentRun[]) => { if (!cancelled) setRuns(Array.isArray(data) ? data : []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [kycRef]);
 
-  useEffect(() => { void fetchRuns(); }, [fetchRuns]);
-
-  // Deduplicate: keep latest run per agent_slug
-  const latestBySlug = new Map<string, AgentRun>();
-  for (const run of runs) {
-    const existing = latestBySlug.get(run.agent_slug);
-    if (!existing || run.started_at > existing.started_at) latestBySlug.set(run.agent_slug, run);
-  }
-  const displayRuns = Array.from(latestBySlug.values()).sort(
-    (a, b) => b.started_at.localeCompare(a.started_at)
-  );
-
-  const slugToName = (slug: string) =>
-    registry.data?.find((a) => a.slug === slug)?.display_name ?? slug;
-
-  const rawAttrs = (run: AgentRun) => {
-    const out = run.raw_output;
-    if (!out) return [];
-    if (Array.isArray((out as { attributes?: unknown }).attributes)) {
-      return (out as { attributes: { attribute_name: string; display_value?: string | null; lineage?: { source?: string }[] }[] }).attributes;
+  // Latest run per agent that produced something (attributes or a thinking log).
+  const latest = useMemo(() => {
+    const m = new Map<string, AgentRun>();
+    for (const run of runs) {
+      if (!["complete", "pending_review", "failed"].includes(run.status)) continue;
+      const hasContent = (run.raw_output?.attributes?.length) || (run.steps?.length);
+      if (!hasContent) continue;
+      const prev = m.get(run.agent_slug);
+      const t = run.completed_at ?? run.started_at ?? "";
+      const pt = prev ? (prev.completed_at ?? prev.started_at ?? "") : "";
+      if (!prev || t > pt) m.set(run.agent_slug, run);
     }
-    if (Array.isArray(out)) return out;
-    return [];
-  };
+    return [...m.values()].sort((a, b) =>
+      (b.completed_at ?? b.started_at ?? "").localeCompare(a.completed_at ?? a.started_at ?? ""));
+  }, [runs]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
+        <Loader2 className="size-4 animate-spin" /> <span className="text-sm">Loading agent runs…</span>
+      </div>
+    );
+  }
+  if (latest.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-muted-foreground py-10 text-center px-4">
+        <Inbox className="size-6 opacity-40" />
+        <p className="text-[12px]">No agent runs yet.</p>
+        <p className="text-[10px] text-muted-foreground/70">Trigger an agent — its thinking log and returned values will appear here.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700">Agent Runs</h3>
-        <button
-          onClick={fetchRuns}
-          disabled={loading}
-          className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40"
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
-
-      {/* Run list */}
-      <div className="flex-1 overflow-y-auto">
-        {displayRuns.length === 0 && !loading && (
-          <p className="text-sm text-gray-400 italic px-4 py-6">No agent runs yet.</p>
-        )}
-        {displayRuns.map((run) => {
-          const isOpen = expanded === run.id;
-          const attrs = rawAttrs(run);
-          const groups = groupBySource(attrs);
-
-          return (
-            <div key={run.id} className="border-b border-gray-100 last:border-0">
-              {/* Row header */}
-              <button
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 text-left"
-                onClick={() => setExpanded(isOpen ? null : run.id)}
-              >
-                <div>
-                  <span className="text-sm font-medium text-gray-800">
-                    {slugToName(run.agent_slug)}
-                  </span>
-                  <span className="ml-2 text-xs text-gray-400 font-mono">{run.agent_slug}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={run.status} />
-                  <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
-                </div>
-              </button>
-
-              {/* Expanded detail */}
-              {isOpen && (
-                <div className="px-4 pb-4 space-y-4">
-                  {/* Thinking steps */}
-                  {run.steps && run.steps.length > 0 && (
-                    <div>
-                      <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                        Thinking Log
-                      </h5>
-                      <ul className="space-y-1">
-                        {run.steps.map((s, i) => (
-                          <li key={i} className="text-xs text-gray-600 flex gap-2">
-                            <span className="text-gray-300 shrink-0">{i + 1}.</span>
-                            <span>{s}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Attribute outputs grouped by source */}
-                  {groups.length > 0 && (
-                    <div>
-                      <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                        Outputs
-                      </h5>
-                      {groups.map((g) => (
-                        <div key={g.source} className="mb-3">
-                          <span className="text-xs text-blue-600 font-medium block mb-1">{g.source}</span>
-                          <div className="grid grid-cols-2 gap-1">
-                            {g.attributes.map((a) => (
-                              <div key={a.attribute_name} className="text-xs bg-gray-50 rounded px-2 py-1">
-                                <span className="text-gray-400 block">{a.attribute_name}</span>
-                                <span className="text-gray-700">{a.display_value ?? "—"}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Error */}
-                  {run.error && (
-                    <div className="text-xs text-red-600 bg-red-50 rounded p-2">
-                      {run.error}
-                    </div>
-                  )}
-
-                  {/* Timestamp */}
-                  <p className="text-xs text-gray-300">
-                    Started {new Date(run.started_at).toLocaleString()}
-                    {run.completed_at && ` · Completed ${new Date(run.completed_at).toLocaleString()}`}
-                  </p>
-                </div>
-              )}
+    <div className="space-y-2 overflow-y-auto">
+      {latest.map((run) => {
+        const attrs = (run.raw_output?.attributes ?? []).filter((a) => attrName(a) && attrGroup(a) !== "wgq");
+        const groups = groupBySource(attrs);
+        const steps = run.steps ?? [];
+        const isOpen = run.id in openRun ? openRun[run.id] : true;
+        const sec = run.id in section ? section[run.id] : "attributes";
+        const toggleSec = (s: "thinking" | "attributes") =>
+          setSection((prev) => ({ ...prev, [run.id]: prev[run.id] === s ? null : s }));
+        return (
+          <div key={run.id} className="rounded-lg border border-border bg-card overflow-hidden">
+            <button
+              onClick={() => setOpenRun((prev) => ({ ...prev, [run.id]: !isOpen }))}
+              className="w-full flex items-center gap-2 px-3 py-2.5 bg-secondary/50 hover:bg-secondary/70 transition-colors text-left border-b border-border"
+            >
+              <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !isOpen && "-rotate-90")} />
+              <Database className="size-3.5 text-primary shrink-0" />
+              <span className="text-[11px] font-bold text-foreground flex-1 truncate">{displayName(run.agent_slug)}</span>
+              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border",
+                run.status === "failed" ? "bg-alert-soft text-alert border-alert/30"
+                : run.status === "pending_review" ? "bg-primary/10 text-primary border-primary/20"
+                : "bg-success-soft text-success border-success/20")}>
+                {run.status === "pending_review" ? "awaiting review" : run.status}
+              </span>
+            </button>
+            <div className="flex items-center gap-1 px-3 py-1.5 text-[9px] text-muted-foreground border-b border-border/60 bg-secondary/20">
+              <Clock className="size-2.5" /> {fmtTime(run.completed_at ?? run.started_at) || "—"}
             </div>
-          );
-        })}
-      </div>
+            {isOpen && (
+              <div>
+                {/* Section toggles */}
+                <div className="flex items-center gap-1 px-2 pt-2">
+                  <SectionTab active={sec === "attributes"} onClick={() => toggleSec("attributes")} icon={ListTree} label={`Attributes (${attrs.length})`} />
+                  <SectionTab active={sec === "thinking"} onClick={() => toggleSec("thinking")} icon={Brain} label={`Thinking (${steps.length})`} />
+                </div>
+
+                {sec === "attributes" && (
+                  <div className="p-1">
+                    {attrs.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground italic px-2 py-3 text-center">This run returned no attribute values.</p>
+                    )}
+                    {groups.map(({ source, items }) => (
+                      <div key={source} className="border-b border-border/50 last:border-b-0">
+                        <div className="px-3 py-1.5 bg-secondary/20 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center justify-between">
+                          <span className="truncate">{source}</span><span className="shrink-0 ml-2">{items.length}</span>
+                        </div>
+                        <div className="divide-y divide-border/40">
+                          {items.map(({ name, value }, i) => (
+                            <div key={`${name}-${i}`} className="flex items-start gap-2 px-3 py-1.5">
+                              <span className="text-[10px] font-medium text-muted-foreground w-[42%] shrink-0">{fmtLabel(name)}</span>
+                              <span className="text-[11px] text-foreground flex-1 min-w-0 break-words">
+                                {value || <span className="italic text-muted-foreground/40">—</span>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {sec === "thinking" && (
+                  <div className="p-3 space-y-1 max-h-72 overflow-y-auto">
+                    {steps.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground italic text-center py-2">No thinking log recorded for this run.</p>
+                    )}
+                    {steps.map((s, i) => (
+                      <p key={i} className="text-[10px] text-muted-foreground font-mono leading-snug">
+                        <span className="text-primary/50 mr-1">›</span>{s}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+function SectionTab({ active, onClick, icon: Icon, label }: {
+  active: boolean; onClick: () => void; icon: typeof Brain; label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-md border transition-colors",
+        active ? "bg-primary/10 text-primary border-primary/30" : "border-border text-muted-foreground hover:text-foreground",
+      )}
+    >
+      <Icon className="size-3" /> {label}
+    </button>
   );
 }

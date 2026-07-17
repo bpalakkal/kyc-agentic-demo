@@ -302,7 +302,7 @@ const WorkQueue = () => {
   return (
     <div className="px-6 py-6">
       <div className="mb-5">
-        <h1 className="text-[18px] font-bold tracking-tight">{firstName}'s Work Queue</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Work Queue</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Select entities to begin a review session. Locked rows are read-only.</p>
       </div>
 
@@ -311,7 +311,7 @@ const WorkQueue = () => {
           <div className="relative w-[340px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
-              className="w-full h-10 pl-9 pr-12 text-sm rounded-full border border-border bg-card outline-none focus:ring-2 focus:ring-ring/30"
+              className="w-full h-10 pl-9 pr-12 text-sm rounded-lg border border-border bg-card outline-none focus:ring-2 focus:ring-ring/30"
               placeholder="Search entities…"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -319,18 +319,18 @@ const WorkQueue = () => {
             </span>
           </div>
 
-          <button className="h-10 px-4 rounded-full border border-primary text-primary text-sm flex items-center gap-2 hover:bg-info-soft transition-colors">
+          <button className="h-10 px-4 rounded-lg border border-primary text-primary text-sm flex items-center gap-2 hover:bg-info-soft transition-colors">
             <SlidersHorizontal className="size-4" />
             Filter
           </button>
 
-          <div className="flex items-center gap-1 ml-2 p-1 rounded-full bg-secondary/60 border border-border">
+          <div className="flex items-center gap-1 ml-2 p-1 rounded-lg bg-secondary/60 border border-border">
             {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={cn(
-                  "px-4 py-1 rounded-full text-sm transition-colors",
+                  "px-4 py-1 rounded-md text-sm transition-colors",
                   activeTab === t.id
                     ? "bg-card shadow-sm font-medium"
                     : "text-muted-foreground hover:bg-card/50"
@@ -347,7 +347,7 @@ const WorkQueue = () => {
           state={{ entities: selectedEntities }}
           onClick={(e) => { if (selectedCount === 0) e.preventDefault(); }}
           className={cn(
-            "h-10 px-5 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm transition-all",
+            "h-10 px-5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-all",
             selectedCount > 0
               ? "bg-primary text-primary-foreground hover:opacity-95 cursor-pointer"
               : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed pointer-events-none"
@@ -359,7 +359,7 @@ const WorkQueue = () => {
         </Link>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
         {/* Header row */}
         <div className={`grid ${COLS} gap-2 px-4 py-3 bg-muted/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground`}>
           <span />
