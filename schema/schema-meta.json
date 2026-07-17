@@ -1,30 +1,6 @@
 {
-  "generatedAt": "2026-07-16T00:26:10.770Z",
-  "entityTypes": {
-    "Registered Investment Advisor or Commodity Trading Advisor": {
-      "alias": "RIA",
-      "not_applicable": [
-        "acting_person",
-        "authorized_signatory.authorized_signatory_date_of_birth",
-        "authorized_signatory.authorized_signatory_government_identification_number",
-        "authorized_signatory.authorized_signatory_nationality",
-        "beneficial_owner.beneficial_owner_source_of_wealth",
-        "investment_advisor",
-        "power_of_attorney",
-        "public_accounting_firm_indicator",
-        "source_of_funds",
-        "sub_advisor",
-        "trustee"
-      ],
-      "optional": [
-        "activity_type",
-        "entity_giin",
-        "lei_code",
-        "other_business_activity",
-        "website_address"
-      ]
-    }
-  },
+  "generatedAt": "2026-07-17T00:33:25.713Z",
+  "entityTypes": {},
   "attributes": {
     "entity_id": {
       "kind": "scalar",
@@ -39,6 +15,15 @@
       "valueEnum": null,
       "verifiable": null,
       "description": "Case management system reference number for this KYC review case."
+    },
+    "assets_under_management_aum": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Total value of assets managed by the entity on behalf of clients, expressed in the reporting currency."
     },
     "cip_classification": {
       "kind": "scalar",
@@ -67,15 +52,6 @@
       "ddAgent": "ria_evidence_of_existence_idv",
       "description": "Country in which the entity was legally incorporated or formed."
     },
-    "registration_country": {
-      "kind": "scalar",
-      "party": null,
-      "child": null,
-      "valueEnum": "Country",
-      "verifiable": null,
-      "ddAgent": null,
-      "description": "Country in which the entity is registered with the relevant commercial/company registry; must equal the country of organization."
-    },
     "date_of_incorporation": {
       "kind": "scalar",
       "party": null,
@@ -85,13 +61,13 @@
       "ddAgent": "ria_evidence_of_existence_idv",
       "description": "Date on which the entity was officially incorporated or registered."
     },
-    "legal_structure": {
+    "entity_classification": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": "LegalStructure",
-      "verifiable": true,
-      "ddAgent": "ria_legal_structure_idv",
+      "verifiable": null,
+      "ddAgent": null,
       "description": "Legal structure of the entity (e.g. Corporation, LLC, Limited Partnership, Trust)."
     },
     "entity_giin": {
@@ -102,6 +78,15 @@
       "verifiable": null,
       "ddAgent": null,
       "description": "Global Intermediary Identification Number (GIIN) assigned under FATCA for reporting purposes."
+    },
+    "entity_jurisdiction": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": "Country",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Primary regulatory jurisdiction in which the entity is domiciled or operates."
     },
     "entity_name": {
       "kind": "scalar",
@@ -121,15 +106,6 @@
       "ddAgent": "ria_cip_classification_id",
       "description": "Description of the entity's primary business activities."
     },
-    "activity_type": {
-      "kind": "scalar",
-      "party": null,
-      "child": null,
-      "valueEnum": "ActivityType",
-      "verifiable": null,
-      "ddAgent": null,
-      "description": "Classification of the entity's primary type of business activity."
-    },
     "entity_risk_rating": {
       "kind": "scalar",
       "party": null,
@@ -148,6 +124,16 @@
       "ddAgent": "ria_evidence_of_existence_idv",
       "description": "Current registration status of the entity (e.g. Active, Dissolved, In Liquidation)."
     },
+    "foreign_branches_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "multi": true,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Details of any branches the entity operates outside its country of incorporation."
+    },
     "legal_registered_address": {
       "kind": "scalar",
       "party": null,
@@ -164,7 +150,17 @@
       "valueEnum": null,
       "verifiable": null,
       "ddAgent": null,
-      "description": "Legal Entity Identifier (LEI) â€” 20-character ISO 17442 code assigned by an accredited LOU."
+      "description": "Legal Entity Identifier (LEI) — 20-character ISO 17442 code assigned by an accredited LOU."
+    },
+    "list_of_subsidiaries": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "multi": true,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Names or identifiers of entities wholly or partially owned or controlled by this entity."
     },
     "listed_exchange": {
       "kind": "scalar",
@@ -193,13 +189,13 @@
       "ddAgent": null,
       "description": "Any secondary or ancillary business activities conducted by the entity."
     },
-    "parent_publicly_listed_on_united_states_exchange_indicator": {
+    "parent_public_ally_listed_on_us_exchange_indicator": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": null,
-      "verifiable": false,
-      "ddAgent": "ria_parent_publicly_listed_id",
+      "verifiable": null,
+      "ddAgent": null,
       "description": "Indicates whether the entity's ultimate parent is publicly listed on a US stock exchange."
     },
     "previous_names": {
@@ -220,6 +216,15 @@
       "verifiable": true,
       "ddAgent": "ria_principal_business_address_idv",
       "description": "Primary address from which the entity conducts its day-to-day business operations."
+    },
+    "registration_country": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": "Country",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Country in which the entity holds its operating licence or statutory registration."
     },
     "regulator": {
       "kind": "scalar",
@@ -269,33 +274,25 @@
       "ddAgent": "ria_source_of_wealth_idv",
       "description": "Describes how the entity's net worth or investable assets were accumulated."
     },
-    "sub_advisor": {
-      "kind": "array",
-      "party": "sub_advisor",
-      "children": [
-        "sub_advisor_name",
-        "sub_advisor_address"
-      ]
-    },
-    "sub_advisor.sub_advisor_name": {
+    "sub_advisor_address": {
       "kind": "scalar",
-      "party": "sub_advisor",
-      "child": "sub_advisor_name",
-      "valueEnum": null,
-      "multi": true,
-      "verifiable": null,
-      "ddAgent": null,
-      "description": "Legal name of any sub-advisor appointed to act on behalf of or alongside the entity."
-    },
-    "sub_advisor.sub_advisor_address": {
-      "kind": "scalar",
-      "party": "sub_advisor",
-      "child": "sub_advisor_address",
+      "party": null,
+      "child": null,
       "valueEnum": null,
       "multi": true,
       "verifiable": null,
       "ddAgent": null,
       "description": "Registered or operational address of the sub-advisor."
+    },
+    "sub_advisor_name": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "multi": true,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Legal name of any sub-advisor appointed to act on behalf of or alongside the entity."
     },
     "trading_names": {
       "kind": "scalar",
@@ -315,25 +312,41 @@
       "ddAgent": "ria_transacting_funds_id",
       "description": "Indicates whether the entity transacts using its own funds, third-party client funds, or both."
     },
-    "tax_identification_number": {
+    "uk_entity_tax_id_number": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": null,
-      "multi": true,
-      "verifiable": true,
-      "ddAgent": "ria_government_identification_idv",
-      "description": "Entity tax identification number. Multi-value; jurisdiction is conveyed by lineage source."
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "UK Unique Taxpayer Reference (UTR) assigned by HMRC."
     },
-    "registration_number": {
+    "uk_registration _number": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": null,
-      "multi": true,
-      "verifiable": true,
-      "ddAgent": "ria_evidence_of_existence_idv",
-      "description": "Entity registration number issued by the relevant company/registry authority. Multi-value; jurisdiction is conveyed by lineage source."
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Company registration number issued by Companies House (UK)."
+    },
+    "us_entity_tax_id_number": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "US Employer Identification Number (EIN) assigned by the Internal Revenue Service."
+    },
+    "us_registration_number": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Entity registration number issued by the relevant US state authority."
     },
     "verification_of_existence": {
       "kind": "scalar",
@@ -353,32 +366,1231 @@
       "ddAgent": null,
       "description": "Official website URL of the entity."
     },
-    "wbq_flag": {
+    "wgq_q11a_has_appointed_officer_indicator": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": null,
       "verifiable": null,
       "ddAgent": null,
-      "description": "Indicates whether the client has provided a Wolfsberg Questionnaire (WBQ)."
+      "description": "WGQ Q11a — Indicates whether the entity has a formally designated AML/compliance officer."
     },
-    "public_accounting_firm_indicator": {
+    "wgq_q11b_has_adverse_info_screening_indicator": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": null,
       "verifiable": null,
       "ddAgent": null,
-      "description": "Indicates whether the entity is a public accounting firm."
+      "description": "WGQ Q11b — Indicates whether the entity screens customers for adverse information or negative news."
     },
-    "fca_firm_reference_number": {
+    "wgq_q11c_has_beneficial_ownership_indicator": {
       "kind": "scalar",
       "party": null,
       "child": null,
       "valueEnum": null,
       "verifiable": null,
       "ddAgent": null,
-      "description": "UK FCA Firm Reference Number (FRN) identifying the regulated firm."
+      "description": "WGQ Q11c — Indicates whether the entity has a process to identify and record beneficial ownership."
+    },
+    "wgq_q11d_has_cash_reporting_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11d — Indicates whether the entity has cash transaction reporting procedures in place."
+    },
+    "wgq_q11e_has_cdd_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11e — Indicates whether the entity conducts Customer Due Diligence (CDD) on its customers."
+    },
+    "wgq_q11f_has_edd_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11f — Indicates whether the entity conducts Enhanced Due Diligence (EDD) for high-risk customers."
+    },
+    "wgq_q11g_has_independent_testing_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11g — Indicates whether the entity's AML programme is subject to independent testing or audit."
+    },
+    "wgq_q11h_has_periodic_review_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11h — Indicates whether the entity conducts periodic reviews of existing customer relationships."
+    },
+    "wgq_q11i_has_policies_and_procedures_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11i — Indicates whether the entity has documented AML policies and procedures."
+    },
+    "wgq_q11j_has_pep_screening_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11j — Indicates whether the entity screens customers against Politically Exposed Person (PEP) lists."
+    },
+    "wgq_q11k_has_risk_assessment_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11k — Indicates whether the entity conducts enterprise-wide AML/financial crime risk assessments."
+    },
+    "wgq_q11l_has_sanctions_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11l — Indicates whether the entity screens customers against applicable sanctions lists."
+    },
+    "wgq_q11m_has_suspicious_activity_reporting_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11m — Indicates whether the entity has a Suspicious Activity/Transaction Reporting (SAR/STR) process."
+    },
+    "wgq_q11n_has_training_and_education_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11n — Indicates whether the entity provides AML training and education to relevant staff."
+    },
+    "wgq_q11o_has_transaction_monitoring_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q11o — Indicates whether the entity operates a transaction monitoring programme."
+    },
+    "wgq_q12_is_policy_approved_annually_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q12 — Indicates whether the AML policy is reviewed and formally approved at least annually."
+    },
+    "wgq_q13_uses_third_parties_for_aml_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q13 — Indicates whether the entity relies on third parties to deliver any component of its AML programme."
+    },
+    "wgq_q13a_third_party_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q13a — Description of any third-party arrangements used for AML programme delivery."
+    },
+    "wgq_q14_has_whistleblower_policy_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q14 — Indicates whether the entity has a whistleblower or speak-up policy."
+    },
+    "wgq_q15_has_abc_policies_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q15 — Indicates whether the entity has Anti-Bribery and Corruption (ABC) policies in place."
+    },
+    "wgq_q16_is_abc_program_audited_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q16 — Indicates whether the entity's ABC programme is subject to independent audit."
+    },
+    "wgq_q17a_is_abc_training_for_board_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q17a — Indicates whether ABC training is delivered to board members."
+    },
+    "wgq_q17b_is_abc_training_for_1st_line_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q17b — Indicates whether ABC training is delivered to first line of defence staff."
+    },
+    "wgq_q17c_is_abc_training_for_2nd_line_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q17c — Indicates whether ABC training is delivered to second line of defence (compliance/risk)."
+    },
+    "wgq_q17d_is_abc_training_for_3rd_line_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q17d — Indicates whether ABC training is delivered to third line of defence (internal audit)."
+    },
+    "wgq_q17e_is_abc_training_for_third_parties": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q17e — Details of ABC training provided to third-party contractors or agents."
+    },
+    "wgq_q17f_is_abc_training_for_non_employed_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q17f — Details of ABC training provided to non-employed individuals such as consultants."
+    },
+    "wgq_q18a_has_policy_for_money_laundering_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q18a — Indicates whether the entity has a specific policy prohibiting involvement in money laundering."
+    },
+    "wgq_q18b_has_policy_for_terrorist_financing_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q18b — Indicates whether the entity has a specific policy prohibiting involvement in terrorist financing."
+    },
+    "wgq_q18c_has_policy_for_sanctions_violations_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q18c — Indicates whether the entity has a specific policy prohibiting sanctions violations."
+    },
+    "wgq_q19a_prohibits_anonymous_accounts_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19a — Indicates whether the entity prohibits opening or maintaining anonymous accounts."
+    },
+    "wgq_q19b_prohibits_unlicensed_bank_accounts_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19b — Indicates whether the entity prohibits accounts for unlicensed banks."
+    },
+    "wgq_q19c_prohibits_dealing_with_entities_serving_unlicensed_banks_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19c — Indicates whether the entity prohibits dealings with institutions that serve unlicensed banks."
+    },
+    "wgq_q19d_prohibits_shell_bank_accounts_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19d — Indicates whether the entity prohibits accounts for shell banks."
+    },
+    "wgq_q19e_prohibits_dealing_with_entities_serving_shell_banks_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19e — Indicates whether the entity prohibits dealings with institutions that serve shell banks."
+    },
+    "wgq_q19f_prohibits_section_311_accounts_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19f — Indicates whether the entity prohibits accounts for entities designated under Section 311 of the USA PATRIOT Act."
+    },
+    "wgq_q19g_prohibits_unlicensed_remittance_agent_accounts_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19g — Indicates whether the entity prohibits accounts for unlicensed money remittance agents."
+    },
+    "wgq_q19h_assesses_pep_risks_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19h — Indicates whether the entity assesses and manages risks associated with PEP customers."
+    },
+    "wgq_q19i_defines_escalation_process_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19i — Indicates whether the entity has a defined escalation process for high-risk or potentially suspicious customers."
+    },
+    "wgq_q19j_outlines_screening_process_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q19j — Indicates whether the entity has a documented customer screening process."
+    },
+    "wgq_q20_has_risk_tolerance_statement_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q20 — Indicates whether the entity has a formal financial crime risk tolerance or risk appetite statement."
+    },
+    "wgq_q21_has_record_retention_procedures_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q21 — Indicates whether the entity has documented procedures for retaining AML-related records."
+    },
+    "wgq_q21a_retention_period": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q21a — Minimum period (in years) for which the entity retains AML and KYC records."
+    },
+    "wgq_q22_verifies_customer_identity_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q22 — Indicates whether the entity verifies customer identity as part of its onboarding process."
+    },
+    "wgq_q23_defines_cdd_completion_timeframe_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q23 — Indicates whether the entity has a defined timeframe for completing Customer Due Diligence."
+    },
+    "wgq_q24a_gathers_customer_identification_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24a — Indicates whether the entity collects formal customer identification information during CDD."
+    },
+    "wgq_q24b_gathers_expected_activity_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24b — Indicates whether the entity gathers information on expected account or transaction activity during CDD."
+    },
+    "wgq_q24c_gathers_nature_of_business_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24c — Indicates whether the entity collects information on the customer's nature of business."
+    },
+    "wgq_q24d_gathers_ownership_structure_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24d — Indicates whether the entity collects information on the customer's ownership and control structure."
+    },
+    "wgq_q24e_gathers_product_usage_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24e — Indicates whether the entity gathers information on intended product or service usage."
+    },
+    "wgq_q24f_gathers_purpose_of_relationship_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24f — Indicates whether the entity collects information on the purpose and nature of the business relationship."
+    },
+    "wgq_q24g_gathers_source_of_funds_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24g — Indicates whether the entity gathers source of funds information during CDD."
+    },
+    "wgq_q24h_gathers_source_of_wealth_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q24h — Indicates whether the entity gathers source of wealth information during CDD."
+    },
+    "wgq_q25a_identifies_ultimate_beneficial_ownership_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q25a — Indicates whether the entity identifies the ultimate beneficial owners (UBOs) of its customers."
+    },
+    "wgq_q25a1_verifies_ultimate_beneficial_owners_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q25a1 — Indicates whether the entity verifies the identity of identified UBOs."
+    },
+    "wgq_q25b_identifies_authorised_signatories_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q25b — Indicates whether the entity identifies authorised signatories on customer accounts."
+    },
+    "wgq_q25c_identifies_key_controllers_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q25c — Indicates whether the entity identifies key controllers of its customers."
+    },
+    "wgq_q25d_identifies_other_relevant_parties_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q25d — Indicates whether the entity identifies other relevant parties such as trustees or protectors."
+    },
+    "wgq_q26_has_customer_risk_classification_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q26 — Indicates whether the entity assigns formal risk classifications to its customers."
+    },
+    "wgq_q27_has_risk_based_pep_screening_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q27 — Indicates whether the entity applies risk-based screening for Politically Exposed Persons."
+    },
+    "wgq_q28_has_pep_review_process_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q28 — Indicates whether the entity has a defined review process for ongoing PEP relationships."
+    },
+    "wgq_q29_is_kyc_renewed_by_risk_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29 — Indicates whether the frequency of KYC renewal is determined by the customer's risk rating."
+    },
+    "wgq_q29a1_is_kyc_renewed_less_than_one_year_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29a1 — Indicates whether high-risk customers are subject to KYC review more frequently than annually."
+    },
+    "wgq_q29a2_is_kyc_renewed_1_to_2_years_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29a2 — Indicates whether customers are reviewed on a 1–2 year cycle."
+    },
+    "wgq_q29a3_is_kyc_renewed_3_to_4_years_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29a3 — Indicates whether customers are reviewed on a 3–4 year cycle."
+    },
+    "wgq_q29a4_is_kyc_renewed_5_years_or_more_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29a4 — Indicates whether some customers are reviewed on a 5-year or longer cycle."
+    },
+    "wgq_q29a5_has_trigger_based_kyc_reviews_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29a5 — Indicates whether the entity performs event-triggered KYC reviews (e.g. on material change of circumstances)."
+    },
+    "wgq_q29a6_other_kyc_review_frequency": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q29a6 — Description of any other KYC review frequency methodology used by the entity."
+    },
+    "wgq_q30a_edd_for_arms_defence_military_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30a — Details of EDD procedures applied to customers in the arms, defence, or military sector."
+    },
+    "wgq_q30b_edd_for_respondent_banks_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30b — Indicates whether the entity applies EDD to respondent bank or correspondent banking relationships."
+    },
+    "wgq_q30b1_edd_assessment_includes_wolfsberg_principles_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30b1 — Indicates whether EDD assessments for respondent banks incorporate the Wolfsberg Correspondent Banking Principles."
+    },
+    "wgq_q30c_edd_for_embassies_consulates_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30c — Details of EDD procedures applied to embassy or consulate customers."
+    },
+    "wgq_q30d_edd_for_extractive_industries_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30d — Details of EDD procedures applied to customers in extractive industries (mining, oil and gas)."
+    },
+    "wgq_q30e_edd_for_gambling_customers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30e — Details of EDD procedures applied to gambling, gaming, or casino sector customers."
+    },
+    "wgq_q30f_edd_for_general_trading_companies_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30f — Details of EDD procedures applied to general trading company customers."
+    },
+    "wgq_q30g_edd_for_marijuana_entities_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30g — Details of EDD procedures applied to cannabis or marijuana-related businesses."
+    },
+    "wgq_q30h_edd_for_msb_mvts_customers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30h — Details of EDD procedures applied to Money Service Businesses (MSBs) or Money or Value Transfer Services (MVTS)."
+    },
+    "wgq_q30i_edd_for_non_account_customers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30i — Details of EDD procedures applied to non-account or occasional transaction customers."
+    },
+    "wgq_q30j_edd_for_ngos_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30j — Details of EDD procedures applied to Non-Governmental Organisation (NGO) customers."
+    },
+    "wgq_q30k_edd_for_non_resident_customers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30k — Details of EDD procedures applied to non-resident customers."
+    },
+    "wgq_q30l_edd_for_nuclear_power_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30l — Details of EDD procedures applied to customers in the nuclear power sector."
+    },
+    "wgq_q30m_edd_for_payment_service_providers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30m — Details of EDD procedures applied to payment service provider customers."
+    },
+    "wgq_q30n_edd_for_peps_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30n — Details of EDD procedures applied to Politically Exposed Person (PEP) customers."
+    },
+    "wgq_q30o_edd_for_pep_close_associates_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30o — Details of EDD procedures applied to close associates of PEPs."
+    },
+    "wgq_q30p_edd_for_pep_related_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30p — Details of EDD procedures applied to PEP-related entities (e.g. family-controlled businesses)."
+    },
+    "wgq_q30q_edd_for_precious_metals_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30q — Details of EDD procedures applied to dealers in precious metals, stones, or high-value goods."
+    },
+    "wgq_q30r_edd_for_adult_entertainment_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30r — Details of EDD procedures applied to adult entertainment sector customers."
+    },
+    "wgq_q30s_edd_for_regulated_charities_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30s — Details of EDD procedures applied to regulated charitable organisations."
+    },
+    "wgq_q30t_edd_for_shell_banks_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30t — Details of EDD procedures applied to entities exhibiting characteristics of shell banks."
+    },
+    "wgq_q30u_edd_for_travel_companies_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30u — Details of EDD procedures applied to travel agency or tour operator customers."
+    },
+    "wgq_q30v_edd_for_unregulated_charities_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30v — Details of EDD procedures applied to unregulated or informal charitable organisations."
+    },
+    "wgq_q30w_edd_for_used_car_dealers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30w — Details of EDD procedures applied to used vehicle dealer customers."
+    },
+    "wgq_q30x_edd_for_virtual_asset_service_providers_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30x — Details of EDD procedures applied to Virtual Asset Service Provider (VASP) customers."
+    },
+    "wgq_q30y_edd_for_other_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q30y — Details of EDD procedures applied to any other high-risk customer categories not listed above."
+    },
+    "wgq_q31_restriction_details": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q31 — Details of any regulatory restrictions or business limitations imposed on the entity."
+    },
+    "wgq_q32_has_risk_based_monitoring_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q32 — Indicates whether the entity applies risk-based transaction monitoring."
+    },
+    "wgq_q33_transaction_monitoring_method": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q33 — Description of the transaction monitoring methodology used (automated, manual, or hybrid)."
+    },
+    "wgq_q33a_manual_monitoring_transaction_types": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q33a — Types of transactions subject to manual review within the monitoring process."
+    },
+    "wgq_q34_has_suspicious_transaction_reporting_reqs_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q34 — Indicates whether the entity is subject to legal or regulatory requirements to file Suspicious Activity Reports (SARs) or Suspicious Transaction Reports (STRs)."
+    },
+    "wgq_q34a_has_suspicious_transaction_reporting_policies_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q34a — Indicates whether the entity has internal policies and procedures governing suspicious transaction reporting."
+    },
+    "wgq_q35_has_transaction_monitoring_review_process_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q35 — Indicates whether the entity has a defined process for reviewing and escalating transaction monitoring alerts."
+    },
+    "wgq_q36_adheres_to_wolfsberg_transparency_standards_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q36 — Indicates whether the entity adheres to Wolfsberg Group standards on transparency and beneficial ownership disclosure."
+    },
+    "wgq_q37a_complies_with_fatf_recommendation_16_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q37a — Indicates whether the entity complies with FATF Recommendation 16 on wire transfer information requirements."
+    },
+    "wgq_q37b_complies_with_local_regulations_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q37b — Indicates whether the entity complies with local wire transfer regulations in its operating jurisdictions."
+    },
+    "wgq_q37b1_local_regulation_spec": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q37b1 — Specifies the local regulation(s) with which the entity complies for wire transfer requirements."
+    },
+    "wgq_q37c_non_compliance_explanation": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q37c — Explanation of any areas of non-compliance with FATF Recommendation 16 or local wire transfer rules."
+    },
+    "wgq_q38_has_sanctions_policy_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q38 — Indicates whether the entity has a formal sanctions compliance policy."
+    },
+    "wgq_q39_has_sanctions_evasion_controls_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q39 — Indicates whether the entity has controls in place specifically to detect and prevent sanctions evasion."
+    },
+    "wgq_q40_screens_customers_against_sanctions_lists_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q40 — Indicates whether the entity screens its customers and counterparties against applicable sanctions lists."
+    },
+    "wgq_q41a_uses_un_sanctions_list": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q41a — Indicates whether the entity screens against UN Security Council consolidated sanctions lists."
+    },
+    "wgq_q41b_uses_ofac_sanctions_list": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q41b — Indicates whether the entity screens against OFAC (US Treasury) Specially Designated Nationals (SDN) and other sanctions lists."
+    },
+    "wgq_q41c_uses_ofsi_sanctions_list": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q41c — Indicates whether the entity screens against OFSI (UK Treasury) financial sanctions lists."
+    },
+    "wgq_q41d_uses_eu_sanctions_list": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q41d — Indicates whether the entity screens against EU consolidated sanctions lists."
+    },
+    "wgq_q41e_uses_g7_sanctions_lists": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q41e — Indicates whether the entity screens against sanctions lists from G7 member states."
+    },
+    "wgq_q41f_uses_other_sanctions_lists": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q41f — Details of any additional sanctions lists consulted by the entity beyond the standard lists."
+    },
+    "wgq_q42_has_physical_presence_in_sanctioned_countries_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q42 — Indicates whether the entity has physical operations, staff, or offices in any sanctioned country."
+    },
+    "wgq_q43a_has_training_for_transaction_reporting_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q43a — Indicates whether AML training covers obligations to report suspicious transactions."
+    },
+    "wgq_q43b_has_training_for_money_laundering_examples_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q43b — Indicates whether AML training includes real-world examples of money laundering typologies."
+    },
+    "wgq_q43c_has_training_for_internal_policies_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q43c — Indicates whether AML training covers the entity's own internal policies and procedures."
+    },
+    "wgq_q43d_has_training_for_new_issues_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q43d — Indicates whether AML training is regularly updated to address new and emerging financial crime risks."
+    },
+    "wgq_q44a_is_training_for_board_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q44a — Indicates whether AML/financial crime training is delivered to board members and senior management."
+    },
+    "wgq_q44b_is_training_for_1st_line_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q44b — Indicates whether AML training is delivered to first line of defence (business/operations) staff."
+    },
+    "wgq_q44c_is_training_for_2nd_line_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q44c — Indicates whether AML training is delivered to second line of defence (compliance and risk) staff."
+    },
+    "wgq_q44d_is_training_for_3rd_line_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q44d — Indicates whether AML training is delivered to third line of defence (internal audit) staff."
+    },
+    "wgq_q44e_is_training_for_third_parties": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q44e — Details of AML training provided to third-party contractors, agents, or outsourced service providers."
+    },
+    "wgq_q44f_is_training_for_non_employed_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q44f — Details of AML training provisions for non-employed individuals performing regulated activities."
+    },
+    "wgq_q45_has_internal_audit_function_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q45 — Indicates whether the entity has an independent internal audit function that reviews the AML/compliance programme."
+    },
+    "wgq_q6b_is_member_owned_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q6b — Indicates whether the entity is member-owned (e.g. mutual, cooperative, or credit union structure)."
+    },
+    "wgq_q6c_is_government_owned_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q6c — Indicates whether the entity is wholly or partially owned by a government or state body."
+    },
+    "wgq_q6d_is_privately_owned_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q6d — Indicates whether the entity is privately owned by individuals or private companies."
+    },
+    "wgq_q7_bearer_shares_percentage": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q7 — Percentage of the entity's total share capital issued as bearer shares."
+    },
+    "wgq_q8_has_offshore_banking_license_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q8 — Indicates whether the entity holds an offshore banking licence."
+    },
+    "wgq_q8a_offshore_branch_name": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q8a — Name of the entity's offshore banking branch, if applicable."
+    },
+    "wgq_q9_has_virtual_bank_license_indicator": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "WGQ Q9 — Indicates whether the entity holds a virtual or digital banking licence."
+    },
+    "compliance_officer_signatures_name": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "multi": true,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Names of compliance officers who have reviewed and signed off on this KYC record."
+    },
+    "mlro_or_equivalent_signatures_name": {
+      "kind": "scalar",
+      "party": null,
+      "child": null,
+      "valueEnum": null,
+      "multi": true,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Names of the MLRO (Money Laundering Reporting Officer) or equivalent officer who has approved this KYC record."
     },
     "documents": {
       "kind": "array",
@@ -390,8 +1602,7 @@
         "document_date_of_issue",
         "document_name",
         "document_type",
-        "document_category",
-        "document_accession_number"
+        "document_category"
       ]
     },
     "documents.document_certification_indicator": {
@@ -457,15 +1668,6 @@
       "ddAgent": null,
       "description": "High-level category grouping for the document (e.g. Formation Document, Financials, Individual Identification)."
     },
-    "documents.document_accession_number": {
-      "kind": "scalar",
-      "party": "documents",
-      "child": "document_accession_number",
-      "valueEnum": null,
-      "verifiable": null,
-      "ddAgent": null,
-      "description": "SEC EDGAR accession number identifying the specific filing."
-    },
     "acting_person": {
       "kind": "array",
       "party": "acting_person",
@@ -519,6 +1721,7 @@
         "authorized_signatory_address",
         "authorized_signatory_country",
         "authorized_signatory_date_of_birth",
+        "authorized_signatory_fiduciary_name",
         "authorized_signatory_government_identification_number",
         "authorized_signatory_legal_structure",
         "authorized_signatory_name",
@@ -554,6 +1757,15 @@
       "verifiable": true,
       "ddAgent": "ria_authorized_signatory_idv",
       "description": "Date of birth of the authorised signatory."
+    },
+    "authorized_signatory.authorized_signatory_fiduciary_name": {
+      "kind": "scalar",
+      "party": "authorized_signatory",
+      "child": "authorized_signatory_fiduciary_name",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Name of the fiduciary entity if the signatory is acting in a fiduciary capacity."
     },
     "authorized_signatory.authorized_signatory_government_identification_number": {
       "kind": "scalar",
@@ -627,6 +1839,7 @@
         "beneficial_owner_country_of_incorporation",
         "beneficial_owner_country_of_residence",
         "beneficial_owner_date_of_birth",
+        "beneficial_owner_entity_classification",
         "beneficial_owner_evidence_of_existence",
         "beneficial_owner_legal_structure",
         "beneficial_owner_name",
@@ -634,7 +1847,8 @@
         "beneficial_owner_nature_of_business",
         "beneficial_owner_past_nationality",
         "beneficial_owner_percentage_of_ownership",
-        "beneficial_owner_source_of_wealth"
+        "beneficial_owner_source_of_wealth",
+        "beneficial_owner_type"
       ]
     },
     "beneficial_owner.beneficial_owner_address": {
@@ -681,6 +1895,15 @@
       "verifiable": true,
       "ddAgent": "ria_beneficial_owner_idv",
       "description": "Date of birth of the beneficial owner, if an individual."
+    },
+    "beneficial_owner.beneficial_owner_entity_classification": {
+      "kind": "scalar",
+      "party": "beneficial_owner",
+      "child": "beneficial_owner_entity_classification",
+      "valueEnum": "LegalStructure",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Legal structure classification of the beneficial owner, if an entity."
     },
     "beneficial_owner.beneficial_owner_evidence_of_existence": {
       "kind": "scalar",
@@ -755,132 +1978,40 @@
       "ddAgent": "ria_beneficial_owner_idv",
       "description": "Description of how the beneficial owner's wealth was accumulated."
     },
-    "Proxy_BO": {
+    "beneficial_owner.beneficial_owner_type": {
+      "kind": "scalar",
+      "party": "beneficial_owner",
+      "child": "beneficial_owner_type",
+      "valueEnum": "EntityOrIndividual",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Classification of the beneficial owner (e.g. Individual, Corporate Entity, Trust, Foundation)."
+    },
+    "board_director": {
       "kind": "array",
-      "party": "Proxy_BO",
+      "party": "board_director",
       "children": [
-        "Proxy_BO_address",
-        "Proxy_BO_cip_classification",
-        "Proxy_BO_country_of_incorporation",
-        "Proxy_BO_country_of_residence",
-        "Proxy_BO_date_of_birth",
-        "Proxy_BO_evidence_of_existence",
-        "Proxy_BO_legal_structure",
-        "Proxy_BO_name",
-        "Proxy_BO_nationality",
-        "Proxy_BO_nature_of_business",
-        "Proxy_BO_past_nationality",
-        "Proxy_BO_percentage_of_ownership"
+        "board_director_name",
+        "board_director_type"
       ]
     },
-    "Proxy_BO.Proxy_BO_address": {
+    "board_director.board_director_name": {
       "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_address",
+      "party": "board_director",
+      "child": "board_director_name",
       "valueEnum": null,
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Residential or registered address of the proxy beneficial owner."
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Full legal name of the board director."
     },
-    "Proxy_BO.Proxy_BO_cip_classification": {
+    "board_director.board_director_type": {
       "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_cip_classification",
-      "valueEnum": "CIPClassification",
-      "verifiable": false,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "CIP classification of the proxy beneficial owner under US BSA/AML Customer Identification Program requirements."
-    },
-    "Proxy_BO.Proxy_BO_country_of_incorporation": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_country_of_incorporation",
-      "valueEnum": "Country",
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Country of incorporation of the proxy beneficial owner, if an entity."
-    },
-    "Proxy_BO.Proxy_BO_country_of_residence": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_country_of_residence",
-      "valueEnum": "Country",
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Country of residence of the proxy beneficial owner."
-    },
-    "Proxy_BO.Proxy_BO_date_of_birth": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_date_of_birth",
+      "party": "board_director",
+      "child": "board_director_type",
       "valueEnum": null,
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Date of birth of the proxy beneficial owner, if an individual."
-    },
-    "Proxy_BO.Proxy_BO_evidence_of_existence": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_evidence_of_existence",
-      "valueEnum": null,
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Indicates whether documentary evidence confirming the proxy beneficial owner's existence has been obtained and verified."
-    },
-    "Proxy_BO.Proxy_BO_legal_structure": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_legal_structure",
-      "valueEnum": "LegalStructure",
-      "verifiable": false,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Legal structure of the proxy beneficial owner entity (e.g. Corporation, Trust, Partnership)."
-    },
-    "Proxy_BO.Proxy_BO_name": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_name",
-      "valueEnum": null,
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Full legal name of the proxy beneficial owner."
-    },
-    "Proxy_BO.Proxy_BO_nationality": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_nationality",
-      "valueEnum": "Country",
-      "verifiable": true,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Nationality of the proxy beneficial owner."
-    },
-    "Proxy_BO.Proxy_BO_nature_of_business": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_nature_of_business",
-      "valueEnum": null,
-      "verifiable": false,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Nature of business or primary activities of the proxy beneficial owner, if an entity."
-    },
-    "Proxy_BO.Proxy_BO_past_nationality": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_past_nationality",
-      "valueEnum": "Country",
-      "multi": true,
-      "verifiable": false,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Previous nationality or nationalities formerly held by the proxy beneficial owner."
-    },
-    "Proxy_BO.Proxy_BO_percentage_of_ownership": {
-      "kind": "scalar",
-      "party": "Proxy_BO",
-      "child": "Proxy_BO_percentage_of_ownership",
-      "valueEnum": null,
-      "verifiable": false,
-      "ddAgent": "ria_proxy_bo_idv",
-      "description": "Percentage of ownership or voting control held by this proxy beneficial owner in the entity."
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Classification of the board director (e.g. Executive, Non-Executive, Independent Non-Executive)."
     },
     "corporate_officer": {
       "kind": "array",
@@ -891,12 +2022,16 @@
         "corporate_officer_country_of_incorporation",
         "corporate_officer_country_of_residence",
         "corporate_officer_date_of_birth",
-        "corporate_officer_cip_classification",
+        "corporate_officer_entity_classification",
+        "corporate_officer_evidence_of_existence",
+        "corporate_officer_governing_law",
         "corporate_officer_legal_structure",
         "corporate_officer_name",
         "corporate_officer_nationality",
+        "corporate_officer_registered_address",
         "corporate_officer_regulator",
-        "corporate_officer_role"
+        "corporate_officer_role",
+        "corporate_officer_type"
       ]
     },
     "corporate_officer.corporate_officer_correspondence_address": {
@@ -944,14 +2079,32 @@
       "ddAgent": "ria_corporate_officer_idv",
       "description": "Date of birth of the corporate officer, if an individual."
     },
-    "corporate_officer.corporate_officer_cip_classification": {
+    "corporate_officer.corporate_officer_entity_classification": {
       "kind": "scalar",
       "party": "corporate_officer",
-      "child": "corporate_officer_cip_classification",
-      "valueEnum": "CIPClassification",
-      "verifiable": false,
-      "ddAgent": "ria_corporate_officer_idv",
-      "description": "CIP classification of the corporate officer under US BSA/AML Customer Identification Program requirements."
+      "child": "corporate_officer_entity_classification",
+      "valueEnum": "LegalStructure",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Legal structure classification of the corporate officer, if an entity."
+    },
+    "corporate_officer.corporate_officer_evidence_of_existence": {
+      "kind": "scalar",
+      "party": "corporate_officer",
+      "child": "corporate_officer_evidence_of_existence",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Indicates whether documentary evidence of the corporate officer's existence has been obtained."
+    },
+    "corporate_officer.corporate_officer_governing_law": {
+      "kind": "scalar",
+      "party": "corporate_officer",
+      "child": "corporate_officer_governing_law",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Governing law jurisdiction under which the corporate officer's appointment is constituted."
     },
     "corporate_officer.corporate_officer_legal_structure": {
       "kind": "scalar",
@@ -980,6 +2133,15 @@
       "ddAgent": "ria_corporate_officer_idv",
       "description": "Nationality of the corporate officer."
     },
+    "corporate_officer.corporate_officer_registered_address": {
+      "kind": "scalar",
+      "party": "corporate_officer",
+      "child": "corporate_officer_registered_address",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Registered address of the corporate officer."
+    },
     "corporate_officer.corporate_officer_regulator": {
       "kind": "scalar",
       "party": "corporate_officer",
@@ -994,9 +2156,19 @@
       "party": "corporate_officer",
       "child": "corporate_officer_role",
       "valueEnum": "CorporateOfficerRole",
+      "multi": true,
       "verifiable": true,
       "ddAgent": "ria_corporate_officer_idv",
       "description": "Role(s) held by the corporate officer within the entity (e.g. CEO, CFO, Company Secretary)."
+    },
+    "corporate_officer.corporate_officer_type": {
+      "kind": "scalar",
+      "party": "corporate_officer",
+      "child": "corporate_officer_type",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Classification of the corporate officer (e.g. Individual, Corporate, Nominee)."
     },
     "investment_advisor": {
       "kind": "array",
@@ -1073,6 +2245,92 @@
       "verifiable": null,
       "ddAgent": null,
       "description": "Registration or classification type of the investment advisor (e.g. RIA, Exempt Reporting Adviser)."
+    },
+    "key_controller": {
+      "kind": "array",
+      "party": "key_controller",
+      "children": [
+        "key_controller_address",
+        "key_controller_correspondence_address",
+        "key_controller_country_of_residence",
+        "key_controller_date_of_birth",
+        "key_controller_entity_type",
+        "key_controller_name",
+        "key_controller_nationality",
+        "key_controller_nature_of_control"
+      ]
+    },
+    "key_controller.key_controller_address": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_address",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Residential or registered address of the key controller."
+    },
+    "key_controller.key_controller_correspondence_address": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_correspondence_address",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Correspondence address for the key controller."
+    },
+    "key_controller.key_controller_country_of_residence": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_country_of_residence",
+      "valueEnum": "Country",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Country of residence of the key controller."
+    },
+    "key_controller.key_controller_date_of_birth": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_date_of_birth",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Date of birth of the key controller, if an individual."
+    },
+    "key_controller.key_controller_entity_type": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_entity_type",
+      "valueEnum": "EntityOrIndividual",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Classification of the key controller (e.g. Individual, Corporate Entity)."
+    },
+    "key_controller.key_controller_name": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_name",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Full legal name of the key controller."
+    },
+    "key_controller.key_controller_nationality": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_nationality",
+      "valueEnum": "Country",
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Nationality of the key controller."
+    },
+    "key_controller.key_controller_nature_of_control": {
+      "kind": "scalar",
+      "party": "key_controller",
+      "child": "key_controller_nature_of_control",
+      "valueEnum": null,
+      "verifiable": null,
+      "ddAgent": null,
+      "description": "Description of the mechanism by which the key controller exercises control (e.g. majority shareholder, sole director, contractual rights)."
     },
     "power_of_attorney": {
       "kind": "array",
@@ -1384,6 +2642,10 @@
     "EntityStatus": [
       "Active",
       "Inactive",
+      "Dissolved",
+      "In Liquidation",
+      "Dormant",
+      "Suspended",
       "n/a"
     ],
     "LegalStructure": [
@@ -1439,7 +2701,7 @@
       "Charity, Religious Group, or Non-Profit",
       "Commercial Bank, Trust Bank, Credit Union, or Savings & Loan",
       "Commingled Trust",
-      "Custodian Accounts for Minors â€“ UGMA, UTMA",
+      "Custodian Accounts for Minors – UGMA, UTMA",
       "ERISA Pension Plan",
       "Estate",
       "Foundation or Endowment",
@@ -1607,16 +2869,16 @@
       "Australian Securities and Investment Commission (ASIC)",
       "Australian Prudential Regulatory Authority (APRA)",
       "Financial Market Authority",
-      "Commission Bancaire, FinanciÃ¨re et des Assurances - Banking Finance and Insurance Commission (BFIC)",
-      "ComissÃ£o do Valores MobiliÃ¡rios - Securities and Exchange Commission of Brazil (CVM)",
-      "SuperintendÃªncia de Seguros Privados (Susep)",
+      "Commission Bancaire, Financière et des Assurances - Banking Finance and Insurance Commission (BFIC)",
+      "Comissão do Valores Mobiliários - Securities and Exchange Commission of Brazil (CVM)",
+      "Superintendência de Seguros Privados (Susep)",
       "Office of the Superintendent of Financial Institutions Canada",
       "Finanstilsynet - Danish Financial Supervisory Authority",
       "Finnish Financial Supervision Authority (FIN-FSA)",
       "Insurance Supervisory Authority (ISA)",
       "Banque de France/Commision Bancaire",
-      "AutoritÃ© des MarchÃ©s Financiers (AMF)",
-      "AutoritÃ© de ContrÃ´le des Assurances et des Mutuelles",
+      "Autorité des Marchés Financiers (AMF)",
+      "Autorité de Contrôle des Assurances et des Mutuelles",
       "Germany) Bundesanstalt fur Finanzdienstleistungs-aufsicht (BaFin)",
       "Bank of Greece",
       "Hellenic Republic Capital Market Commission",
@@ -1624,11 +2886,11 @@
       "Hong Kong Monetary Authority",
       "Securities and Futures Commission",
       "Office of the Commissioner of Insurance",
-      "FjÃ¡rmÃ¡laeftirlitiÄ‘ - Financial Supervisory Authority, Iceland (FME)",
+      "Fjármálaeftirlitiđ - Financial Supervisory Authority, Iceland (FME)",
       "Central Bank and Financial Services Authority of Ireland",
       "Financial Supervision Commission (FSM)",
       "Banca d'Italia Eurosistema",
-      "Commissione Nazionale per le SocietÃ  e la Borsa (Consob)",
+      "Commissione Nazionale per le Società e la Borsa (Consob)",
       "Istituto per la Vigilanza sulle Assicurazioni Private e di Interesse Collecttivo (ISVAP)",
       "Financial Services Agency",
       "Jersey Financial Services Corp. (JFSC)",
@@ -1640,14 +2902,14 @@
       "Securities Commission of New Zealand",
       "Kredittilsynet - Financial Supervisory Authority of Norway",
       "Banco de Portugal",
-      "ComissÃ£o do Mercado de Valores MobiliÃ¡rios - Portugese Securities Market Commission (CMVM)",
+      "Comissão do Mercado de Valores Mobiliários - Portugese Securities Market Commission (CMVM)",
       "Instituto de Seguros de Portugal - Portugese Insurance Institute (ISP)",
       "Monetary Authority of Singapore",
-      "Banco de EspaÃ±a Eurosistema",
-      "ComisiÃ³n Nacional del Mercado de Valores",
-      "DirecciÃ³n General de Seguros y Fondos de Pensiones (DGSFP)",
+      "Banco de España Eurosistema",
+      "Comisión Nacional del Mercado de Valores",
+      "Dirección General de Seguros y Fondos de Pensiones (DGSFP)",
       "Finansinspektionen - Swedish Financial Supervisory Authority",
-      "Commission fÃ©dÃ©rale des banques - Swiss Federal Banking Commission (SFBC)",
+      "Commission fédérale des banques - Swiss Federal Banking Commission (SFBC)",
       "Financial Services Authority (FSA)",
       "Financial Conduct Authority (FCA)",
       "Federal Reserve Board",
@@ -1771,7 +3033,7 @@
       "Hospitality/Recreation",
       "Import and Export of Physical Commodities",
       "Intellectual Property/Patents/Royalties",
-      "Internet CafÃ©/Call Shop",
+      "Internet Café/Call Shop",
       "Jewelry/Gems/Precious Metals - Dealers/Wholesalers",
       "Jewelry/Gems/Precious Metals - Manufacturing",
       "Law",
@@ -1817,63 +3079,6 @@
     ],
     "PlaceholderEnum": [
       "TODO_PLACEHOLDER_MISSING_ENUM_VALUES"
-    ],
-    "ActivityType": [
-      "Advertising/Marketing/PR",
-      "Aerospace",
-      "Agriculture/Forestry/Fishing",
-      "Arms Trading - Retail / Manufacturing",
-      "Art Dealers/Antique Dealers/Auction Houses",
-      "Artists, Athletes or Other Public Figures",
-      "Arts and Recreation",
-      "Automotive",
-      "Car Dealer",
-      "Casinos/Gaming",
-      "Charity / Religious Group / Non Profit / Foundation",
-      "Chemicals",
-      "Commodities Trading",
-      "Computers/Electronics/Technology",
-      "Construction",
-      "Consumer / Retail",
-      "Crowdfunding",
-      "Cryptocurrency",
-      "E-commerce",
-      "Education",
-      "Elder Care",
-      "Entertainment/Adult Industry",
-      "Financial Services/Products",
-      "Government/Military/Public",
-      "Hospitality/Recreation",
-      "Import and Export of Physical Commodities",
-      "Information and Telecommunication",
-      "Intellectual Property/Patents/Royalties",
-      "Internet Cafe/Call Shop",
-      "Jewelry/Gems/Precious Metals - Dealers/Wholesalers",
-      "Jewelry/Gems/Precious Metals - Manufacturing",
-      "Law",
-      "Managers/Agents of Artists, Athletes or Other Public Figures",
-      "Manufacturing",
-      "Marijuana Services",
-      "Media/Publishing/Entertainment",
-      "Medical/Health/Social Assistance",
-      "Mining",
-      "Money Service Business",
-      "Offshore/Dredging",
-      "Other",
-      "Pharmaceuticals",
-      "Professional Org. for Artists, Athletes or Other Public Figures",
-      "Professional Services",
-      "Real Estate, Rental and Leasing",
-      "Services / Research",
-      "Stock Promotion",
-      "Student",
-      "Technology",
-      "Telecommunications/Networking",
-      "Travel / Transportation / Storage",
-      "Travel Agency",
-      "Utilities / Energy",
-      "Waste Management",
-      "n/a"
     ]
   }
 }

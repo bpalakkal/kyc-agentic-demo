@@ -13,6 +13,7 @@ import WorkQueue from "./pages/WorkQueue";
 import ExceptionReview from "./pages/ExceptionReview";
 import Screening from "./pages/Screening";
 import Reports from "./pages/Reports";
+import Agents from "./pages/Agents";
 import NotFound from "./pages/NotFound";
 
 const ScrollToTop = () => {
@@ -49,6 +50,7 @@ function AppRoutes() {
           <Route path="/work-queue/review/:kycRef/screening" element={<Screening />} />
           <Route path="/work-queue/review" element={<Navigate to="/work-queue" replace />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/agents" element={<Agents />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

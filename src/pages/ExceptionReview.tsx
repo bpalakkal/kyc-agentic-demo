@@ -63,6 +63,9 @@ import {
 } from "@/data/kycMockData";
 import { ForgeLineagePanel } from "@/components/kyc/ForgeLineagePanel";
 import { ForgePersonCard } from "@/components/kyc/ForgePersonCard";
+import { PersonRoleTable } from "@/components/kyc/PersonRoleTable";
+import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
+import { AgentTriggers } from "@/components/kyc/AgentTriggers";
 import { WgqTabContent } from "@/components/kyc/WgqTabContent";
 import { CollabPanel } from "@/components/kyc/CollabPanel";
 import { EntityFiles } from "@/components/kyc/EntityFiles";
@@ -1068,7 +1071,7 @@ const ExceptionReview = () => {
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"locker" | "collab" | "files">("locker");
+  const [rightTab, setRightTab] = useState<"locker" | "collab" | "files" | "runs">("locker");
   const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes" | "screening">("exception");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
@@ -1259,12 +1262,7 @@ const ExceptionReview = () => {
           </button>
         </div>
         {attrViewMode === "attributes" && (
-          <button
-            onClick={() => runAgents(["document", "audit"], "Re-run all attributes")}
-            className="text-[11px] px-3 py-1.5 rounded-md bg-primary text-primary-foreground font-semibold flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
-          >
-            <RotateCw className="size-3" /> Re-run Agents
-          </button>
+          <AgentTriggers caseKyc={active.kyc} entityName={active.entity} />
         )}
       </div>
 
@@ -1807,6 +1805,17 @@ const ExceptionReview = () => {
                 >
                   <Folder className="size-3.5" /> Files
                 </button>
+                <button
+                  onClick={() => setRightTab("runs")}
+                  className={cn(
+                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                    rightTab === "runs"
+                      ? "font-medium border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Bot className="size-3.5" /> Agent Runs
+                </button>
               </div>
               <button
                 onClick={() => setRightPaneOpen(false)}
@@ -1819,6 +1828,7 @@ const ExceptionReview = () => {
             {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
             {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
             {rightTab === "files"  && <div className="h-full overflow-hidden flex flex-col"><EntityFiles kycRef={active.kyc} /></div>}
+            {rightTab === "runs"   && <AgentRunsPanel kycRef={active.kyc} />}
           </aside>
         ) : (
           <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-4">
@@ -1867,6 +1877,16 @@ const ExceptionReview = () => {
                   title="Files"
                 >
                   <Folder className="size-3" /> Files
+                </button>
+              </div>
+              <div className="w-5 h-px bg-border/60" />
+              <div className="relative">
+                <button
+                  onClick={() => { setRightPaneOpen(true); setRightTab("runs"); }}
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+                  title="Agent Runs"
+                >
+                  <Bot className="size-3" /> Runs
                 </button>
               </div>
             </div>
@@ -2987,6 +3007,7 @@ const AttributeFormView = ({
   const [forgePersons, setForgePersons] = useState<Record<string, ForgePersonRow[]>>({});
   const [forgeTrace, setForgeTrace] = useState<ForgeTraceRow | null>(null);
   const [attrTab, setAttrTab] = useState<'core' | 'wgq'>('core');
+  const [attrSubTab, setAttrSubTab] = useState<'attrs' | 'persons'>('attrs');
 
   const { runAgents } = useAgents();
 
@@ -3112,9 +3133,87 @@ const AttributeFormView = ({
     setOverrideNote("");
   };
 
+  const refreshPersons = () => {
+    if (selectedEntities.length === 0) return;
+    Promise.all(
+      selectedEntities.map(e =>
+        apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(e.kyc)}/persons`).then(r => r.ok ? r.json() : {})
+      )
+    ).then(results => {
+      const personMap: Record<string, ForgePersonRow[]> = {};
+      for (const persons of results) Object.assign(personMap, persons as Record<string, ForgePersonRow[]>);
+      setForgePersons(personMap);
+    }).catch(() => {});
+  };
+
+  const handlePersonPersist = (kyc: string | undefined, role: string, personIndex: number, values: Record<string, string>) => {
+    const ref = kyc ?? selectedEntities[0]?.kyc;
+    if (!ref) return;
+    apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(ref)}/persons/${encodeURIComponent(role)}/${personIndex}/override`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values }),
+    }).then(() => refreshPersons()).catch(console.error);
+  };
+
+  const personRoleEntries = PERSON_ROLE_LABELS
+    .map(({ role, label }) => ({ role, label, persons: forgePersons[role] ?? [] }))
+    .filter(({ persons }) => persons.length > 0);
+
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: openTraceFor ? "minmax(0,1fr) 360px" : "1fr" }}>
     <div className="space-y-0 min-w-0">
+      {/* Sub-tab selector: Attributes | Persons */}
+      <div className="flex items-center gap-1 mb-4 border-b border-border pb-2">
+        <button
+          onClick={() => setAttrSubTab('attrs')}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-md transition-colors",
+            attrSubTab === 'attrs'
+              ? "bg-primary/10 text-primary font-semibold"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Database className="size-3.5 inline mr-1.5" />
+          Attributes
+        </button>
+        <button
+          onClick={() => setAttrSubTab('persons')}
+          className={cn(
+            "px-3 py-1.5 text-sm rounded-md transition-colors",
+            attrSubTab === 'persons'
+              ? "bg-primary/10 text-primary font-semibold"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <UserCircle2 className="size-3.5 inline mr-1.5" />
+          Persons
+          {Object.values(forgePersons).reduce((s, arr) => s + arr.length, 0) > 0 && (
+            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
+              {Object.values(forgePersons).reduce((s, arr) => s + arr.length, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Persons view */}
+      {attrSubTab === 'persons' && (
+        <div className="space-y-6 pb-4">
+          {personRoleEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic px-1">No person records loaded. Trigger a sourcing agent to populate.</p>
+          ) : (
+            personRoleEntries.map(({ role, label, persons }) => (
+              <div key={role}>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{label}</h4>
+                <PersonRoleTable persons={persons} role={role} onPersist={handlePersonPersist} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Attributes view (hidden when Persons tab is active) */}
+      {attrSubTab === 'attrs' && <>
       {/* Status strip */}
       <div className="flex items-center gap-2 px-1 pb-3 flex-wrap">
         <span className={cn(
@@ -3298,6 +3397,7 @@ const AttributeFormView = ({
       {entitiesForTree.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-10">No entities selected.</p>
       )}
+      </>}
     </div>
 
     {/* Trace / Audit right pane */}

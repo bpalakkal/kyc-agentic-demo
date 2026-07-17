@@ -25,6 +25,7 @@ const tabs = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/work-queue", label: "Work Queue" },
   { to: "/reports", label: "Reports" },
+  { to: "/agents", label: "Agents" },
 ] as { to: string; label: string; end?: boolean; disabled?: boolean }[];
 
 // ─── AI Chat Floating ─────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ export type ForgeLineageEntry = {
 export type ForgeTraceRow = ForgeAttrRow & { lineage: ForgeLineageEntry[] | null };
 
 export type ForgePersonRow = {
+  kyc?: string;
   role: string;
   person_index: number;
   full_name: string | null;

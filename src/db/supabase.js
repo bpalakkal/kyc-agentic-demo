@@ -491,6 +491,36 @@ export async function getPersons(kycRef) {
   for (const role of Object.keys(grouped)) {
     grouped[role].sort((a, b) => (a.person_index ?? 0) - (b.person_index ?? 0));
   }
+
+  // Layer 3: apply analyst overrides from person_overrides table.
+  const { data: overrides } = await sb
+    .from('person_overrides')
+    .select('role, person_index, field, value')
+    .eq('kyc_ref', kycRef);
+
+  if (overrides?.length) {
+    const overrideMap = {};
+    for (const o of overrides) {
+      const key = `${o.role}:${o.person_index}`;
+      if (!overrideMap[key]) overrideMap[key] = {};
+      overrideMap[key][o.field] = o.value;
+    }
+    for (const persons of Object.values(grouped)) {
+      for (const p of persons) {
+        const fields = overrideMap[`${p.role}:${p.person_index}`];
+        if (!fields) continue;
+        for (const [field, value] of Object.entries(fields)) {
+          if (field === 'full_name')     { p.full_name     = value ?? null; continue; }
+          if (field === 'nationality')   { p.nationality   = value ?? null; continue; }
+          if (field === 'ownership_pct') { p.ownership_pct = value != null ? parseFloat(value) : null; continue; }
+          if (p.attributes?.[field] !== undefined) {
+            p.attributes[field] = { ...p.attributes[field], display_value: value, _overridden: true };
+          }
+        }
+      }
+    }
+  }
+
   return grouped;
 }
 

@@ -515,6 +515,13 @@ app.post('/api/agent-run-api/:runId/commit', requireAuth, async (req, res) => {
     const runner = new RunnerClass(getSb().sb);
     const result = await runner.commit(req.params.runId, pending.kycRef, output, pending.initiatedBy);
 
+    // Persist thinking steps and raw output for AgentRunsPanel history view.
+    const steps = apiRunnerSteps.get(req.params.runId) ?? [];
+    await getSb().sb.from('agent_runs')
+      .update({ steps, raw_output: output })
+      .eq('id', req.params.runId)
+      .catch(() => {});
+
     apiRunnerSteps.delete(req.params.runId);
     res.json(result);
   } catch (err) {
@@ -859,16 +866,179 @@ app.patch('/api/entity/:kycRef/screening/disposition', requireAuth, async (req, 
   }
 });
 
-// ─── Due Diligence stubs (DD agent coming separately) ────────────────────────
+// ─── Agent registry ───────────────────────────────────────────────────────────
 
-// POST /api/entity/:kycRef/dd/run — placeholder: DD agents not yet implemented
-app.post('/api/entity/:kycRef/dd/run', requireAuth, (_req, res) => {
-  res.status(501).json({ error: 'DD agents coming soon' });
+// GET /api/agents — static agent list built from the runner map + metadata
+app.get('/api/agents', requireAuth, (_req, res) => {
+  const agents = [
+    // ── Sourcing ──────────────────────────────────────────────────────────────
+    { slug: 'uk-sourcing-flow', display_name: 'UK Sourcing Flow',   category: 'sourcing', jurisdiction: 'UK',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: true  },
+    { slug: 'companies-house',  display_name: 'Companies House',    category: 'sourcing', jurisdiction: 'UK',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'fca',              display_name: 'FCA Register',       category: 'sourcing', jurisdiction: 'UK',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'jersey-fsc',       display_name: 'Jersey FSC',         category: 'sourcing', jurisdiction: 'Jersey',     runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'us-sourcing-flow', display_name: 'US Sourcing Flow',   category: 'sourcing', jurisdiction: 'US',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: true  },
+    { slug: 'sec',              display_name: 'SEC EDGAR',          category: 'sourcing', jurisdiction: 'US',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'iapd',             display_name: 'IAPD',              category: 'sourcing', jurisdiction: 'US',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'nyse',             display_name: 'NYSE',              category: 'sourcing', jurisdiction: 'US',         runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'gleif',            display_name: 'GLEIF',             category: 'sourcing', jurisdiction: 'Global',     runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    // ── Due Diligence ─────────────────────────────────────────────────────────
+    { slug: 'dd-all-in-one',                         display_name: 'DD — All In One',              category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: true  },
+    { slug: 'ria-entity-name-idv',                   display_name: 'Entity Name IDV',              category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-cip-classification-id',             display_name: 'CIP Classification ID',        category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-legal-structure-idv',               display_name: 'Legal Structure IDV',          category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-evidence-of-existence-idv',         display_name: 'Evidence of Existence IDV',    category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-beneficial-owner-idv',              display_name: 'Beneficial Owner IDV',         category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-authorized-signatory-idv',          display_name: 'Authorized Signatory IDV',     category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-corporate-officer-idv',             display_name: 'Corporate Officer IDV',        category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-registered-address-idv',            display_name: 'Registered Address IDV',       category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-principal-business-address-idv',    display_name: 'Principal Business Address IDV', category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-regulator-idv',                     display_name: 'Regulator IDV',                category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true,  trigger_all: false },
+    { slug: 'ria-government-identification-idv',     display_name: 'Government Identification IDV', category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-parent-publicly-listed-id',         display_name: 'Parent Publicly Listed ID',     category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-securities-exchange-act-id',        display_name: 'Securities Exchange Act ID',    category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-sole-proprietorship-id',            display_name: 'Sole Proprietorship ID',        category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-commodities-indicator-id',          display_name: 'Commodities Indicator ID',      category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-transacting-funds-id',              display_name: 'Transacting Funds ID',          category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-source-of-wealth-idv',              display_name: 'Source of Wealth IDV',          category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    { slug: 'ria-proxy-bo-idv',                      display_name: 'Proxy BO IDV',                  category: 'due_diligence', cip_classification: 'RIA', runner_type: 'api', output_type: 'attributes', enabled: true, trigger_all: false },
+    // ── Screening ─────────────────────────────────────────────────────────────
+    { slug: 'screening',        display_name: 'Full Screening',     category: 'screening',     runner_type: 'api', output_type: 'screening',   enabled: true,  trigger_all: true  },
+  ];
+  res.json(agents);
 });
 
-// GET /api/entity/:kycRef/dd/plan — placeholder: DD plan not yet implemented
-app.get('/api/entity/:kycRef/dd/plan', requireAuth, (_req, res) => {
-  res.status(501).json({ error: 'DD agents coming soon' });
+// ─── Person overrides ─────────────────────────────────────────────────────────
+
+// POST /api/entity/:kycRef/persons/:role/:index/override — write analyst edits to person_overrides
+app.post('/api/entity/:kycRef/persons/:role/:index/override', requireAuth, async (req, res) => {
+  const { kycRef, role, index } = req.params;
+  const { values } = req.body ?? {};
+  if (!values || typeof values !== 'object') return res.status(400).json({ error: 'values object required' });
+
+  const personIndex = parseInt(index, 10);
+  if (!Number.isFinite(personIndex)) return res.status(400).json({ error: 'index must be an integer' });
+
+  const overriddenBy = req.user.id;
+  const rows = Object.entries(values).map(([field, value]) => ({
+    kyc_ref: kycRef, role, person_index: personIndex,
+    field, value: value != null ? String(value) : null,
+    overridden_by: overriddenBy,
+    overridden_at: new Date().toISOString(),
+  }));
+
+  try {
+    const { sb } = getSb();
+    const { error } = await sb.from('person_overrides')
+      .upsert(rows, { onConflict: 'kyc_ref,role,person_index,field' });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, count: rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Entity data ──────────────────────────────────────────────────────────────
+
+// GET /api/entity-data/:kycRef — entity_data.json shape used by DD agents
+app.get('/api/entity-data/:kycRef', requireAuth, async (req, res) => {
+  const { kycRef } = req.params;
+  try {
+    const { getAttributes, getPersons, getEntity } = getSb();
+    const [attrs, persons, entity] = await Promise.all([
+      getAttributes(kycRef),
+      getPersons(kycRef),
+      getEntity(kycRef),
+    ]);
+    const { buildEntityDataJson } = await import('./agents/dd/entityData.js');
+    const parts  = kycRef.split('_');
+    const entityId = parts[0];
+    const caseId   = parts.slice(1).join('_');
+    res.json(buildEntityDataJson(attrs, persons, { entityId, caseId }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Due Diligence ────────────────────────────────────────────────────────────
+
+// GET /api/entity/:kycRef/dd/plan — which DD agents still have work remaining
+app.get('/api/entity/:kycRef/dd/plan', requireAuth, async (req, res) => {
+  const { kycRef } = req.params;
+  try {
+    const { getAttributes, getPersons, getEntity } = getSb();
+    const [attrs, persons, entity] = await Promise.all([
+      getAttributes(kycRef),
+      getPersons(kycRef),
+      getEntity(kycRef),
+    ]);
+    const { agentsToRun, entityTypeForCase } = await import('./agents/dd/gate.js');
+    const entityType = entityTypeForCase(entity);
+    const agents = agentsToRun(attrs, persons, entityType);
+    res.json({
+      entityType,
+      agents: agents.map(a => ({ slug: a.slug, persona: a.persona, remaining: a.remaining })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/entity/:kycRef/dd/run — kick off DD agents (all or specific slugs)
+// Body: { slugs?: string[], entityName?: string }
+// Omit slugs → runs dd-all-in-one (fastest path)
+app.post('/api/entity/:kycRef/dd/run', requireAuth, async (req, res) => {
+  const { kycRef } = req.params;
+  const { slugs, entityName } = req.body ?? {};
+  const initiatedBy = req.user.id;
+
+  try {
+    const { getEntity } = getSb();
+    const entity = await getEntity(kycRef);
+    const name = entityName ?? entity?.entity_name ?? kycRef;
+
+    const toRun = (slugs?.length ? slugs : ['dd-all-in-one']);
+    const started = [];
+
+    for (const slug of toRun) {
+      const RunnerClass = await loadRunnerClass(slug).catch(() => null);
+      if (!RunnerClass) { started.push({ slug, error: 'not found' }); continue; }
+
+      const runner = new RunnerClass(getSb().sb);
+      const steps  = [];
+
+      const { runId, executionPromise } = await runner.startPreview(
+        { kycRef, entityName: name, initiatedBy },
+        { onStep: (msg) => steps.push(msg) },
+      );
+
+      apiRunnerSteps.set(runId, steps);
+
+      executionPromise
+        .then(({ output }) => {
+          apiRunnerOutput.set(runId, { output, kycRef, initiatedBy });
+          steps.push('✓ Ready for review');
+          setTimeout(async () => {
+            if (apiRunnerOutput.has(runId)) {
+              apiRunnerOutput.delete(runId);
+              apiRunnerSteps.delete(runId);
+              await getSb().sb.from('agent_runs')
+                .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+                .eq('id', runId).catch(() => {});
+            }
+          }, 30 * 60 * 1000);
+        })
+        .catch((err) => {
+          console.error(`[dd-run] ${slug} preview failed: ${err.message}`);
+          steps.push(`⚠ ${err.message}`);
+        });
+
+      started.push({ slug, runId });
+    }
+
+    res.json({ started, count: started.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
