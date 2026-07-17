@@ -302,8 +302,13 @@ const WorkQueue = () => {
   return (
     <div className="px-6 py-6">
       <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight">Work Queue</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Select entities to begin a review session. Locked rows are read-only.</p>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-2xl font-bold tracking-tight">Work Queue</h1>
+          <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
+            {loading ? "…" : `${apiEntities.length} entities`}
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">Select entities to begin a review session. Locked rows are read-only.</p>
       </div>
 
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">

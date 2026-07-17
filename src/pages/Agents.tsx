@@ -52,7 +52,7 @@ export default function Agents() {
         </Button>
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Loading registry...</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading registry…</p>}
       {isError && (
         <p className="text-sm text-destructive">
           Failed to load agents: {(error as Error)?.message}
@@ -139,7 +139,7 @@ export default function Agents() {
             <div className="flex items-center gap-3">
               {agents.length > 0 && (
                 <span>
-                  {start}--{end} of {agents.length}
+                  {start}–{end} of {agents.length}
                 </span>
               )}
               <div className="flex items-center gap-1">
