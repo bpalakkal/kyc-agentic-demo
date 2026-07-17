@@ -794,28 +794,22 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
             const status = String(rd.status ?? "");
 
             if (status === "pending_review") {
-              cancelled.current = true; // stop polling — modal takes over
-              setPendingDiff({
-                runId,
-                kycRef,
-                agentId: run.agentId,
-                onCommit: (result) => {
-                  const stats = (result as Record<string, unknown>)?.stats as Record<string, unknown> | undefined;
-                  const parts: string[] = [];
-                  if (Number(stats?.attrCount)  > 0) parts.push(`${stats!.attrCount} attrs`);
-                  if (Number(stats?.excCount)   > 0) parts.push(`${stats!.excCount} exceptions`);
-                  if (Number(stats?.fileStored) > 0) parts.push(`${stats!.fileStored} files`);
-                  markDone(
-                    [...latestSteps, `✓ Accepted — saved: ${parts.join(" · ") || "no data"}`],
-                    result,
-                  );
-                  setPendingDiff(null);
-                },
-                onCancel: () => {
-                  markDone([...latestSteps, "✗ Review cancelled — no changes saved"], null);
-                  setPendingDiff(null);
-                },
-              });
+              cancelled.current = true; // stop polling — auto-commit
+              try {
+                const cr = await apiFetch(`${AGENT_API_BASE}/api/agent-run-api/${runId}/commit`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                });
+                const cd = cr.ok ? await cr.json() : {};
+                const stats = (cd as Record<string, unknown>)?.stats as Record<string, unknown> | undefined;
+                const parts: string[] = [];
+                if (Number(stats?.attrCount)  > 0) parts.push(`${stats!.attrCount} attrs`);
+                if (Number(stats?.excCount)   > 0) parts.push(`${stats!.excCount} exceptions`);
+                if (Number(stats?.fileStored) > 0) parts.push(`${stats!.fileStored} files`);
+                markDone([...latestSteps, `✓ Saved: ${parts.join(" · ") || "complete"}`], cd);
+              } catch {
+                markDone([...latestSteps, "⚠ Auto-commit failed"], null);
+              }
               return;
             }
 
@@ -923,7 +917,6 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
     <AgentContext.Provider value={value}>
       {children}
       <AgentDock />
-      <AgentDiffPortal />
     </AgentContext.Provider>
   );
 };
@@ -1106,24 +1099,44 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
   );
 };
 
-// =========== Attribute Diff Modal Portal ===========
-// Renders the diff review modal whenever an API runner reaches 'pending_review'.
-
-const AgentDiffPortal = () => {
-  const { pendingDiff } = useAgents();
-  if (!pendingDiff) return null;
-  return <AttributeDiffModal pending={pendingDiff} />;
-};
 
 // =========== Bottom-right Agent Console Dock ===========
 
+const fmtElapsed = (ms: number) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+};
+const runAttrCount = (r: AgentRun): number | null => {
+  const res = r.result as Record<string, unknown> | undefined;
+  const direct = Number(res?.attrCount);
+  if (Number.isFinite(direct)) return direct;
+  const stats = res?.stats as Record<string, unknown> | undefined;
+  const s = Number(stats?.attrCount);
+  return Number.isFinite(s) ? s : null;
+};
+const runFailed = (r: AgentRun) =>
+  r.state === "done" && /⚠|✗|failed|error|timed out/i.test(r.thoughts[r.thoughts.length - 1] ?? "");
+
 const AgentDock = () => {
   const { runs, dockOpen, dockMinimized, setDockOpen, setDockMinimized, isRunning, currentLabel } = useAgents();
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!isRunning) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [isRunning]);
 
   if (!dockOpen || runs.length === 0) return null;
 
   const completed = runs.filter((r) => r.state === "done").length;
   const total = runs.length;
+
+  const groups = new Map<string, { name: string; runs: AgentRun[] }>();
+  for (const r of runs) {
+    const key = r.kycRef ?? r.entityName ?? "—";
+    if (!groups.has(key)) groups.set(key, { name: r.entityName ?? key, runs: [] });
+    groups.get(key)!.runs.push(r);
+  }
 
   return (
     <div className={cn(
@@ -1156,67 +1169,45 @@ const AgentDock = () => {
           <div className="h-1 w-full bg-secondary">
             <div className="h-full bg-primary transition-all duration-500" style={{ width: `${(completed / total) * 100}%` }} />
           </div>
-          <div className="max-h-[420px] overflow-y-auto p-3 space-y-2">
-            {runs.map((r) => {
-              const agent = AGENTS_BY_ID[r.agentId];
-              const Icon = agent.icon;
-              const visibleThoughts = r.thoughts.slice(0, r.state === "done" ? r.thoughts.length : r.currentThought + 1);
-              return (
-                <div
-                  key={r.id}
-                  className={cn(
-                    "rounded-lg border p-2.5 transition-all",
-                    r.state === "running" && "border-primary bg-info-soft/40",
-                    r.state === "done" && "border-success-soft-border bg-success-soft/20",
-                    r.state === "pending" && "border-border bg-card opacity-60"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "size-6 rounded-md grid place-items-center shrink-0",
-                      r.state === "running" && "bg-primary/15 text-primary",
-                      r.state === "done" && "bg-success-soft text-success",
-                      r.state === "pending" && "bg-secondary text-muted-foreground",
-                    )}>
-                      {r.state === "running" ? <Loader2 className="size-3.5 animate-spin" /> :
-                        r.state === "done" ? <CheckCircle2 className="size-3.5" /> :
-                        <Icon className="size-3.5" />}
-                    </span>
-                    <p className="text-[12px] font-medium flex-1 truncate">{agent.name}</p>
-                    <span className={cn(
-                      "text-[9px] px-1.5 py-0.5 rounded-full uppercase font-medium tracking-wide",
-                      r.state === "running" && "bg-primary text-primary-foreground",
-                      r.state === "done" && "bg-success-soft text-success border border-success-soft-border",
-                      r.state === "pending" && "bg-secondary text-muted-foreground",
-                    )}>{r.state}</span>
-                  </div>
-                  {r.state !== "pending" && (
-                    <div className="mt-1.5 pl-8 space-y-0.5">
-                      {visibleThoughts.map((t, i) => (
-                        <p key={i} className="text-[11px] text-muted-foreground font-mono leading-snug animate-fade-in">
-                          <span className="text-primary/60">›</span> {t}
-                        </p>
-                      ))}
-                      {r.state === "done" && (() => {
-                        const res = r.result as Record<string, unknown> | undefined;
-                        const stats = res?.stats as Record<string, unknown> | undefined;
-                        if (!stats) return null;
-                        const parts: string[] = [];
-                        if (Number(stats.attrCount)  > 0) parts.push(`${stats.attrCount} attrs`);
-                        if (Number(stats.excCount)   > 0) parts.push(`${stats.excCount} exceptions`);
-                        if (Number(stats.fileStored) > 0) parts.push(`${stats.fileStored} files`);
-                        if (!parts.length) return null;
-                        return (
-                          <p className="text-[11px] text-success font-mono leading-snug mt-0.5">
-                            <span className="text-success/60">✓</span> Saved: {parts.join(" · ")}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                  )}
+          <div className="max-h-[420px] overflow-y-auto p-3 space-y-3">
+            {[...groups.entries()].map(([key, g]) => (
+              <div key={key}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Building2 className="size-3 text-muted-foreground shrink-0" />
+                  <span className="text-[11px] font-semibold truncate">{g.name}</span>
+                  {g.name !== key && <span className="text-[9px] text-muted-foreground font-mono truncate">{key}</span>}
                 </div>
-              );
-            })}
+                <div className="space-y-1">
+                  {g.runs.map((r) => {
+                    const name = r.displayName ?? AGENTS_BY_ID[r.agentId as AgentId]?.name ?? r.agentId;
+                    const failed = runFailed(r);
+                    const elapsed = ((r.state === "done" ? (r.completedAt ?? now) : now) - r.startedAt);
+                    const ac = runAttrCount(r);
+                    const dot = r.state === "running" ? "bg-success animate-pulse"
+                      : failed ? "bg-alert"
+                      : r.state === "done" ? "bg-success"
+                      : "bg-muted-foreground/40";
+                    const statusText = r.state === "running" ? "running" : failed ? "failed" : r.state === "done" ? "done" : "queued";
+                    const statusColor = failed ? "text-alert" : r.state === "done" || r.state === "running" ? "text-success" : "text-muted-foreground";
+                    return (
+                      <div key={r.id} className="flex items-center gap-2 rounded-md border border-border/70 bg-secondary/20 px-2.5 py-1.5">
+                        <span className={cn("size-2 rounded-full shrink-0", dot)} />
+                        <span className="text-[11px] font-medium flex-1 truncate">{name}</span>
+                        {r.state !== "pending" && (
+                          <span className="text-[9px] text-muted-foreground tabular-nums shrink-0">{fmtElapsed(elapsed)}</span>
+                        )}
+                        {r.state === "done" && !failed && ac != null && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border shrink-0">
+                            {ac} attr{ac === 1 ? "" : "s"}
+                          </span>
+                        )}
+                        <span className={cn("text-[9px] uppercase font-semibold tracking-wide shrink-0", statusColor)}>{statusText}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
           <div className="px-3 py-2 border-t border-border flex items-center justify-between bg-secondary/30">
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
