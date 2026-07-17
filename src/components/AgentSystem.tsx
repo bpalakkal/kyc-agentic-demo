@@ -624,6 +624,18 @@ type AgentRun = {
   result?: unknown;
 };
 
+export type InlineProposal = {
+  runId: string;
+  kycRef: string;
+  agentSlug: string;
+  attributeName: string;
+  attributeGroup: string;
+  currentValue: string | null;
+  proposedValue: string;
+  source: string;
+  status: "new" | "changed";
+};
+
 // PendingDiff is defined in AttributeDiffModal to avoid a circular import.
 
 type AgentContextValue = {

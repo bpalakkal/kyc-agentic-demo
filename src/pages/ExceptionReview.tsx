@@ -9,25 +9,12 @@
  * Top bar        QA Review · Escalate · Outreach · Submit actions
  * Bottom-right   Agent Console Dock (from AgentSystem
  *
- * Data sources (current state — demo)
- * ─────────────────────────────────────
- * `exceptions`         Hard-coded array below (~13 curated exceptions across
- *                      Brevan Howard and Marshall Wace).  These are the only
- *                      entities with full exception detail.
- * GENERATED_EXCEPTIONS Auto-generated from entities.md — merged at runtime
- *                      (Long Focus, Brookfield).
- * GENERATED_*          All other generated data (attributes, comparisons,
- *                      activity, comments, tasks) from entities-generated.ts.
- *
- * TODO (production)
- * ─────────────────
- * - Replace `exceptions` + GENERATED_EXCEPTIONS with GET /api/cases/:kycId/exceptions
- * - Replace attribute panels with GET /api/cases/:kycId/attributes
- * - Replace activity feed with a real-time websocket or polling subscription
- * - Resolution submission (handleSubmit) currently only sets local state —
- *   wire to POST /api/cases/:kycId/exceptions/:excId/resolve
- * - Escalation and Outreach are UI-only — wire to notification/email service
- * - Zoom meeting creation already calls a real API (server.js /api/zoom/create-meeting)
+ * Data sources
+ * ─────────────
+ * Exceptions are fetched from GET /api/entity/:kycRef/exceptions (Supabase DB).
+ * Attributes are fetched from GET /api/entity/:kycRef/attributes (merged snapshot + agent-run layers).
+ * If DB returns no exceptions, a stub placeholder is rendered per selected entity.
+ * No hardcoded or mock data is used — all real data or empty states.
  */
 
 import { useState, useEffect, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
@@ -35,42 +22,41 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
   Send, Mail, Plus, ThumbsUp, ThumbsDown, RotateCw, Paperclip,
-  ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock,
-  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap, ClipboardList,
-  Folder,
+  ShieldCheck, Database, Search, Sparkles, ChevronRight, Play, Settings2, Building2, Clock, Loader2,
+  ShieldAlert, Briefcase, ArrowRight, UserCircle2, MessageSquare, Bot, Video, Calendar, Network, Zap,
+  Folder, Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { useAgents, type AgentId, AGENT_API_BASE } from "@/components/AgentSystem";
+import { useAgents, type AgentId, type InlineProposal, AGENT_API_BASE } from "@/components/AgentSystem";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { GENERATED_EXCEPTIONS, GENERATED_COMPARISONS, GENERATED_ENTITY_PROFILES, GENERATED_COMMENTS, GENERATED_WATCHERS, GENERATED_ACTIVITY } from "@/data/entities-generated";
 import { GraphView } from "@/components/GraphView";
 import { Input }    from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { ForgeAttrRow, ForgeTraceRow, ForgePersonRow } from "@/types/forgeTypes";
-import { PERSON_ROLE_LABELS } from "@/types/forgeTypes";
 import {
-  type AttrTrace, type AttrDoc, type AttrDocKind, type EntityAttr, type EntityProfile, type AuditEntry,
-  type CaseDoc,
-  ENTITY_PROFILES, ATTRIBUTE_TRACES, SOURCE_STYLE, DOT_STYLE, SOURCE_AGENT,
+  type AttrTrace, type AttrDoc, type AttrDocKind, type EntityAttr, type AuditEntry,
+  type CaseDoc, type EntityProfile,
+  SOURCE_STYLE, DOT_STYLE, SOURCE_AGENT,
   STATUS_LABEL, COMPLETENESS_LABEL, COMPLETENESS_STYLE, DOC_KIND_META,
-  ATTR_AUDIT_LOG, NESTED_ATTR_PROFILES, CASE_DOCUMENTS, TRACE_DOCS,
-  COMMENTS_BY_KYC, WATCHERS_BY_KYC, ACTIVITY_BY_KYC,
+  CASE_DOCUMENTS, TRACE_DOCS,
 } from "@/data/kycMockData";
 import { ForgeLineagePanel } from "@/components/kyc/ForgeLineagePanel";
-import { ForgePersonCard } from "@/components/kyc/ForgePersonCard";
 import { PersonRoleTable } from "@/components/kyc/PersonRoleTable";
-import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
-import { AgentTriggers } from "@/components/kyc/AgentTriggers";
 import { WgqTabContent } from "@/components/kyc/WgqTabContent";
 import { CollabPanel } from "@/components/kyc/CollabPanel";
 import { EntityFiles } from "@/components/kyc/EntityFiles";
-import { SimpleFieldRow, InlineTraceDrawer, NestedObjectBlock } from "@/components/kyc/SimpleFieldRow";
+import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
+import { DatastoreDocuments } from "@/components/kyc/DatastoreDocuments";
+import { SimpleFieldRow, InlineTraceDrawer } from "@/components/kyc/SimpleFieldRow";
+import { canonicalAttrKey, lineageConflict } from "@/lib/attrLabel";
+import { entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
 import Screening from "@/pages/Screening";
+import { AgentTriggers } from "@/components/kyc/AgentTriggers";
 
 
 
@@ -107,782 +93,15 @@ type Exc = {
   attrLabel?: string; // field_name from DB — the attribute this exception is tied to
 };
 
-const exceptions: Exc[] = [
-  {
-    id: "e1",
-    title: "Undisclosed PSC Address Change",
-    category: "Beneficial Ownership",
-    confidence: 88,
-    status: "Pending",
-    entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30229",
-    flagText: "PSC Mr Alan Eldad Howard's correspondence address on file (82 Baker Street, London) does not match the most recent Form CS01 submission to Companies House.",
-    narrative: "Companies House PSC register lists '82 Baker Street, London W1U 6AE' but the firm's latest annual confirmation statement filed on 03/14/2026 references a different correspondence address ('27 Hill Street, London W1J 5LP'). PSCs are required to notify changes within 14 days under Schedule 1A of the Companies Act 2006. No PSC02 amendment has been received.",
-    reasoningSteps: [
-      "Pulled current PSC record for OC302636 from Companies House Public Data API.",
-      "Compared PSC.psc_correspondence_address against latest CS01 submission text.",
-      "Confirmed 14-day notification window under Sch.1A CA 2006 has lapsed without a PSC02 filing.",
-    ],
-    evidenceRationale: "Companies House is the authoritative source for UK PSC and registered-address data. The firm's own CS01 is a counter-evidence source filed under directors' personal liability.",
-    evidence: [
-      { name: "Companies House PSC Filing", sub: "OC302636 · Mr A E Howard" },
-      { name: "Form CS01 (03/14/2026)", sub: "Brevan Howard LLP · Confirmation Statement" },
-      { name: "Companies Act 2006 Sch. 1A", sub: "PSC notification window" },
-    ],
-    acceptability: "Address-only PSC changes carry low ML/TF risk if the underlying identity (DOB, nationality, nature-of-control) is unchanged. Remediation is typically a 14-day client request for a corrected PSC02 filing.",
-    resolutions: [
-      { id: "r1", title: "Request PSC02 correction filing from client", desc: "Send automated reach-out to Brevan Howard Compliance asking for a backdated PSC02 to align the register. SLA: 7 business days.", recommended: true,
-        agents: ["beneficial-owner", "outreach", "audit"], agentLabel: "Request PSC02 correction",
-        postRunSummary: "Outreach drafted to Brevan Howard Compliance requesting a backdated PSC02 filing. Case held in 'awaiting client' state with a 7-business-day SLA; no PSC data overwritten yet.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (PSC02 correction requested) · SLA 2026-04-30" },
-          { attr: "Outreach Log", before: "—", after: "Email queued to compliance@brevanhoward.com · Template PSC02_CORRECTION_v2" },
-          { attr: "PSC Correspondence Address", before: "82 Baker Street, London W1U 6AE (Companies House)", after: "82 Baker Street, London W1U 6AE — pending PSC02 confirmation" },
-        ],
-      },
-      { id: "r2", title: "Accept current Companies House record as authoritative", desc: "Adopt the on-file PSC address (82 Baker Street) and flag the CS01 cell-level mismatch as a non-material filing typo.",
-        agents: ["beneficial-owner", "document", "audit"], agentLabel: "Adopt Companies House record",
-        postRunSummary: "Companies House PSC record adopted as authoritative. CS01 address mismatch annotated as a non-material filing typo and case closed.",
-        updates: [
-          { attr: "PSC Correspondence Address", before: "Conflict (CS01 vs PSC register)", after: "82 Baker Street, London W1U 6AE (Companies House · authoritative)" },
-          { attr: "CS01 Annotation", before: "—", after: "Cell-level address typo — non-material, retained for audit" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Accepted" },
-        ],
-      },
-      { id: "r3", title: "Escalate to MLRO for PSC integrity review", desc: "Use if the address change suggests an undisclosed change in control or nominee arrangement.",
-        agents: ["beneficial-owner", "risk-scoring", "outreach", "audit"], agentLabel: "Escalate to MLRO",
-        postRunSummary: "Case escalated to MLRO with a precautionary risk-tier bump pending PSC integrity review.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — MLRO review" },
-          { attr: "Risk Tier", before: "Elevated", after: "High (precautionary · pending MLRO outcome)" },
-          { attr: "Owner", before: "KYC Analyst (Tier 2)", after: "MLRO · J. Mendes" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e2",
-    title: "Cross-Jurisdiction Corporate Member (Jersey)",
-    category: "Enhanced Due Diligence",
-    confidence: 92,
-    status: "Pending",
-    entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30229",
-    flagText: "Designated member 'BH Partnership Holdings Limited' is incorporated in Jersey, Channel Islands — a jurisdiction requiring EDD under FCA SYSC 6.3.",
-    narrative: "Per Companies House, BH Partnership Holdings Limited (Jersey reg. 106333) is one of two corporate designated members of Brevan Howard Asset Management LLP. Jersey is on the firm's EDD-required list owing to bank-secrecy heritage, despite being FATF-compliant. EDD requires source-of-funds for the Jersey member and beneficial-owner mapping up to natural persons.",
-    reasoningSteps: [
-      "Identified two corporate-llp-designated-members from Companies House OC302636.",
-      "Matched officer_place_registered 'JERSEY, CHANNEL ISLANDS' against EDD jurisdiction policy POL-EDD-23.",
-      "Confirmed no EDD pack on file for the Jersey member in the Evidence Locker.",
-    ],
-    evidenceRationale: "Companies House officer record is authoritative for the corporate member's domicile. The firm's internal EDD jurisdiction list (POL-EDD-23) is the policy reference for triggering EDD.",
-    evidence: [
-      { name: "Companies House Officer Record", sub: "BH Partnership Holdings · Jersey 106333" },
-      { name: "EDD Jurisdiction Policy POL-EDD-23", sub: "Internal · Jersey listed" },
-      { name: "Jersey Financial Services Comm.", sub: "Registry Lookup · Active" },
-    ],
-    acceptability: "Jersey corporate members are permissible under FCA rules but mandate full EDD — source-of-wealth, source-of-funds, and natural-person beneficial-owner traversal. Common for UK alt-investment LLPs.",
-    resolutions: [
-      { id: "r1", title: "Run Enhanced Due Diligence on Jersey member", desc: "Trigger EDD pack: pull JFSC entity record, traverse ownership to natural-person UBOs, source-of-wealth declaration.", recommended: true,
-        agents: ["beneficial-owner", "regulatory", "sanctions", "pep", "audit"], agentLabel: "Run EDD on BH Partnership Holdings",
-        postRunSummary: "EDD pack generated: JFSC record retrieved, UBO chain resolved to natural persons, and source-of-wealth declaration linked. Jersey member upgraded to EDD-cleared.",
-        updates: [
-          { attr: "EDD Status (BH Partnership Holdings Ltd)", before: "Not Started", after: "EDD Cleared · 2026-04-19" },
-          { attr: "UBO Chain (Jersey leg)", before: "Unresolved at corporate-member layer", after: "Resolved to Mr A E Howard (100% upstream attribution)" },
-          { attr: "Evidence Locker", before: "0 EDD artefacts", after: "+3 artefacts (JFSC extract, UBO chart, SOW declaration)" },
-        ],
-      },
-      { id: "r2", title: "Request natural-person UBO chart from client", desc: "Ask the client to supply a signed UBO map for the Jersey member up to natural persons with >25% voting rights.",
-        agents: ["beneficial-owner", "outreach", "audit"], agentLabel: "Request UBO chart from client",
-        postRunSummary: "Outreach sent to client requesting a signed UBO map for the Jersey member. Case parked pending response.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (UBO chart requested)" },
-          { attr: "Outreach Log", before: "—", after: "Email to compliance@brevanhoward.com · Template UBO_REQUEST_v1" },
-        ],
-      },
-      { id: "r3", title: "Accept member as conduit of Mr A E Howard ownership", desc: "Treat the Jersey member as a transparent holding vehicle for the disclosed PSC. Document rationale; no further EDD.",
-        agents: ["beneficial-owner", "document", "audit"], agentLabel: "Accept Jersey member as transparent",
-        postRunSummary: "Jersey corporate member treated as a transparent holding vehicle for the disclosed PSC. Rationale documented and case closed.",
-        updates: [
-          { attr: "EDD Status (BH Partnership Holdings Ltd)", before: "EDD Required", after: "Waived — transparent holding for disclosed PSC" },
-          { attr: "Rationale Memo", before: "—", after: "MEMO-EDD-WAIVE-30214 · attached" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Accepted" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e3",
-    title: "Previous Company Name Continuity",
-    category: "Identity Consistency",
-    confidence: 95,
-    status: "Pending",
-    entity: "Brevan Howard Asset Management LLP",
-    kyc: "KYC-30229",
-    flagText: "Entity was previously registered as 'RIVAGE CAPITAL MANAGEMENT LLP' — chain-of-title verification required.",
-    narrative: "Companies House shows OC302636 was originally registered as 'Rivage Capital Management LLP' before changing its name to 'Brevan Howard Asset Management LLP'. The internal CRM has only the current name with no prior-name link. KYC policy requires positive identification that the regulated entity is the same legal person across the name change to preserve audit chain.",
-    reasoningSteps: [
-      "Read entity_previous_company_names array from Companies House for OC302636.",
-      "Searched FCA Register for both names — confirmed FRN history continuous since 2003.",
-      "Flagged CRM gap: prior name not stored, breaking the lineage view for analysts.",
-    ],
-    evidenceRationale: "Companies House preserves prior names against the same company number. FCA Register independently confirms the regulatory permission was carried across the change.",
-    evidence: [
-      { name: "Companies House Name History", sub: "OC302636 · Rivage → Brevan Howard" },
-      { name: "FCA Register FRN", sub: "Permission continuous since 2003" },
-      { name: "CRM Entity Record", sub: "Internal · Prior name missing" },
-    ],
-    acceptability: "Lawful name changes preserve the underlying company number and regulatory permissions. No AML concern arises if FCA and Companies House records are consistent.",
-    resolutions: [
-      { id: "r1", title: "Backfill prior name into CRM and close exception", desc: "Auto-write 'Rivage Capital Management LLP (until 2007)' into CRM aliases; close exception with audit log.", recommended: true,
-        agents: ["identity", "document", "audit"], agentLabel: "Backfill prior name into CRM",
-        postRunSummary: "CRM alias backfilled with the prior legal name and lineage view restored. Exception closed with full audit trail.",
-        updates: [
-          { attr: "CRM · Entity Aliases", before: "—", after: "Rivage Capital Management LLP (until 2007-04-16)" },
-          { attr: "Lineage Continuity", before: "Broken at 2007 name change", after: "Continuous (same OC302636 · FRN 209517)" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Resolved" },
-        ],
-      },
-      { id: "r2", title: "Request board minutes evidencing name change", desc: "Use if FCA / CH evidence is insufficient for governance committee review.",
-        agents: ["document", "outreach", "audit"], agentLabel: "Request board minutes",
-        postRunSummary: "Document request issued to client for board minutes covering the 2007 name change; case held pending document upload.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (board minutes requested)" },
-          { attr: "Document Requests", before: "—", after: "DOC-REQ-30214-NAME-2007 (board minutes · 2007 name change)" },
-        ],
-      },
-      { id: "r3", title: "Defer pending FCA letter retrieval", desc: "Pause case until the original FCA name-change confirmation letter is uploaded.",
-        agents: ["outreach", "audit"], agentLabel: "Defer pending FCA letter",
-        postRunSummary: "Case deferred until the original FCA name-change confirmation letter is retrieved from the archive.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Deferred (awaiting FCA letter)" },
-          { attr: "Next Review", before: "—", after: "2026-05-03" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e4",
-    title: "FCA Permission Scope Drift",
-    category: "Regulatory Status",
-    confidence: 79,
-    status: "Pending",
-    entity: "Marshall Wace LLP",
-    kyc: "KYC-30188",
-    flagText: "FCA register shows a new permission ('Managing an AIF') added on 02/11/2026 — internal record not yet updated.",
-    narrative: "Marshall Wace LLP (FRN 211088) extended its FCA permissions in February 2026 to include 'Managing an Alternative Investment Fund' on top of its existing investment-management permissions. The CRM permission set was last refreshed in November 2025 and has not been re-synced, creating a drift between the regulator-of-record and our internal risk model.",
-    reasoningSteps: [
-      "Polled FCA Register API for FRN 211088 permissions versus stored snapshot.",
-      "Detected delta: new permission 'Managing an AIF' active since 02/11/2026.",
-      "Computed risk-model impact: AIFMD scope adds disclosure obligations under SI 2013/1773.",
-    ],
-    evidenceRationale: "The FCA Register is the statutory source for UK authorised firm permissions. The CRM snapshot is the internal source-of-truth that drives risk scoring.",
-    evidence: [
-      { name: "FCA Register FRN 211088", sub: "Permissions snapshot 04/19/2026" },
-      { name: "CRM Permission Set", sub: "Internal · Snapshot 11/02/2025" },
-      { name: "AIFMD SI 2013/1773", sub: "Statutory Instrument" },
-    ],
-    acceptability: "Adding regulated permissions is a routine corporate event for a multi-strategy LLP. The control concern is delayed internal sync, not the underlying permission, which is lawful.",
-    resolutions: [
-      { id: "r1", title: "Sync CRM permission set with FCA register", desc: "Auto-write 'Managing an AIF' into CRM permission set with effective date 02/11/2026 and re-run the risk model.", recommended: true,
-        agents: ["regulatory", "risk-scoring", "audit"], agentLabel: "Sync permissions with FCA",
-        postRunSummary: "FCA register snapshot pulled and CRM permission set synchronised. Risk model re-scored with the AIFMD scope expansion factored in.",
-        updates: [
-          { attr: "CRM · FCA Permissions", before: "Investment management, MiFID II", after: "Investment management, MiFID II, Managing an AIF (eff. 2026-02-11)" },
-          { attr: "Composite Risk Score", before: "58 (Elevated)", after: "64 (Elevated · AIFMD scope)" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Resolved" },
-        ],
-      },
-      { id: "r2", title: "Request AIFMD disclosure pack from client", desc: "Ask Marshall Wace Compliance for the AIFMD Article 23 disclosure pack covering the newly in-scope funds.",
-        agents: ["regulatory", "document", "outreach", "audit"], agentLabel: "Request AIFMD disclosure",
-        postRunSummary: "Outreach issued to Marshall Wace Compliance requesting the Article 23 disclosure pack covering the newly in-scope AIFs.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (AIFMD Art. 23 pack)" },
-          { attr: "Outreach Log", before: "—", after: "Email to compliance@mwam.com · Template AIFMD_ART23_v1" },
-          { attr: "Document Requests", before: "—", after: "DOC-REQ-30188-AIFMD-2026" },
-        ],
-      },
-      { id: "r3", title: "Elevate risk tier pending review", desc: "Apply a precautionary tier bump until the new AIF scope is fully evidenced and re-scored.",
-        agents: ["risk-scoring", "regulatory", "audit"], agentLabel: "Elevate risk tier",
-        postRunSummary: "Precautionary risk-tier bump applied to Marshall Wace pending full evidencing of the AIF scope expansion.",
-        updates: [
-          { attr: "Risk Tier", before: "Elevated", after: "High (precautionary · AIFMD scope drift)" },
-          { attr: "Review Cadence", before: "Annual", after: "Semi-annual until tier revert" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e5",
-    title: "Sanctions Screening — PSC Name Hit",
-    category: "Sanctions",
-    confidence: 97,
-    status: "Pending",
-    entity: "Marshall Wace LLP",
-    kyc: "KYC-30188",
-    flagText: "PSC 'Sir Paul Marshall' matches a non-sanctioned namesake on the UK HMT consolidated list at 84% fuzzy similarity.",
-    narrative: "HMT consolidated list contains 'Paul Marshall' (b. 1971, Zimbabwean national, designated under Zimbabwe regime — now de-listed). Marshall Wace's Sir Paul Marshall (b. 1959, British, knighted 2016) is verifiably a different individual. Identity divergence is conclusive on DOB, nationality, and HMRC-verified passport.",
-    reasoningSteps: [
-      "Screened all PSCs against OFAC SDN, EU CFSP, UN 1267, HMT consolidated lists.",
-      "Fuzzy match returned 84% similarity on name; exact DOB and nationality differ.",
-      "Confirmed identity divergence using HMRC-verified passport and Companies House DOB.",
-    ],
-    evidenceRationale: "HMT's primary list and the client's verified identity documents (passport + Companies House DOB) are the authoritative sources for resolving sanctions name-match alerts.",
-    evidence: [
-      { name: "HMT Consolidated List", sub: "Updated 04/01/2026 · de-listed entry" },
-      { name: "Passport — Sir Paul Marshall", sub: "GBR · Verified on file" },
-      { name: "World-Check Screening Log", sub: "Run 04/19/2026" },
-    ],
-    acceptability: "Documented false positives are routinely cleared at the analyst level with the underlying identity evidence retained in the case file. No regulatory reporting obligation arises from a confirmed non-match.",
-    resolutions: [
-      { id: "r1", title: "Clear as confirmed false positive", desc: "Identity divergence is conclusive: different DOB, nationality, and verified passport. Retain evidence and update screening exception list.", recommended: true,
-        agents: ["sanctions", "identity", "audit"], agentLabel: "Clear as confirmed false positive",
-        postRunSummary: "Identity divergence (DOB, nationality, passport) confirmed against the HMT match. Alert cleared as a false positive with evidence retained.",
-        updates: [
-          { attr: "Sanctions Alert (Sir Paul Marshall)", before: "Open · 84% fuzzy match", after: "Cleared — Confirmed False Positive" },
-          { attr: "Evidence Locker", before: "Identity docs on file", after: "+1 clearance memo (DOB / nationality divergence)" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Cleared" },
-        ],
-      },
-      { id: "r2", title: "Suppress future fuzzy matches for this name pair", desc: "Add the cleared identity pair to the screening allowlist to prevent recurring alerts on subsequent runs.",
-        agents: ["sanctions", "audit"], agentLabel: "Suppress future fuzzy matches",
-        postRunSummary: "Cleared identity pair added to the sanctions allowlist to suppress recurring fuzzy alerts on subsequent screening runs.",
-        updates: [
-          { attr: "Screening Allowlist", before: "—", after: "Sir Paul Marshall (b. 1959, British) vs HMT 'Paul Marshall' (b. 1971, ZWE)" },
-          { attr: "Expected Future Alerts", before: "≈ 1 per screening cycle", after: "0 (suppressed)" },
-        ],
-      },
-      { id: "r3", title: "Request fresh identity verification before clearing", desc: "Use if existing identity documents are older than 12 months or if heightened HMT scrutiny is warranted.",
-        agents: ["identity", "outreach", "audit"], agentLabel: "Request fresh identity verification",
-        postRunSummary: "Fresh identity-verification request issued to the client. Alert held open until refreshed documents are on file.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (fresh ID verification)" },
-          { attr: "Outreach Log", before: "—", after: "Email to compliance@mwam.com · Template IDV_REFRESH_v2" },
-        ],
-      },
-    ],
-  },
-  // ===== Long Focus Capital Management, LLC (KYC-30215) =====
-  {
-    id: "e6",
-    title: "US Registration Number Mismatch",
-    category: "Identity Consistency",
-    confidence: 92,
-    status: "Pending",
-    entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215",
-    flagText: "Client-provided CRD 801-12345 resolves to a different legal entity in SEC IAPD. IAPD record for the matching legal name shows 801-67890.",
-    narrative: "The client onboarding form lists US Registration Number 801-12345. That CRD resolves in IAPD to 'Long Focus Capital LLC' — a different legal entity with a different address. The legal name and principal address on the onboarding form match the entity registered under 801-67890. Most likely a transcription error on the onboarding form; SEC IAPD is the authoritative system of record under KYC Policy §3.1.",
-    reasoningSteps: [
-      "SEC IAPD is the system of record for RIA registration numbers under KYC Policy §3.1.",
-      "Legal entity name and principal address on Form ADV match the client onboarding form exactly.",
-      "Client-provided number resolves in IAPD but to a different legal entity with a different address — supports transcription-error hypothesis.",
-    ],
-    evidenceRationale: "SEC IAPD (Form ADV Part 1A) is the statutory source for US RIA registration numbers; client onboarding form is the counter-source.",
-    evidence: [
-      { name: "SEC IAPD — Form ADV Part 1A", sub: "Retrieved 2026-05-20 · CRD 801-67890" },
-      { name: "Client Onboarding Form", sub: "Self-reported · CRD 801-12345" },
-      { name: "KYC Policy §3.1", sub: "Authoritative source hierarchy" },
-    ],
-    acceptability: "Field-level transcription errors against an authoritative regulator source are routinely corrected to the regulator value with an audit-trail entry. No EDD or escalation typically required.",
-    resolutions: [
-      { id: "r1", title: "Run SEC-ADV Verification Agent and update to 801-67890", desc: "Verify match against SEC IAPD, write 801-67890 to the entity record, and log the discrepancy in the audit trail.", recommended: true,
-        agents: ["regulatory", "identity", "audit"], agentLabel: "Verify and update US Reg #",
-        postRunSummary: "SEC IAPD match confirmed for legal name + principal address. Entity record updated to CRD 801-67890 with a full discrepancy memo in the audit log.",
-        updates: [
-          { attr: "US Registration Number", before: "801-12345 (client self-reported)", after: "801-67890 (SEC IAPD · authoritative)" },
-          { attr: "Discrepancy Memo", before: "—", after: "MEMO-30215-CRD · client transcription error vs IAPD" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Resolved" },
-        ],
-      },
-      { id: "r2", title: "Accept client-provided number with Senior Analyst override", desc: "Retain 801-12345 with documented rationale and a Senior Analyst override signature.",
-        agents: ["identity", "audit"], agentLabel: "Accept with override",
-        postRunSummary: "Client-provided CRD retained under Senior Analyst override; rationale memo attached to case.",
-        updates: [
-          { attr: "US Registration Number", before: "801-12345 (unverified)", after: "801-12345 (Senior Analyst override · MEMO-30215-OVR)" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Accepted with Override" },
-        ],
-      },
-      { id: "r3", title: "Return to client via Relationship Manager", desc: "Route back to RM for client to confirm the correct CRD; case parked pending response.",
-        agents: ["outreach", "audit"], agentLabel: "Return to client for CRD confirmation",
-        postRunSummary: "RM outreach queued requesting confirmation of the correct CRD; case held pending client response.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (CRD confirmation requested)" },
-          { attr: "Outreach Log", before: "—", after: "RM Anderson · Template CRD_CONFIRM_v1 · SLA 5 business days" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e7",
-    title: "Outstanding LEI Code",
-    category: "Regulatory Status",
-    confidence: 78,
-    status: "Pending",
-    entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215",
-    flagText: "No active LEI found on GLEIF under the entity's legal name or SEC registration number. AUM of $2.4B suggests reportable derivatives activity is plausible.",
-    narrative: "GLEIF returned no match for the legal name 'Long Focus Capital Management, LLC' or against US Reg # 801-67890. For an RIA with $2.4B AUM an LEI is typically expected for swap and derivatives counterparty reporting under EMIR / Dodd-Frank. Absence may indicate the client does not transact in reportable instruments, or that registration has lapsed / is pending.",
-    reasoningSteps: [
-      "LEI is not a CIP requirement and does not block case closure under the FinCEN CDD Rule.",
-      "LEI is required for any EMIR- or Dodd-Frank-reportable derivative or swap activity, which is plausible given AUM.",
-      "GLEIF returned no match on either legal name or SEC registration number — indicates no LEI has ever been issued (vs. lapsed).",
-    ],
-    evidenceRationale: "GLEIF is the global registry of record for LEI codes; the client onboarding form is the counter-source for self-declared identifiers.",
-    evidence: [
-      { name: "GLEIF Registry Lookup", sub: "Legal name + CRD 801-67890 · no match" },
-      { name: "Client Onboarding Form", sub: "LEI field left blank" },
-      { name: "EMIR / Dodd-Frank Reporting Rules", sub: "Reportable derivative activity trigger" },
-    ],
-    acceptability: "Absence of LEI is acceptable if the client does not transact in reportable derivatives. Conditional approval pending client confirmation is a common path.",
-    resolutions: [
-      { id: "r1", title: "Request LEI from client via portal", desc: "Send a templated outreach to the client requesting an LEI; conditionally approve the case if the client confirms no reportable activity. SLA: 7 business days.", recommended: true,
-        agents: ["outreach", "regulatory", "audit"], agentLabel: "Request LEI from client",
-        postRunSummary: "Outreach drafted to client requesting LEI registration or written confirmation of no reportable derivatives activity. Case held in conditional-approval state with a 7-business-day SLA.",
-        updates: [
-          { attr: "LEI Code", before: "Not provided", after: "Pending client (LEI request · SLA 2026-06-02)" },
-          { attr: "Outreach Log", before: "—", after: "Email to client portal · Template LEI_REQUEST_v2" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Conditional approval — awaiting LEI" },
-        ],
-      },
-      { id: "r2", title: "Initiate Broad Search Agent across alternative registries", desc: "Sweep GMEI Utility, KY3P, and other identifier registries before client outreach to rule out an alternative LEI source.",
-        agents: ["identity", "regulatory", "audit"], agentLabel: "Broad search alternative registries",
-        postRunSummary: "Broad Search Agent swept GMEI Utility and KY3P; no alternative LEI was found. Case advanced for client outreach.",
-        updates: [
-          { attr: "Alternative Registry Search", before: "Not run", after: "GMEI Utility · KY3P · 0 matches (2026-05-25)" },
-          { attr: "Recommendation", before: "—", after: "Proceed to client LEI request" },
-        ],
-      },
-      { id: "r3", title: "Flag for re-verification at 30 days", desc: "Park the field with a 30-day re-verification flag; close all other exceptions independently.",
-        agents: ["regulatory", "audit"], agentLabel: "Defer 30-day re-verification",
-        postRunSummary: "LEI field flagged for re-verification on 2026-06-24; case can close on remaining attributes pending that follow-up.",
-        updates: [
-          { attr: "LEI Code", before: "Not provided", after: "Deferred — re-verify 2026-06-24" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Open — non-blocking deferral" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e8",
-    title: "Principal Place of Business Mismatch",
-    category: "Identity Consistency",
-    confidence: 90,
-    status: "Pending",
-    entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215",
-    flagText: "Corporate website shows 123 Main Street, NY 10001; Form ADV (SEC filing) and the client onboarding form both show 456 Broad Avenue, NY 10005.",
-    narrative: "Two of three sources (Form ADV and client onboarding form) agree on 456 Broad Avenue, NY 10005. The corporate website shows 123 Main Street — likely a secondary office or stale marketing content. Per KYC Policy §3.5 the regulatory filing supersedes marketing material for address determination.",
-    reasoningSteps: [
-      "KYC Policy §3.5 places regulatory filings above corporate website content for address verification.",
-      "Form ADV address matches the address self-reported on the client onboarding form — two corroborating sources.",
-      "Website discrepancy is consistent with a secondary office or stale content, not a substantive change of principal place of business.",
-    ],
-    evidenceRationale: "Form ADV (regulatory filing) and client onboarding form (self-attestation) are the authoritative sources; corporate website is marketing material.",
-    evidence: [
-      { name: "Form ADV Filing (SEC)", sub: "Filed 2026-03-31 · 456 Broad Avenue, NY 10005" },
-      { name: "Corporate Website", sub: "Retrieved 2026-05-20 · 123 Main Street, NY 10001" },
-      { name: "Client Onboarding Form", sub: "Self-reported · 456 Broad Avenue, NY 10005" },
-    ],
-    acceptability: "When two authoritative sources corroborate and only marketing content diverges, accepting the filing address with an audit note is standard practice.",
-    resolutions: [
-      { id: "r1", title: "Accept Form ADV address as authoritative", desc: "Adopt 456 Broad Avenue (Form ADV + client form) as the principal place of business; annotate the website mismatch as non-material stale content.", recommended: true,
-        agents: ["regulatory", "document", "audit"], agentLabel: "Accept Form ADV address",
-        postRunSummary: "Form ADV address adopted as authoritative; website discrepancy annotated as non-material stale content and case closed.",
-        updates: [
-          { attr: "Principal Place of Business", before: "Conflict (Website vs Form ADV)", after: "456 Broad Avenue, NY 10005 (Form ADV · authoritative)" },
-          { attr: "Website Annotation", before: "—", after: "Stale marketing content — non-material, retained for audit" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Closed — Accepted" },
-        ],
-      },
-      { id: "r2", title: "Run Geolocation & Business Directory check", desc: "Use D&B and Google Places as a tiebreaker before acceptance — confirms the 456 Broad address is operationally active.",
-        agents: ["identity", "document", "audit"], agentLabel: "Geolocation tiebreaker check",
-        postRunSummary: "D&B and Google Places both confirm 456 Broad Avenue is the operationally active office; 123 Main Street is listed as a secondary location. Acceptance recommended.",
-        updates: [
-          { attr: "D&B Lookup", before: "Not run", after: "456 Broad Avenue · primary operating address" },
-          { attr: "Google Places", before: "Not run", after: "456 Broad Avenue · open · 4.6★ (regional HQ)" },
-        ],
-      },
-      { id: "r3", title: "Request clarification from client", desc: "Ask the client to confirm the primary operating address and explain the website divergence.",
-        agents: ["outreach", "audit"], agentLabel: "Request address clarification",
-        postRunSummary: "Outreach sent to client requesting written confirmation of the principal place of business and an explanation of the website divergence.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client (address clarification)" },
-          { attr: "Outreach Log", before: "—", after: "Email to compliance@longfocus.com · Template PPOB_CLARIFY_v1" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e9",
-    title: "Missing Compliance Officer Attestation",
-    category: "Document Completeness",
-    confidence: 95,
-    status: "Pending",
-    entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215",
-    flagText: "CCO identity (Sarah Chen) is known via Form ADV Schedule A, but no signed attestation has been provided by the client.",
-    narrative: "Form ADV Schedule A independently identifies Sarah Chen as Chief Compliance Officer. The gap is a missing signed attestation, not the CCO's identity. A templated DocuSign request to the named CCO is the most direct remediation path.",
-    reasoningSteps: [
-      "CCO identity is independently verified through Form ADV Schedule A — a regulatory filing.",
-      "The gap is an artefact (a signed attestation) rather than an unknown attribute.",
-      "Direct DocuSign outreach to the verified CCO closes the gap without RM mediation.",
-    ],
-    evidenceRationale: "Form ADV Schedule A is the regulatory source for named compliance officers; the artefact gap is procedural rather than substantive.",
-    evidence: [
-      { name: "Form ADV Schedule A", sub: "Sarah Chen · Chief Compliance Officer" },
-      { name: "Client Submitted Documents", sub: "No signed attestation on file" },
-      { name: "KYC Policy §4.2", sub: "CCO attestation requirement" },
-    ],
-    acceptability: "Procedural gaps where the underlying attribute is verified are typically closed via templated outreach; conditional approval is also acceptable while the signature is in flight.",
-    resolutions: [
-      { id: "r1", title: "Generate pre-filled DocuSign attestation to Sarah Chen", desc: "Auto-populate the attestation form with ADV-confirmed CCO details and send via DocuSign. SLA: 5 business days.", recommended: true,
-        agents: ["document", "outreach", "audit"], agentLabel: "DocuSign attestation to CCO",
-        postRunSummary: "Pre-filled DocuSign attestation queued to Sarah Chen (CCO). Case held in awaiting-signature state with a 5-business-day SLA.",
-        updates: [
-          { attr: "Compliance Officer Attestation", before: "Not provided", after: "Pending signature (DocuSign envelope #DS-30215-CCO)" },
-          { attr: "Outreach Log", before: "—", after: "DocuSign to schen@longfocus.com · Template CCO_ATTEST_v3" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting signature — DocuSign" },
-        ],
-      },
-      { id: "r2", title: "Accept ADV-listed CCO with conditional flag", desc: "Accept the CCO identity from Form ADV and flag the attestation to follow; allow case to close on other attributes.",
-        agents: ["regulatory", "audit"], agentLabel: "Accept ADV CCO conditionally",
-        postRunSummary: "CCO identity accepted from Form ADV with a conditional flag pending signed attestation. Case can advance on other attributes.",
-        updates: [
-          { attr: "Compliance Officer", before: "Identified · attestation missing", after: "Sarah Chen (ADV-verified) · attestation conditional flag" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Conditional approval — attestation outstanding" },
-        ],
-      },
-      { id: "r3", title: "Escalate to client relationship team", desc: "Route to the RM to chase the attestation directly with the client's compliance team.",
-        agents: ["outreach", "audit"], agentLabel: "Escalate to RM team",
-        postRunSummary: "Case escalated to the RM team to chase the signed CCO attestation directly.",
-        updates: [
-          { attr: "Owner", before: "KYC Analyst (Tier 2)", after: "RM Anderson · client relationship team" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — RM follow-up" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "e10",
-    title: "Beneficial Ownership Not Identified",
-    category: "Beneficial Ownership",
-    confidence: 85,
-    status: "Pending",
-    entity: "Long Focus Capital Management, LLC",
-    kyc: "KYC-30215",
-    flagText: "Ownership chain terminates at a Delaware holding company (Long Focus Holdings LLC, 100%) with no publicly disclosed natural-person owners. FinCEN BOI report not on file.",
-    narrative: "Form ADV Schedule A lists Long Focus Holdings LLC as 100% owner — an entity, not a natural person. Public registry traversal terminates at that holding company; Delaware does not require public disclosure of LLC ownership. The FinCEN CDD Rule (31 CFR 1010.230) requires identification of natural-person beneficial owners at the 25%+ threshold, so case closure is blocked until a natural person is identified or the client supplies a FinCEN BOI report.",
-    reasoningSteps: [
-      "25% beneficial-ownership threshold is a regulatory requirement under 31 CFR 1010.230 — case closure is blocked.",
-      "Delaware does not require public disclosure of LLC ownership, so traversal through public sources alone is unlikely to succeed.",
-      "Paid registries (LexisNexis, Sayari) may resolve ownership without client outreach, but the client BOI report is the authoritative source.",
-    ],
-    evidenceRationale: "FinCEN BOI report is the statutory source for natural-person beneficial owners; Form ADV Schedule A and Companies House (UK branch) are supporting evidence.",
-    evidence: [
-      { name: "Form ADV Schedule A", sub: "Owner: Long Focus Holdings LLC (100%)" },
-      { name: "Delaware Division of Corporations", sub: "No public ownership disclosure" },
-      { name: "Companies House (UK branch)", sub: "PSC register · no PSC > 25%" },
-      { name: "31 CFR 1010.230", sub: "FinCEN CDD Rule · 25% UBO requirement" },
-    ],
-    acceptability: "Ownership behind a Delaware holding company is common for US RIAs. The control concern is the missing BOI report; a 7-day formal request is the standard remediation.",
-    resolutions: [
-      { id: "r1", title: "Issue formal FinCEN BOI report request to client", desc: "Send a formal BOI report request with a 7-day SLA; case held in awaiting-client state until natural-person UBOs are identified.", recommended: true,
-        agents: ["beneficial-owner", "outreach", "regulatory", "audit"], agentLabel: "Request FinCEN BOI report",
-        postRunSummary: "Formal FinCEN BOI report request issued to the client. Case held in awaiting-client state with a 7-business-day SLA; closure blocked until natural-person UBOs are identified.",
-        updates: [
-          { attr: "Beneficial Owner (25%+)", before: "Unresolved — chain ends at Long Focus Holdings LLC", after: "Pending — FinCEN BOI report requested" },
-          { attr: "Outreach Log", before: "—", after: "Formal request to compliance@longfocus.com · Template FINCEN_BOI_v1 · SLA 2026-06-02" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Blocked — Awaiting FinCEN BOI report" },
-        ],
-      },
-      { id: "r2", title: "Run Ownership Resolution Agent against paid registries", desc: "Sweep LexisNexis and Sayari to attempt to resolve natural-person ownership before client outreach.",
-        agents: ["beneficial-owner", "identity", "audit"], agentLabel: "Run Ownership Resolution Agent",
-        postRunSummary: "Ownership Resolution Agent traversed LexisNexis and Sayari; partial signal found — proceed to client BOI request for authoritative confirmation.",
-        updates: [
-          { attr: "Paid Registry Traversal", before: "Not run", after: "LexisNexis · Sayari · partial signal (1 candidate UBO)" },
-          { attr: "Recommendation", before: "—", after: "Proceed to client BOI request for authoritative confirmation" },
-        ],
-      },
-      { id: "r3", title: "Escalate to Enhanced Due Diligence team", desc: "Route to the EDD team for full ownership investigation given the opaque Delaware holding structure.",
-        agents: ["beneficial-owner", "risk-scoring", "audit"], agentLabel: "Escalate to EDD team",
-        postRunSummary: "Case escalated to the EDD team for full ownership investigation. Precautionary risk-tier bump applied pending EDD outcome.",
-        updates: [
-          { attr: "Owner", before: "KYC Analyst (Tier 2)", after: "EDD Team · Lead: K. Okafor" },
-          { attr: "Risk Tier", before: "Medium-High", after: "High (precautionary · pending EDD outcome)" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — EDD investigation" },
-        ],
-      },
-    ],
-  },
-  // ===== Brookfield Asset Management PIC US, LLC (KYC-30216) =====
-  {
-    id: "b1",
-    title: "Risk Rating Discrepancy",
-    category: "Classification & Risk",
-    confidence: 82,
-    status: "Pending",
-    entity: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216",
-    flagText: "System-generated High Risk classification triggered by Cayman-domiciled ownership entities conflicts with initial Low Risk assessment and prior UK policy closure (January 2026).",
-    narrative: "During onboarding, the addition of Cayman-domiciled ownership entities automatically triggered a High Risk classification. The entity was previously classified as Low Risk under another division's UK policy closure in January 2026 — no material adverse factors were identified at that time. Cayman jurisdiction alone is not considered a high-risk trigger under UK standards. The ultimate beneficial owner is a reputable and known entity. The client has demonstrated full cooperation throughout the process.",
-    reasoningSteps: [
-      "Entity previously classified as Low Risk at UK policy closure in January 2026 — no adverse factors identified.",
-      "Introduction of Cayman-domiciled ownership entities triggered automatic High Risk classification.",
-      "Cayman jurisdiction alone is not a high-risk indicator under UK standards; ultimate beneficial owner is reputable and known.",
-      "Late-stage threshold changes (25% → 10%) would negatively impact client experience without commensurate risk benefit.",
-    ],
-    evidenceRationale: "Internal risk model output and prior classification history are the primary sources. Client cooperation and UBO reputation are mitigating factors.",
-    evidence: [
-      { name: "Internal Risk Model Output", sub: "High Risk triggered · Cayman ownership entities" },
-      { name: "Prior UK Policy Closure (Jan 2026)", sub: "Low Risk — no adverse factors identified" },
-      { name: "Client KYC File", sub: "Full cooperation on record throughout process" },
-    ],
-    acceptability: "A risk rating override is supportable where the trigger is jurisdiction-based and the UBO is a known, reputable entity with no adverse indicators. Compliance sign-off and documented rationale are required.",
-    resolutions: [
-      { id: "r1", title: "Seek Compliance confirmation for 25% ownership threshold", desc: "Request Compliance to confirm that a 25% ownership drilldown threshold is appropriate given the prior low-risk classification, reputable UBO, and jurisdiction-specific interpretation of Cayman exposure.", recommended: true,
-        agents: ["regulatory", "beneficial-owner", "audit"], agentLabel: "Confirm threshold with Compliance",
-        postRunSummary: "Compliance confirmed 25% ownership drilldown threshold is appropriate. Risk rating retained with documented rationale. No additional documentation requests required.",
-        updates: [
-          { attr: "Ownership Threshold", before: "10% (system-triggered)", after: "25% (Compliance-confirmed)" },
-          { attr: "Risk Rating", before: "High (system-generated)", after: "Low (Compliance-approved override)" },
-          { attr: "Rationale Memo", before: "—", after: "MEMO-30216-RISK · Compliance sign-off attached" },
-        ],
-      },
-      { id: "r2", title: "Request formal risk rating override from Compliance", desc: "Request a risk rating exception or override from Compliance to align the entity back to Low/Medium risk, supported by historical assessment, absence of new adverse risk indicators, and client cooperation.",
-        agents: ["regulatory", "risk-scoring", "audit"], agentLabel: "Request risk rating override",
-        postRunSummary: "Risk rating override request submitted to Compliance with supporting rationale. Awaiting Compliance decision.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — Compliance override decision pending" },
-          { attr: "Override Request", before: "—", after: "Submitted to Compliance · MEMO-30216-OVR" },
-        ],
-      },
-      { id: "r3", title: "Escalate to Sales / Coverage for client context", desc: "Engage Sales and Coverage teams to provide client relationship context and support justification for the 25% threshold to avoid additional documentation requests that could disrupt onboarding.",
-        agents: ["outreach", "audit"], agentLabel: "Escalate to Sales and Coverage",
-        postRunSummary: "Sales and Coverage teams engaged for client relationship context. Supporting memo attached to case for Compliance review.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Escalated — Sales/Coverage stakeholder input pending" },
-          { attr: "Outreach Log", before: "—", after: "Coverage team notified · Template STAKE_ESCALATE_v1" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "b2",
-    title: "CIP Classification / NAICS Code Discrepancy",
-    category: "Classification & Risk",
-    confidence: 75,
-    status: "Pending",
-    entity: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216",
-    flagText: "Client confirmed entity as NFIE (Non-Financial Entity) but internal due diligence trigger classifies it as a financial/investment entity based on 'Investment adviser / asset manager' NAICS mapping.",
-    narrative: "During onboarding the client confirmed the entity as a Non-Financial Entity (NFIE), indicating it does not consider itself engaged in regulated financial institution activities. The internal trigger is driven by the 'Investment adviser / asset manager' nature of business, commonly associated with financial investment activity. The entity's activities — described by the client as a holding company / financing vehicle — require validation to determine whether they extend beyond intra-group purposes to third-party investment or financial services activity.",
-    reasoningSteps: [
-      "Client explicitly classified entity as Non-Financial Entity (NFIE) during onboarding.",
-      "Internal CIP trigger fired on 'Investment adviser / asset manager' nature-of-business code, typically linked to financial/investment entity classification.",
-      "Resolution requires validation of whether entity activities are strictly intra-group or extend to third-party investment services.",
-      "Outcome determines whether entity remains NFIE or is reclassified as Financial Entity (Investment Entity).",
-    ],
-    evidenceRationale: "Form ADV and client onboarding form are the primary sources. The classification discrepancy requires Legal or Compliance determination.",
-    evidence: [
-      { name: "Form ADV (SEC)", sub: "Nature of business: Investment adviser / asset manager" },
-      { name: "Client Onboarding Response", sub: "Self-classified as NFIE · holding company / financing vehicle" },
-      { name: "Internal CIP Classification Policy", sub: "Financial activity flag triggered by NAICS mapping" },
-    ],
-    acceptability: "NFIE classification is supportable if the entity's activities are strictly intra-group and do not constitute regulated financial services for third parties. Legal review or targeted client outreach is required to substantiate.",
-    resolutions: [
-      { id: "r1", title: "Request Legal team review of NFIE classification", desc: "Engage Legal to assess the appropriateness of the NFIE classification based on nature of business, derivatives access, and whether activities extend to third parties.", recommended: true,
-        agents: ["regulatory", "identity", "audit"], agentLabel: "Legal review of NFIE classification",
-        postRunSummary: "Legal review completed. Entity confirmed as NFIE — activities limited to intra-group financing and advisory services. Classification retained as Non-Financial Entity.",
-        updates: [
-          { attr: "CIP Classification", before: "Exception — Financial activity flag raised", after: "NFIE — confirmed by Legal · MEMO-30216-CIP" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Resolved — Legal-confirmed NFIE classification" },
-        ],
-      },
-      { id: "r2", title: "Targeted client outreach for activity clarification", desc: "Contact client to confirm whether entity performs investment or financial activities for third parties vs strictly intra-group, and clarify the basis for their NFIE classification.",
-        agents: ["outreach", "document", "audit"], agentLabel: "Client outreach for CIP clarification",
-        postRunSummary: "Client outreach sent requesting clarification on nature of activities and basis for NFIE classification. Case held pending client response.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client — CIP clarification requested" },
-          { attr: "Outreach Log", before: "—", after: "Email queued · Template CIP_CLARIFY_v1 · SLA 7 business days" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "b3",
-    title: "Acting Person — Authority Documentation Gap",
-    category: "Beneficial Ownership",
-    confidence: 88,
-    status: "Pending",
-    entity: "Brookfield Asset Management PIC US, LLC",
-    kyc: "KYC-30216",
-    flagText: "Acting Person identified is not a member of the Vorstand / Executive Management Board. No Power of Attorney or authorised signatory list provided to evidence delegated authority.",
-    narrative: "An Acting Person (AP) has been identified for the entity; however, the individual is not a member of the Vorstand (Executive Management Board) or equivalent governing body. Per KYC guidance, where the Acting Person is not part of the governing body, the individual must have documented authority — evidenced through a Power of Attorney (PoA) or inclusion in an authorised signatory list. No such documentation has been provided, creating a KYC control gap.",
-    reasoningSteps: [
-      "KYC guidance requires Acting Persons not on the governing board to provide explicit delegated authority documentation.",
-      "Acceptable evidence: formal Power of Attorney document, or an authorised signatory list naming the individual.",
-      "No PoA or authorised signatory evidence has been provided or identified in the document locker.",
-      "Without such documentation there is insufficient evidence to validate the individual's authority to act on behalf of the entity.",
-    ],
-    evidenceRationale: "Form ADV Schedule A identifies the Acting Person. Absence of PoA or signatory list is confirmed from the document locker review.",
-    evidence: [
-      { name: "Form ADV Schedule A", sub: "Acting Person identified — not on governing board" },
-      { name: "Client Submitted Documents", sub: "No PoA or authorised signatory list on file" },
-      { name: "KYC Authority Documentation Policy", sub: "PoA or signatory list required for non-board APs" },
-    ],
-    acceptability: "Acting Person designation without supporting authority documentation is not acceptable under current KYC policy. The gap must be resolved before case closure.",
-    resolutions: [
-      { id: "r1", title: "Request Power of Attorney documentation from client", desc: "Reach out to the client to obtain a valid PoA document or authorised signatory list confirming the individual's authority to act on behalf of the entity.", recommended: true,
-        agents: ["outreach", "document", "audit"], agentLabel: "Request PoA from client",
-        postRunSummary: "Client outreach sent requesting Power of Attorney or authorised signatory list. Case held pending receipt of documentation.",
-        updates: [
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Awaiting client — PoA documentation requested" },
-          { attr: "Outreach Log", before: "—", after: "Email queued · Template POA_REQUEST_v1 · SLA 7 business days" },
-          { attr: "Acting Person Authority", before: "Not evidenced", after: "Pending — PoA requested" },
-        ],
-      },
-      { id: "r2", title: "Revalidate Acting Person — replace with board member", desc: "Request client confirmation on whether the identified Acting Person should be replaced with a Vorstand / Executive Management Board member, or confirm current AP with formal authority documentation.",
-        agents: ["identity", "document", "audit"], agentLabel: "Revalidate Acting Person selection",
-        postRunSummary: "Client confirmed Acting Person selection and provided updated signatory documentation. Case updated with evidenced authority.",
-        updates: [
-          { attr: "Acting Person", before: "Unconfirmed — no authority documentation", after: "Confirmed — PoA / authorised signatory on file" },
-          { attr: "Case Status", before: "Open · Pending analyst action", after: "Resolved — authority documented" },
-        ],
-      },
-    ],
-  },
-];
+const exceptions: Exc[] = [];
+
 
 // ---------- Side-by-side comparison data per exception ----------
 type CompareRow = { field: string; a: string; b: string; conflict?: boolean };
 type Compare = { aLabel: string; bLabel: string; rows: CompareRow[] };
 
-const COMPARISONS: Record<string, Compare> = {
-  e1: {
-    aLabel: "Companies House PSC Register",
-    bLabel: "Form CS01 (03/14/2026)",
-    rows: [
-      { field: "PSC Name", a: "Mr Alan Eldad Howard", b: "Mr Alan Eldad Howard" },
-      { field: "Correspondence Address", a: "82 Baker Street, London W1U 6AE", b: "27 Hill Street, London W1J 5LP", conflict: true },
-      { field: "PSC02 Notification (14-day window)", a: "Not received", b: "Not filed", conflict: true },
-      { field: "Date of Birth", a: "1963-09", b: "1963-09" },
-    ],
-  },
-  e2: {
-    aLabel: "Companies House Officer Record",
-    bLabel: "EDD Policy POL-EDD-23",
-    rows: [
-      { field: "Corporate Member", a: "BH Partnership Holdings Limited", b: "BH Partnership Holdings Limited" },
-      { field: "Jurisdiction", a: "Jersey, Channel Islands", b: "Jersey listed — EDD required", conflict: true },
-      { field: "EDD Pack on File", a: "Not present", b: "Required (SOW + UBO chart)", conflict: true },
-      { field: "UBO Resolution", a: "Unresolved at corporate layer", b: "Required to natural persons", conflict: true },
-    ],
-  },
-  e3: {
-    aLabel: "Companies House",
-    bLabel: "Internal CRM",
-    rows: [
-      { field: "Current Name", a: "Brevan Howard Asset Management LLP", b: "Brevan Howard Asset Management LLP" },
-      { field: "Previous Name", a: "Rivage Capital Management LLP (until 2007)", b: "— (not stored)", conflict: true },
-      { field: "Company Number", a: "OC302636", b: "OC302636" },
-      { field: "FCA FRN Continuity", a: "Continuous since 2003", b: "Lineage gap at 2007 name change", conflict: true },
-    ],
-  },
-  e4: {
-    aLabel: "FCA Register (04/19/2026)",
-    bLabel: "CRM Permission Set (11/02/2025)",
-    rows: [
-      { field: "FRN", a: "211088", b: "211088" },
-      { field: "Investment Management", a: "Active", b: "Active" },
-      { field: "Managing an AIF", a: "Active · eff. 2026-02-11", b: "Not present", conflict: true },
-      { field: "AIFMD Scope", a: "In-scope (Art. 23 disclosure)", b: "Out-of-scope", conflict: true },
-    ],
-  },
-  e5: {
-    aLabel: "HMT Consolidated List entry",
-    bLabel: "Client Identity on File",
-    rows: [
-      { field: "Name", a: "Paul Marshall", b: "Sir Paul Marshall" },
-      { field: "Date of Birth", a: "1971", b: "1959", conflict: true },
-      { field: "Nationality", a: "Zimbabwean", b: "British", conflict: true },
-      { field: "Status", a: "De-listed (Zimbabwe regime)", b: "Active KYC · knighted 2016" },
-      { field: "Passport", a: "—", b: "HMRC-verified on file" },
-    ],
-  },
-  e6: {
-    aLabel: "Client Onboarding Form",
-    bLabel: "SEC IAPD (Form ADV Part 1A)",
-    rows: [
-      { field: "US Registration Number", a: "801-12345 (self-reported)", b: "801-67890 (retrieved 2026-05-20)", conflict: true },
-      { field: "Legal Entity Name", a: "Long Focus Capital Management, LLC", b: "Long Focus Capital Management, LLC" },
-      { field: "Principal Address", a: "456 Broad Avenue, New York, NY", b: "456 Broad Avenue, New York, NY" },
-    ],
-  },
-  e7: {
-    aLabel: "GLEIF Registry",
-    bLabel: "Client Onboarding Form",
-    rows: [
-      { field: "LEI Code", a: "No active LEI under entity legal name", b: "Not provided", conflict: true },
-      { field: "Search by US Reg # 801-67890", a: "No match", b: "n/a", conflict: true },
-      { field: "AUM (context)", a: "n/a", b: "$2.4B reported" },
-    ],
-  },
-  e8: {
-    aLabel: "Corporate Website",
-    bLabel: "Form ADV Filing (SEC)",
-    rows: [
-      { field: "Principal Address", a: "123 Main Street, New York, NY 10001", b: "456 Broad Avenue, New York, NY 10005", conflict: true },
-      { field: "Source Date", a: "Retrieved 2026-05-20", b: "Filing dated 2026-03-31" },
-      { field: "Matches Client Form", a: "No", b: "Yes", conflict: true },
-    ],
-  },
-  e9: {
-    aLabel: "Form ADV Schedule A",
-    bLabel: "Client Submitted Documents",
-    rows: [
-      { field: "Compliance Officer Name", a: "Sarah Chen (Chief Compliance Officer)", b: "Not listed", conflict: true },
-      { field: "Signed Attestation", a: "n/a", b: "Not provided", conflict: true },
-    ],
-  },
-  e10: {
-    aLabel: "Form ADV Schedule A",
-    bLabel: "Public Registry Traversal",
-    rows: [
-      { field: "25%+ Beneficial Owner", a: "Long Focus Holdings LLC (100%) — entity, not individual", b: "Chain terminates at Long Focus Holdings LLC; no further public data", conflict: true },
-      { field: "FinCEN BOI Filing", a: "Not provided by client", b: "n/a", conflict: true },
-      { field: "Companies House (UK branch)", a: "No PSC at >25%", b: "n/a" },
-    ],
-  },
-  b1: {
-    aLabel: "Internal Risk Model Output",
-    bLabel: "Prior UK Policy Closure (Jan 2026)",
-    rows: [
-      { field: "Risk Rating", a: "High (Cayman ownership triggered)", b: "Low (no adverse factors)", conflict: true },
-      { field: "Ownership Threshold Applied", a: "10% (system-triggered)", b: "25% (prior assessment)", conflict: true },
-      { field: "UBO", a: "Brookfield Asset Management group", b: "Brookfield Asset Management group" },
-      { field: "Client Cooperation", a: "Full cooperation on record", b: "Full cooperation on record" },
-    ],
-  },
-  b2: {
-    aLabel: "Form ADV (SEC)",
-    bLabel: "Client Onboarding Response",
-    rows: [
-      { field: "Nature of Business", a: "Investment adviser / asset manager", b: "Holding company / financing vehicle (intra-group)", conflict: true },
-      { field: "CIP Classification", a: "Financial Entity (Investment Entity) — system-triggered", b: "NFIE (Non-Financial Entity) — client confirmed", conflict: true },
-      { field: "Third-Party Activity", a: "Indicates financial investment activity", b: "Intra-group only (per client)", conflict: true },
-    ],
-  },
-  b3: {
-    aLabel: "Form ADV Schedule A",
-    bLabel: "Client Submitted Documents",
-    rows: [
-      { field: "Acting Person Classification", a: "Identified — not on governing board", b: "No authority documentation provided", conflict: true },
-      { field: "Power of Attorney Evidence", a: "Not on file", b: "Not provided", conflict: true },
-      { field: "Authorised Signatory List", a: "Not referenced", b: "Not provided", conflict: true },
-    ],
-  },
-};
+const COMPARISONS: Record<string, Compare> = {};
+
 
 const getSla = (title: string, recommended?: boolean): string => {
   const t = title.toLowerCase();
@@ -907,9 +126,6 @@ const buildHeaderMeta = (addressed: number, total: number) => [
 ];
 
 const DEFAULT_SELECTED_ENTITIES: { name: string; kyc: string; drg?: string }[] = [];
-
-// KYC refs that have fully-curated hardcoded exceptions (used as fallback only)
-const HARDCODED_KYCS = new Set(exceptions.map((e) => e.kyc));
 
 // ─── DB exception types ───────────────────────────────────────────────────────
 
@@ -995,12 +211,7 @@ const ExceptionReview = () => {
     if (urlKycRef) return [{ name: '…', kyc: urlKycRef }];
     return DEFAULT_SELECTED_ENTITIES;
   }, [navState, fetchedEntities, urlKycRef]);
-  const selectedKycSet = useMemo(() => new Set(selectedEntities.map((e) => e.kyc)), [selectedEntities]);
-  const selectedNameSet = useMemo(() => new Set(selectedEntities.map((e) => e.name)), [selectedEntities]);
-  const filteredExceptions = useMemo(
-    () => exceptions.filter((e) => selectedKycSet.has(e.kyc) || selectedNameSet.has(e.entity)),
-    [selectedKycSet, selectedNameSet],
-  );
+
 
   // Build a placeholder exception for a selected entity that has no curated exceptions
   const buildStubException = (ent: { name: string; kyc: string }): Exc => ({
@@ -1052,14 +263,9 @@ const ExceptionReview = () => {
   }, [selectedEntities]);
 
   const effectiveExceptions = useMemo(() => {
-    // DB exceptions take precedence; for entities with no DB data, fall back to
-    // hardcoded curated exceptions (Brevan Howard / Marshall Wace demo data).
-    const dbKycs = new Set(dbExceptions.map((e) => e.kyc));
-    const hardcodedFallback = filteredExceptions.filter((e) => !dbKycs.has(e.kyc));
-    const all = [...dbExceptions, ...hardcodedFallback];
-    if (all.length > 0) return all;
+    if (dbExceptions.length > 0) return dbExceptions;
     return selectedEntities.map(buildStubException);
-  }, [filteredExceptions, dbExceptions, selectedEntities]);
+  }, [dbExceptions, selectedEntities]);
   const initialActiveId = effectiveExceptions[0]?.id;
 
   const [activeId, setActiveId] = useState(initialActiveId);
@@ -1071,7 +277,7 @@ const ExceptionReview = () => {
   const [evidenceDoc, setEvidenceDoc] = useState<{ doc: AttrDoc; attr: EntityAttr; entity: string } | null>(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
-  const [rightTab, setRightTab] = useState<"locker" | "collab" | "files" | "runs">("locker");
+  const [rightTab, setRightTab] = useState<"locker" | "collab" | "sourcing">("locker");
   const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes" | "screening">("exception");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
@@ -1102,22 +308,32 @@ const ExceptionReview = () => {
   // If selection changes and current active is no longer in the effective set, reset
   useEffect(() => {
     if (!effectiveExceptions.find((e) => e.id === activeId)) {
-      setActiveId(effectiveExceptions[0]?.id ?? exceptions[0].id);
+      setActiveId(effectiveExceptions[0]?.id);
     }
   }, [effectiveExceptions, activeId]);
 
-  const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0] ?? exceptions[0])!;
+  const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0])!;
 
   const activeDrg = selectedEntities.find((e) => e.kyc === active.kyc)?.drg ?? null;
   const drgEntities = activeDrg
     ? selectedEntities.filter((e) => e.drg === activeDrg)
     : [];
 
+  // The active exception can be demo/mock data carrying a legacy KYC-302xx ref that
+  // isn't a real DB row. Agents must run against a seeded entity, so resolve the
+  // context to the selected (URL-backed) entity: match active.kyc when it's real,
+  // otherwise fall back to the first selected entity. Prevents the agent_runs
+  // foreign-key violation when triggering agents on a mock-matched entity.
+  const contextEntity =
+    selectedEntities.find((e) => e.kyc === active.kyc) ??
+    selectedEntities[0] ??
+    { name: active.entity, kyc: active.kyc };
+
   // Keep agent context in sync with the currently viewed entity so "Run Agent" dropdown knows what to search
   useEffect(() => {
-    setEntityContext({ name: active.entity, kyc: active.kyc });
+    setEntityContext({ name: contextEntity.name, kyc: contextEntity.kyc });
     return () => setEntityContext(null);
-  }, [active.entity, active.kyc, setEntityContext]);
+  }, [contextEntity.name, contextEntity.kyc, setEntityContext]);
 
   const openEvidence = (ev: Evidence) => {
     const lower = ev.name.toLowerCase();
@@ -1194,8 +410,119 @@ const ExceptionReview = () => {
   const addressedCount = Object.keys(resolvedMap).filter((id) => effectiveExceptions.find((e) => e.id === id)).length;
   const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length);
 
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitDone, setSubmitDone] = useState(false);
+  const handleSubmit = async () => {
+    if (submitLoading || addressedCount === 0) return;
+    setSubmitLoading(true);
+    const resolved = Object.entries(resolvedMap)
+      .filter(([id]) => id.startsWith("db-"))
+      .map(([id, info]) => {
+        // ID format: db-{kyc_ref}-{exception_number}
+        const parts = id.replace(/^db-/, "").split("-");
+        const num = parseInt(parts[parts.length - 1], 10);
+        const kyc = parts.slice(0, -1).join("-");
+        return { kyc, num, resolutionTitle: info.resolutionTitle };
+      })
+      .filter(r => Number.isFinite(r.num));
+    try {
+      await Promise.all(resolved.map(r =>
+        apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(r.kyc)}/exception/${r.num}/resolve`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolution: r.resolutionTitle }),
+        })
+      ));
+      setSubmitDone(true);
+      setTimeout(() => setSubmitDone(false), 3000);
+    } catch { /* keep local state */ }
+    finally { setSubmitLoading(false); }
+  };
 
-
+  // Right pane (Document Locker / Collaboration / Files / Sourcing Runs), rendered
+  // across the Exception, Attribute and Screening views. Keyed off the reviewed
+  // entity (paneKyc) so it works even for cases with no exceptions.
+  const docCount = 0;
+  const renderRightPane = (paneKyc: string, paneEntityName: string) =>
+    rightPaneOpen ? (
+      <aside className="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-4 border-b border-border">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setRightTab("locker")}
+              className={cn("pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                rightTab === "locker" ? "font-medium border-b-2 border-primary" : "text-muted-foreground hover:text-foreground")}
+            >
+              <FileText className="size-4" /> Documents
+            </button>
+            <button
+              onClick={() => setRightTab("collab")}
+              className={cn("pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                rightTab === "collab" ? "font-medium border-b-2 border-primary" : "text-muted-foreground hover:text-foreground")}
+            >
+              <MessageSquare className="size-3.5" /> Collaboration
+              <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{0}</span>
+            </button>
+            <button
+              onClick={() => setRightTab("sourcing")}
+              className={cn("pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
+                rightTab === "sourcing" ? "font-medium border-b-2 border-primary" : "text-muted-foreground hover:text-foreground")}
+            >
+              <Database className="size-3.5" /> Agent Runs
+            </button>
+          </div>
+          <button
+            onClick={() => setRightPaneOpen(false)}
+            className="ml-2 size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+            title="Collapse pane"
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+        </div>
+        {rightTab === "locker" && <div className="h-full overflow-y-auto"><DatastoreDocuments kycRef={paneKyc} /></div>}
+        {rightTab === "collab" && <CollabPanel entity={paneEntityName} kyc={paneKyc} />}
+        {rightTab === "sourcing" && <div className="h-full overflow-y-auto"><AgentRunsPanel kycRef={paneKyc} /></div>}
+      </aside>
+    ) : (
+      <aside className="rounded-lg border border-border bg-card shadow-sm flex flex-col items-center py-4">
+        <button
+          onClick={() => setRightPaneOpen(true)}
+          className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors shrink-0"
+          title="Expand right pane"
+        >
+          <ChevronDown className="size-3.5 rotate-90" />
+        </button>
+        <div className="flex-1 flex flex-col items-center justify-evenly w-full pt-3">
+          <div className="relative">
+            <button
+              onClick={() => { setRightPaneOpen(true); setRightTab("locker"); }}
+              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+              title="Documents"
+            >
+              <FileText className="size-3" /> Documents
+            </button>
+          </div>
+          <div className="w-5 h-px bg-border/60" />
+          <div className="relative">
+            <button
+              onClick={() => { setRightPaneOpen(true); setRightTab("collab"); }}
+              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+              title="Collaboration"
+            >
+              <MessageSquare className="size-3" /> Collaboration
+            </button>
+          </div>
+          <div className="w-5 h-px bg-border/60" />
+          <button
+            onClick={() => { setRightPaneOpen(true); setRightTab("sourcing"); }}
+            className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
+            title="Agent Runs"
+          >
+            <Database className="size-3" /> Agent Runs
+          </button>
+        </div>
+      </aside>
+    );
 
 
   return (
@@ -1207,67 +534,16 @@ const ExceptionReview = () => {
         onClose={() => setGraphOpen(false)}
       />
     )}
-    <div className="px-6 py-2 max-w-[1480px] mx-auto">
-      {/* ── Exception / Attributes view toggle ──────────────────────────── */}
-      <div className="flex items-center justify-between mb-3">
-        {/* Segmented pill */}
-        <div className="inline-flex items-center bg-secondary rounded-lg p-1 gap-1">
-          <button
-            onClick={() => setAttrViewMode("exception")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all",
-              attrViewMode === "exception"
-                ? "bg-card shadow-sm border border-border text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <ShieldAlert className={cn("size-4", attrViewMode === "exception" ? "text-warning" : "text-muted-foreground")} />
-            Exception
-            {(() => {
-              const n = effectiveExceptions.filter(e => e.status === "Pending").length;
-              return n > 0 ? (
-                <span className="bg-alert-soft text-alert text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-alert-soft-border">{n}</span>
-              ) : null;
-            })()}
-          </button>
-          <button
-            onClick={() => setAttrViewMode("attributes")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all",
-              attrViewMode === "attributes"
-                ? "bg-card shadow-sm border border-border text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Database className={cn("size-4", attrViewMode === "attributes" ? "text-primary" : "text-muted-foreground")} />
-            Attributes
-            {(() => {
-              const n = selectedEntities.reduce((sum, e) => sum + (ENTITY_PROFILES[e.name]?.attrs.length ?? 0), 0);
-              return n > 0 ? (
-                <span className="bg-secondary text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border">{n}</span>
-              ) : null;
-            })()}
-          </button>
-          <button
-            onClick={() => setAttrViewMode("screening")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-all",
-              attrViewMode === "screening"
-                ? "bg-card shadow-sm border border-border text-foreground font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <ShieldCheck className={cn("size-4", attrViewMode === "screening" ? "text-primary" : "text-muted-foreground")} />
-            Screening Results
-          </button>
-        </div>
-        {attrViewMode === "attributes" && (
-          <AgentTriggers caseKyc={active.kyc} entityName={active.entity} />
-        )}
-      </div>
-
+    <div className="px-6 py-4 max-w-[1480px] mx-auto">
       {/* Top header — entity ribbon shown in both modes */}
-      <div className="rounded-xl border border-border bg-card p-4 mb-4">
+      <div className="rounded-lg border border-border border-l-4 border-l-primary bg-gradient-to-r from-primary/[0.06] to-card p-4 mb-4">
+        <div className="text-[11px] text-muted-foreground mb-2.5 flex items-center gap-1.5">
+          <Link to="/work-queue" className="hover:text-foreground transition-colors">Work Queue</Link>
+          <ChevronRight className="size-3 shrink-0" />
+          <span className="text-foreground font-medium">{activeDrg ?? "No DRG"}</span>
+          <ChevronRight className="size-3 shrink-0" />
+          <span>{active.kyc}</span>
+        </div>
         <div className="flex items-start justify-between gap-6">
           <div className="flex items-start gap-4 gap-y-2 flex-1 flex-wrap min-w-[380px]">
             <div className="w-full">
@@ -1275,7 +551,7 @@ const ExceptionReview = () => {
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-1.5 hover:text-primary transition-colors group">
-                    <h1 className="text-[15px] font-semibold group-hover:underline underline-offset-2">
+                    <h1 className="text-lg font-bold text-primary group-hover:underline underline-offset-2">
                       {activeDrg ?? "No DRG Assigned"}
                     </h1>
                     <Info className="size-3.5 text-muted-foreground group-hover:text-primary" />
@@ -1319,13 +595,13 @@ const ExceptionReview = () => {
           <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={() => setGraphOpen(true)}
-              className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors"
+              className="text-sm px-4 py-2 rounded-lg border border-border flex items-center gap-2 hover:bg-secondary transition-colors"
             >
               <Network className="size-4" /> Graph View
             </button>
             <Popover open={reachOutOpen} onOpenChange={setReachOutOpen}>
               <PopoverTrigger asChild>
-                <button className="text-sm px-4 py-2 rounded-full border border-border flex items-center gap-2 hover:bg-secondary transition-colors">
+                <button className="text-sm px-4 py-2 rounded-lg border border-border flex items-center gap-2 hover:bg-secondary transition-colors">
                   <Mail className="size-4" /> Initiate Outreach
                   {reachOutCount > 0 && (
                     <span className="size-5 rounded-full bg-primary text-primary-foreground text-[10px] grid place-items-center font-semibold">
@@ -1360,7 +636,7 @@ const ExceptionReview = () => {
                 </button>
               </PopoverContent>
             </Popover>
-            <div className="flex items-center gap-1 border border-border rounded-full overflow-hidden">
+            <div className="flex items-center gap-1 border border-border rounded-lg overflow-hidden">
               <Link to="/work-queue" className="text-sm text-muted-foreground hover:text-foreground px-3 py-2 hover:bg-secondary transition-colors">Cancel</Link>
               <span className="w-px h-6 bg-border" />
             <Popover open={escalateOpen} onOpenChange={setEscalateOpen}>
@@ -1402,8 +678,23 @@ const ExceptionReview = () => {
               </PopoverContent>
             </Popover>
               <span className="w-px h-6 bg-border" />
-              <button className="text-sm px-4 py-2 bg-primary text-primary-foreground flex items-center gap-2 hover:opacity-95 transition-opacity">
-                <Send className="size-4" /> Submit
+              <button
+                onClick={handleSubmit}
+                disabled={submitLoading || addressedCount === 0}
+                className={cn(
+                  "text-sm px-4 py-2 flex items-center gap-2 transition-opacity",
+                  submitDone
+                    ? "bg-success text-white"
+                    : addressedCount === 0
+                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                    : "bg-primary text-primary-foreground hover:opacity-95",
+                )}
+              >
+                {submitLoading ? <Loader2 className="size-4 animate-spin" /> : submitDone ? <CheckCircle2 className="size-4" /> : <Send className="size-4" />}
+                {submitDone ? "Submitted" : "Submit"}
+                {addressedCount > 0 && !submitDone && (
+                  <span className="bg-white/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{addressedCount}</span>
+                )}
               </button>
             </div>
           </div>
@@ -1421,6 +712,57 @@ const ExceptionReview = () => {
             <button className="text-muted-foreground hover:text-foreground"><X className="size-3" /></button>
           </span>
         ))}
+      </div>
+
+      {/* ── Exception / Attributes view toggle (underline tabs) ─────────── */}
+      <div className="flex items-end justify-between border-b border-border mb-4">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => setAttrViewMode("exception")}
+            className={cn(
+              "flex items-center gap-2 py-2.5 text-sm border-b-2 -mb-px transition-colors",
+              attrViewMode === "exception"
+                ? "border-primary text-primary font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ShieldAlert className="size-4" />
+            Exception View
+            {(() => {
+              const n = effectiveExceptions.filter(e => e.status === "Pending").length;
+              return n > 0 ? (
+                <span className="bg-alert-soft text-alert text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-alert-soft-border">{n}</span>
+              ) : null;
+            })()}
+          </button>
+          <button
+            onClick={() => setAttrViewMode("attributes")}
+            className={cn(
+              "flex items-center gap-2 py-2.5 text-sm border-b-2 -mb-px transition-colors",
+              attrViewMode === "attributes"
+                ? "border-primary text-primary font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Database className="size-4" />
+            Attribute View
+          </button>
+          <button
+            onClick={() => setAttrViewMode("screening")}
+            className={cn(
+              "flex items-center gap-2 py-2.5 text-sm border-b-2 -mb-px transition-colors",
+              attrViewMode === "screening"
+                ? "border-primary text-primary font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <ShieldCheck className="size-4" />
+            Screening Results
+          </button>
+        </div>
+        {selectedEntities[0]?.kyc && (
+          <AgentTriggers caseKyc={selectedEntities[0].kyc} entityName={selectedEntities[0]?.name ?? selectedEntities[0].kyc} />
+        )}
       </div>
 
       {attrViewMode === "exception" && (
@@ -1512,7 +854,7 @@ const ExceptionReview = () => {
 
         {/* Center: Exception summary — auto-collapses when right pane opens */}
         {rightPaneOpen ? (
-          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
+          <aside className="rounded-lg border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
             <button
               onClick={() => setRightPaneOpen(false)}
               className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
@@ -1528,7 +870,7 @@ const ExceptionReview = () => {
             </button>
           </aside>
         ) : (
-        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <header className="flex items-center justify-between mb-3 pb-3 border-b border-border">
             <div className="flex items-center gap-3 flex-wrap">
               <Settings2 className="size-3.5 text-muted-foreground" />
@@ -1679,7 +1021,7 @@ const ExceptionReview = () => {
                       disabled={disabled}
                       aria-disabled={disabled}
                       className={cn(
-                        "text-left rounded-xl p-4 flex flex-col gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary/40",
+                        "text-left rounded-lg p-4 flex flex-col gap-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary/40",
                         !disabled && "hover:shadow-md",
                         disabled && "cursor-not-allowed",
                         opt.recommended && !sel && "border-2 border-success bg-gradient-to-br from-success-soft to-card shadow-sm",
@@ -1766,152 +1108,70 @@ const ExceptionReview = () => {
         )}
 
         {/* Right: Document Locker / Collaboration — collapsible */}
-        {rightPaneOpen ? (
-          <aside className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-4 border-b border-border">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setRightTab("locker")}
-                  className={cn(
-                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
-                    rightTab === "locker"
-                      ? "font-medium border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <FileText className="size-4" /> Document Locker
-                  <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length}</span>
-                </button>
-                <button
-                  onClick={() => setRightTab("collab")}
-                  className={cn(
-                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
-                    rightTab === "collab"
-                      ? "font-medium border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <MessageSquare className="size-3.5" /> Collaboration
-                  <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{(COMMENTS_BY_KYC[active.kyc]?.length ?? 0)}</span>
-                </button>
-                <button
-                  onClick={() => setRightTab("files")}
-                  className={cn(
-                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
-                    rightTab === "files"
-                      ? "font-medium border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Folder className="size-3.5" /> Files
-                </button>
-                <button
-                  onClick={() => setRightTab("runs")}
-                  className={cn(
-                    "pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
-                    rightTab === "runs"
-                      ? "font-medium border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Bot className="size-3.5" /> Agent Runs
-                </button>
-              </div>
-              <button
-                onClick={() => setRightPaneOpen(false)}
-                className="ml-2 size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
-                title="Collapse pane"
-              >
-                <ChevronRight className="size-3.5" />
-              </button>
-            </div>
-            {rightTab === "locker" && <DocumentLocker selectedEntityNames={selectedEntities.map((e) => e.name)} />}
-            {rightTab === "collab" && <CollabPanel entity={active.entity} kyc={active.kyc} />}
-            {rightTab === "files"  && <div className="h-full overflow-hidden flex flex-col"><EntityFiles kycRef={active.kyc} /></div>}
-            {rightTab === "runs"   && <AgentRunsPanel kycRef={active.kyc} />}
-          </aside>
-        ) : (
-          <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col items-center py-4">
-            <button
-              onClick={() => setRightPaneOpen(true)}
-              className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors shrink-0"
-              title="Expand right pane"
-            >
-              <ChevronDown className="size-3.5 rotate-90" />
-            </button>
-            <div className="flex-1 flex flex-col items-center justify-evenly w-full pt-3">
-              <div className="relative">
-                <button
-                  onClick={() => { setRightPaneOpen(true); setRightTab("locker"); }}
-                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
-                  title="Document Locker"
-                >
-                  <FileText className="size-3" /> Documents
-                </button>
-                {CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length > 0 && (
-                  <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[8px] grid place-items-center font-semibold leading-none">
-                    {CASE_DOCUMENTS.filter((d) => selectedEntities.some((e) => e.name === d.entity)).length}
-                  </span>
-                )}
-              </div>
-              <div className="w-5 h-px bg-border/60" />
-              <div className="relative">
-                <button
-                  onClick={() => { setRightPaneOpen(true); setRightTab("collab"); }}
-                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
-                  title="Collaboration"
-                >
-                  <MessageSquare className="size-3" /> Collaboration
-                </button>
-                {(COMMENTS_BY_KYC[active.kyc]?.length ?? 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[8px] grid place-items-center font-semibold leading-none">
-                    {COMMENTS_BY_KYC[active.kyc]?.length}
-                  </span>
-                )}
-              </div>
-              <div className="w-5 h-px bg-border/60" />
-              <div className="relative">
-                <button
-                  onClick={() => { setRightPaneOpen(true); setRightTab("files"); }}
-                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
-                  title="Files"
-                >
-                  <Folder className="size-3" /> Files
-                </button>
-              </div>
-              <div className="w-5 h-px bg-border/60" />
-              <div className="relative">
-                <button
-                  onClick={() => { setRightPaneOpen(true); setRightTab("runs"); }}
-                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
-                  title="Agent Runs"
-                >
-                  <Bot className="size-3" /> Runs
-                </button>
-              </div>
-            </div>
-          </aside>
-        )}
+        {renderRightPane(active.kyc, active.entity)}
 
       </div>
       </>
       )}
       {attrViewMode === "attributes" && (
-        <ErrorBoundary label="AttributeFormView">
-        <AttributeFormView
-          selectedEntities={selectedEntities}
-          exceptions={effectiveExceptions}
-        />
-        </ErrorBoundary>
+        <div className="grid gap-6" style={{ gridTemplateColumns: `${rightPaneOpen ? "44px" : "minmax(0,1fr)"} ${rightPaneOpen ? "minmax(0,1fr)" : "44px"}` }}>
+          {rightPaneOpen ? (
+            <aside className="rounded-lg border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
+              <button
+                onClick={() => setRightPaneOpen(false)}
+                className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+                title="Expand attribute view"
+              >
+                <ChevronDown className="size-3.5 -rotate-90" />
+              </button>
+              <button
+                onClick={() => setRightPaneOpen(false)}
+                className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              >
+                <Database className="size-3" /> Attribute View
+              </button>
+            </aside>
+          ) : (
+            <ErrorBoundary label="AttributeFormView">
+              <AttributeFormView
+                selectedEntities={selectedEntities}
+                exceptions={effectiveExceptions}
+              />
+            </ErrorBoundary>
+          )}
+          {renderRightPane(selectedEntities[0]?.kyc ?? active.kyc, selectedEntities[0]?.name ?? active.entity)}
+        </div>
       )}
 
       {attrViewMode === "screening" && (
-        <ErrorBoundary label="Screening">
-          {selectedEntities[0]?.kyc
-            ? <Screening kycRef={selectedEntities[0].kyc} embedded />
-            : <p className="text-sm text-muted-foreground py-6">Select a case to view screening results.</p>}
-        </ErrorBoundary>
+        <div className="grid gap-6" style={{ gridTemplateColumns: `${rightPaneOpen ? "44px" : "minmax(0,1fr)"} ${rightPaneOpen ? "minmax(0,1fr)" : "44px"}` }}>
+          {rightPaneOpen ? (
+            <aside className="rounded-lg border border-border bg-card shadow-sm flex flex-col items-center py-3 gap-2">
+              <button
+                onClick={() => setRightPaneOpen(false)}
+                className="size-7 rounded border border-border grid place-items-center hover:bg-secondary transition-colors"
+                title="Expand screening view"
+              >
+                <ChevronDown className="size-3.5 -rotate-90" />
+              </button>
+              <button
+                onClick={() => setRightPaneOpen(false)}
+                className="mt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5"
+              >
+                <ShieldCheck className="size-3" /> Screening Results
+              </button>
+            </aside>
+          ) : (
+            <ErrorBoundary label="Screening">
+              {selectedEntities[0]?.kyc
+                ? <Screening kycRef={selectedEntities[0].kyc} embedded />
+                : <p className="text-sm text-muted-foreground py-6">Select a case to view screening results.</p>}
+            </ErrorBoundary>
+          )}
+          {renderRightPane(selectedEntities[0]?.kyc ?? active.kyc, selectedEntities[0]?.name ?? active.entity)}
+        </div>
       )}
+
 
       {openAgent && <AgentReviewModal onClose={() => setOpenAgent(false)} />}
       {evidenceDoc && (
@@ -1984,10 +1244,10 @@ const ExceptionReview = () => {
               </div>
             </div>
             <DialogFooter>
-              <button onClick={() => setReachOutModal(null)} className="text-sm px-4 py-2 rounded-full border border-border hover:bg-secondary transition-colors">Cancel</button>
+              <button onClick={() => setReachOutModal(null)} className="text-sm px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors">Cancel</button>
               <button
                 onClick={() => { setReachOutCount((c) => c + 1); setReachOutModal(null); }}
-                className="text-sm px-5 py-2 rounded-full bg-primary text-primary-foreground flex items-center gap-2 hover:opacity-95 transition-opacity shadow-sm"
+                className="text-sm px-5 py-2 rounded-lg bg-primary text-primary-foreground flex items-center gap-2 hover:opacity-95 transition-opacity shadow-sm"
               >
                 <Send className="size-3.5" /> Send Email
               </button>
@@ -2012,7 +1272,7 @@ const ExceptionReview = () => {
             {/* ── Success state ── */}
             {zoomMeeting ? (
               <div className="space-y-4 py-2">
-                <div className="rounded-xl border border-success/40 bg-success-soft/50 p-4 flex items-start gap-3">
+                <div className="rounded-lg border border-success/40 bg-success-soft/50 p-4 flex items-start gap-3">
                   <CheckCircle2 className="size-5 text-success shrink-0 mt-0.5" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-success">Meeting created</p>
@@ -2144,7 +1404,7 @@ const ExceptionReview = () => {
             <DialogFooter>
               <button
                 onClick={() => { setReachOutModal(null); setZoomMeeting(null); setZoomError(null); }}
-                className="text-sm px-4 py-2 rounded-full border border-border hover:bg-secondary transition-colors"
+                className="text-sm px-4 py-2 rounded-lg border border-border hover:bg-secondary transition-colors"
               >
                 {zoomMeeting ? "Close" : "Cancel"}
               </button>
@@ -2350,9 +1610,9 @@ const DocumentLocker = ({ selectedEntityNames }: { selectedEntityNames: string[]
 // Attribute category taxonomy — ordered; first category is expanded by default
 const ATTR_CATEGORY_ORDER = [
   "Entity Identification",
-  "Registration & Regulatory",
-  "Address & Operations",
   "Classification & Risk",
+  "Address & Operations",
+  "Registration & Regulatory",
   "Financial Profile",
   "Officers & Signatories",
   "Ownership & Control",
@@ -2450,86 +1710,61 @@ const ATTR_CATEGORY_MAP: Record<string, AttrCategory> = {
 };
 
 // Snake_case attribute names from the master schema, grouped by category.
-// Used as the baseline for entities that have no curated ENTITY_PROFILES entry,
-// so all expected attributes are visible even before any agent run has populated them.
-const MASTER_CORE_ATTRS: string[] = [
-  // Entity Identification
-  'entity_name', 'entity_status', 'entity_registration_number',
-  'country_of_incorporation', 'registration_country', 'date_of_incorporation',
-  'lei_code', 'entity_giin', 'entity_jurisdiction',
-  'previous_names', 'trading_names', 'verification_of_existence',
-  'uk_registration_number', 'us_registration_number',
-  'uk_entity_tax_id_number', 'us_entity_tax_id_number',
-  // Registration & Regulatory
-  'regulator', 'entity_regulator', 'entity_activity_type',
-  'listed_exchange', 'listing_status',
-  'commodities_future_trading_commission_registered_indicator',
-  'securities_exchange_act_of_1934_section_13_or_15d_indicator',
-  'compliance_officer_signatures_name', 'mlro_or_equivalent_signatures_name',
-  // Address & Operations
-  'principal_place_of_business', 'entity_principal_place_of_business',
-  'legal_registered_address', 'foreign_branches_details',
-  'entity_nature_of_business', 'other_business_activity',
-  'list_of_subsidiaries', 'sole_proprietorship_indicator',
-  'parent_public_ally_listed_on_us_exchange_indicator',
-  'sub_advisor_name', 'sub_advisor_address',
-  'website_address', 'entity_website_address', 'entity_source_url',
-  // Classification & Risk
-  'entity_classification', 'entity_risk_rating', 'cip_classification',
-  'transacting_with_own_or_third_party_funds_indicator',
-  // Financial Profile
-  'assets_under_management_aum', 'source_of_funds', 'source_of_wealth',
-  // Ownership & Control — multi-value officer/controller rows (corporate_officer_N,
-  // key_controller_N) are added at runtime from DB forgeAttrs
-];
+// Master-driven: visible entity-level attributes for the entity type, sourced
+// from the canonical schema (schema/) with per-entity-type applicability
+// (not_applicable hidden, optional included). Replaces the former hardcoded list
+// — retires the drifted names (uk_/us_ splits, entity_classification, and the
+// entity_*-prefixed duplicates). Party objects render via the person tables.
+const MASTER_CORE_ATTRS: string[] = entityLevelCoreAttrs();
+// Attributes that are optional for the entity type (collect if provided, no IDV).
+const OPTIONAL_CORE_ATTRS: Set<string> = optionalCoreAttrs();
 
+// Canonical attribute → category. Keyed on master-schema attribute names.
 const SCHEMA_ATTR_CATEGORY: Record<string, AttrCategory> = {
+  // Classification & Risk
+  'cip_classification': "Classification & Risk",
+  'legal_structure': "Classification & Risk",
+  'entity_risk_rating': "Classification & Risk",
+  'wbq_flag': "Classification & Risk",
+
+  // Entity Identification
   'entity_name': "Entity Identification",
   'entity_status': "Entity Identification",
-  'entity_registration_number': "Entity Identification",
   'country_of_incorporation': "Entity Identification",
   'registration_country': "Entity Identification",
   'date_of_incorporation': "Entity Identification",
-  'lei_code': "Entity Identification",
-  'entity_giin': "Entity Identification",
-  'entity_jurisdiction': "Entity Identification",
+  'registration_number': "Entity Identification",
   'previous_names': "Entity Identification",
   'trading_names': "Entity Identification",
   'verification_of_existence': "Entity Identification",
-  'uk_registration_number': "Entity Identification",
-  'us_registration_number': "Entity Identification",
-  'uk_entity_tax_id_number': "Entity Identification",
-  'us_entity_tax_id_number': "Entity Identification",
+  'entity_giin': "Entity Identification",
+  'lei_code': "Entity Identification",
+  'transacting_with_own_or_third_party_funds_indicator': "Entity Identification",
+
+  // Address & Operations
+  'principal_place_of_business': "Address & Operations",
+  'legal_registered_address': "Address & Operations",
+  'entity_nature_of_business': "Address & Operations",
+  'other_business_activity': "Address & Operations",
+  'sole_proprietorship_indicator': "Address & Operations",
+  'parent_publicly_listed_on_united_states_exchange_indicator': "Address & Operations",
+  'website_address': "Address & Operations",
+  'source_of_wealth': "Address & Operations",
+
+  // Registration & Regulatory
   'regulator': "Registration & Regulatory",
-  'entity_regulator': "Registration & Regulatory",
-  'entity_activity_type': "Registration & Regulatory",
+  'activity_type': "Registration & Regulatory",
   'listed_exchange': "Registration & Regulatory",
   'listing_status': "Registration & Regulatory",
   'commodities_future_trading_commission_registered_indicator': "Registration & Regulatory",
   'securities_exchange_act_of_1934_section_13_or_15d_indicator': "Registration & Regulatory",
-  'compliance_officer_signatures_name': "Registration & Regulatory",
-  'mlro_or_equivalent_signatures_name': "Registration & Regulatory",
-  'principal_place_of_business': "Address & Operations",
-  'entity_principal_place_of_business': "Address & Operations",
-  'legal_registered_address': "Address & Operations",
-  'foreign_branches_details': "Address & Operations",
-  'entity_nature_of_business': "Address & Operations",
-  'other_business_activity': "Address & Operations",
-  'list_of_subsidiaries': "Address & Operations",
-  'sole_proprietorship_indicator': "Address & Operations",
-  'parent_public_ally_listed_on_us_exchange_indicator': "Address & Operations",
-  'sub_advisor_name': "Address & Operations",
-  'sub_advisor_address': "Address & Operations",
-  'website_address': "Address & Operations",
-  'entity_website_address': "Address & Operations",
-  'entity_source_url': "Address & Operations",
-  'entity_classification': "Classification & Risk",
-  'entity_risk_rating': "Classification & Risk",
-  'cip_classification': "Classification & Risk",
-  'transacting_with_own_or_third_party_funds_indicator': "Classification & Risk",
-  'assets_under_management_aum': "Financial Profile",
+  'tax_identification_number': "Registration & Regulatory",
+  'fca_firm_reference_number': "Registration & Regulatory",
+
+  // Financial Profile
   'source_of_funds': "Financial Profile",
-  'source_of_wealth': "Financial Profile",
+
+  // Party objects (render as tables, but categorize the section headers)
   'corporate_officer': "Officers & Signatories",
   'key_controller': "Ownership & Control",
 };
@@ -2551,15 +1786,11 @@ function buildAttrCategories(
   excs: Exc[],
   options: { pendingOnly?: boolean } = {},
 ): { category: AttrCategory; items: { label: string; flagged: boolean }[] }[] {
-  const profile = ENTITY_PROFILES[entity];
   const isFlagged = (label: string) => {
-    const traceFlagged = ATTRIBUTE_TRACES[label]?.status === "flagged";
-    const pa = profile?.attrs.find((x) => x.label === label);
-    const excFlagged = excs.some(
+    return excs.some(
       (exc) => exc.entity === entity && exc.status === "Pending" &&
         (exc.attrLabel ? exc.attrLabel === label : exc.title === label)
     );
-    return traceFlagged || pa?.status === "alert" || pa?.status === "warn" || excFlagged;
   };
   const visible = options.pendingOnly ? attrs.filter(isFlagged) : attrs;
   const buckets: Record<AttrCategory, { label: string; flagged: boolean }[]> = {
@@ -2590,40 +1821,10 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
 
   const { runAgents } = useAgents();
 
-  // Resolve trace — preferring the curated ATTRIBUTE_TRACES, falling back to a
-  // synthesized trace from the entity profile so every clicked attribute shows
-  // provenance information.
-  const trace = useMemo(() => {
-    if (!selected) return null;
-    const curated = ATTRIBUTE_TRACES[selected.label];
-    if (curated) return curated;
-    const pa = ENTITY_PROFILES[selected.entity]?.attrs.find((x) => x.label === selected.label);
-    if (!pa) return null;
-    const agent = SOURCE_AGENT[pa.source];
-    const status: "verified" | "flagged" = pa.status === "ok" ? "verified" : "flagged";
-    return {
-      value: pa.value,
-      status,
-      confidence: pa.status === "ok" ? 96 : pa.status === "warn" ? 82 : 64,
-      agents: [
-        { id: "document" as AgentId, name: agent.name, action: "Resolved attribute value", thought: `Returned "${pa.value}" from ${agent.system} for ${selected.entity}.`, source: agent.system },
-        { id: "audit" as AgentId, name: "Audit Agent", action: "Stamped provenance entry", thought: "Wrote retrieval snapshot and source citation to the immutable audit log.", source: `Audit Log · ${selected.entity}` },
-      ],
-      conclusion:
-        pa.status === "ok"
-          ? "Attribute resolved cleanly against record-of-truth; no divergence detected."
-          : pa.status === "warn"
-          ? "Attribute resolved but a deviation was detected against linked sources — analyst review queued."
-          : "Attribute violates policy threshold or required check — routed to exception queue for analyst action.",
-    } as AttrTrace;
-  }, [selected]);
+  // Trace data comes from real DB lineage via forgeAttr — no mock fallback.
+  const trace = useMemo((): AttrTrace | null => null, [selected]);
 
-  const traceDocs = useMemo(() => {
-    if (!selected) return [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[];
-    const pa = ENTITY_PROFILES[selected.entity]?.attrs.find((x) => x.label === selected.label);
-    if (pa?.docs?.length) return pa.docs.map((d) => ({ entity: selected.entity, attr: pa, doc: d }));
-    return (TRACE_DOCS[selected.label] ?? []).filter((d) => d.entity === selected.entity);
-  }, [selected]);
+  const traceDocs = useMemo(() => [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[], [selected]);
 
 
   const attrNode = (label: string, entity: string, flagged: boolean) => {
@@ -2770,24 +1971,21 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
     </button>
   );
 
-  // Build tree entries from the live selectedEntities, falling back to exception
-  // titles for Supabase-backed entities that have no curated profile.
+  // Build tree entries from the live selectedEntities.
+  // Attribute labels come only from DB exceptions (field_name); no mock profile fallback.
   const entitiesForTree = selectedEntities.map((e) => {
-    const profile = ENTITY_PROFILES[e.name];
-    const profileLabels = profile?.attrs.map((a) => a.label) ?? [];
-    // For entities with no curated profile, fall back to exception titles as attr labels
-    const excTitleLabels = profileLabels.length === 0
-      ? excs.filter((exc) => exc.kyc === e.kyc && !exc.id.startsWith('stub-') && !exc.attrLabel).map((exc) => exc.title)
-      : [];
-    // Always surface DB exception field_names as attrs, regardless of whether a profile exists
+    // Surface DB exception field_names as attrs
     const dbAttrLabels = excs
       .filter((exc) => exc.kyc === e.kyc && exc.attrLabel)
       .map((exc) => exc.attrLabel!);
+    const excTitleLabels = excs
+      .filter((exc) => exc.kyc === e.kyc && !exc.id.startsWith('stub-') && !exc.attrLabel)
+      .map((exc) => exc.title);
     return {
       entity: e.name,
       kyc: e.kyc,
       drg: e.drg ?? 'No DRG Assigned',
-      attrs: Array.from(new Set([...profileLabels, ...excTitleLabels, ...dbAttrLabels])),
+      attrs: Array.from(new Set([...excTitleLabels, ...dbAttrLabels])),
     };
   });
 
@@ -2863,7 +2061,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
             {categoryCards.map(({ category, items, pending }) => {
               const sorted = [...items].sort((a, b) => Number(b.flagged) - Number(a.flagged));
               return (
-                <div key={category} className="rounded-xl border border-border bg-card p-3 mb-3 break-inside-avoid">
+                <div key={category} className="rounded-lg border border-border bg-card p-3 mb-3 break-inside-avoid">
                   <div className="flex items-center justify-between mb-2 gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{category}</span>
                     {pending > 0 && (
@@ -2968,7 +2166,7 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
 
       {openEntity && (
         <EntityDetailPanel
-          profile={ENTITY_PROFILES[openEntity]}
+          profile={null}
           onClose={() => setOpenEntity(null)}
         />
       )}
@@ -3007,12 +2205,17 @@ const AttributeFormView = ({
   const [forgePersons, setForgePersons] = useState<Record<string, ForgePersonRow[]>>({});
   const [forgeTrace, setForgeTrace] = useState<ForgeTraceRow | null>(null);
   const [attrTab, setAttrTab] = useState<'core' | 'wgq'>('core');
-  const [attrSubTab, setAttrSubTab] = useState<'attrs' | 'persons'>('attrs');
 
   const { runAgents } = useAgents();
+  // Bumped after analyst saves an override so the attribute view re-fetches from DB.
+  const [overrideVersion, setOverrideVersion] = useState(0);
 
   // Stable key so the effect only re-runs when the set of selected entities changes
   const entityKycKey = selectedEntities.map(e => e.kyc).join(',');
+
+  const entityKycs = useMemo(() => new Set(selectedEntities.map(e => e.kyc)), [entityKycKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const entityProposals: InlineProposal[] = [];
+  const proposalByAttr: Record<string, InlineProposal> = {};
 
   // Fetch Forge attributes + persons for ALL selected entities in parallel
   useEffect(() => {
@@ -3021,13 +2224,19 @@ const AttributeFormView = ({
     Promise.all(selectedEntities.map(e => Promise.all([
       apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(e.kyc)}/attributes`).then(r => r.ok ? r.json() : []),
       apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(e.kyc)}/persons`).then(r => r.ok ? r.json() : {}),
-    ]))).then(results => {
+    ]).then(([attrs, persons]) => ({ kyc: e.kyc, attrs, persons })))).then(results => {
       if (cancelled) return;
       const attrMap: Record<string, ForgeAttrRow> = {};
       const personMap: Record<string, ForgePersonRow[]> = {};
-      for (const [attrs, persons] of results) {
+      for (const { kyc, attrs, persons } of results) {
         for (const a of (attrs as ForgeAttrRow[])) attrMap[a.attribute_name] = a;
-        Object.assign(personMap, persons as Record<string, ForgePersonRow[]>);
+        // Tag each person with its source entity and concat per role (so a role
+        // shared across selected entities keeps all records, and edits persist
+        // against the correct kyc_ref).
+        for (const [role, arr] of Object.entries(persons as Record<string, ForgePersonRow[]>)) {
+          const tagged = arr.map(p => ({ ...p, kyc }));
+          personMap[role] = [...(personMap[role] ?? []), ...tagged];
+        }
       }
       setForgeAttrs(attrMap);
       setForgePersons(personMap);
@@ -3036,7 +2245,7 @@ const AttributeFormView = ({
       if (hasWgq && !hasCore) setAttrTab('wgq');
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [entityKycKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entityKycKey, overrideVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch full lineage trace when user opens trace for a Forge attribute
   useEffect(() => {
@@ -3054,166 +2263,118 @@ const AttributeFormView = ({
   // Close override form when trace changes
   useEffect(() => { setOpenOverrideFor(null); setOverrideDraft(""); setOverrideNote(""); }, [openTraceFor]);
 
-  // Resolve trace for the currently open field (same logic as AttributeTree)
-  const trace = useMemo(() => {
-    if (!openTraceFor) return null;
-    const curated = ATTRIBUTE_TRACES[openTraceFor.label];
-    if (curated) return curated;
-    const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(x => x.label === openTraceFor.label);
-    if (!pa) return null;
-    const agent = SOURCE_AGENT[pa.source];
-    const status: "verified" | "flagged" = pa.status === "ok" ? "verified" : "flagged";
-    return {
-      value: pa.value,
-      status,
-      confidence: pa.status === "ok" ? 96 : pa.status === "warn" ? 82 : 64,
-      agents: [
-        { id: "document" as AgentId, name: agent.name, action: "Resolved attribute value", thought: `Returned "${pa.value}" from ${agent.system} for ${openTraceFor.entity}.`, source: agent.system },
-        { id: "audit" as AgentId, name: "Audit Agent", action: "Stamped provenance entry", thought: "Wrote retrieval snapshot and source citation to the immutable audit log.", source: `Audit Log · ${openTraceFor.entity}` },
-      ],
-      conclusion: pa.status === "ok"
-        ? "Attribute resolved cleanly against record-of-truth; no divergence detected."
-        : pa.status === "warn"
-        ? "Attribute resolved but a deviation was detected against linked sources — analyst review queued."
-        : "Attribute violates policy threshold or required check — routed to exception queue for analyst action.",
-    } as AttrTrace;
-  }, [openTraceFor]);
+  // Trace data comes from real DB lineage via forgeAttr — no mock fallback.
+  const trace = useMemo((): AttrTrace | null => null, [openTraceFor]);
 
-  const traceDocs = useMemo(() => {
-    if (!openTraceFor) return [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[];
-    const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(x => x.label === openTraceFor.label);
-    if (pa?.docs?.length) return pa.docs.map(d => ({ entity: openTraceFor.entity, attr: pa, doc: d }));
-    return (TRACE_DOCS[openTraceFor.label] ?? []).filter(d => d.entity === openTraceFor.entity);
-  }, [openTraceFor]);
+  const traceDocs = useMemo(() => [] as { entity: string; attr: EntityAttr; doc: AttrDoc }[], [openTraceFor]);
 
   const categorize = (entity: string, attrs: string[]) =>
     buildAttrCategories(entity, attrs, excs);
 
   const isCatOpen = (key: string, idx: number) => {
     if (key in openCats) return openCats[key];
-    return idx < 2; // first two sections open by default
+    return idx < 1; // only the first section open by default; rest collapsed
   };
 
   // Build entitiesForTree (same shape as AttributeTree uses)
   const entitiesForTree = selectedEntities.map(e => {
-    const profile = ENTITY_PROFILES[e.name];
-    const profileLabels = profile?.attrs.map(a => a.label) ?? [];
-    // When no curated profile, use the master schema as the baseline so all expected
-    // attributes are visible even before any agent run has populated them.
-    // DB attributes (forgeAttrs) are merged in to capture any runner-specific names
-    // not in the schema (e.g. entity_principal_place_of_business from FCA runner).
-    const forgeLabels = profileLabels.length === 0
-      ? Array.from(new Set([
-          ...MASTER_CORE_ATTRS,
-          ...Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name),
-        ]))
-      : [];
-    const excTitleLabels = profileLabels.length === 0 && forgeLabels.length === 0
-      ? excs.filter(exc => exc.kyc === e.kyc && !exc.id.startsWith("stub-") && !exc.attrLabel).map(exc => exc.title)
-      : [];
+    // The master schema ALWAYS drives the attribute list for the onboarding entity
+    // type: every required + optional attribute is shown (not_applicable hidden via
+    // entityLevelCoreAttrs()), even before any agent run has populated a value.
+    // DB attribute names from completed agent runs are merged in on top.
+    const forgeLabels = Array.from(new Set([
+      ...MASTER_CORE_ATTRS,
+      ...Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name),
+    ]));
     const dbAttrLabels = excs.filter(exc => exc.kyc === e.kyc && exc.attrLabel).map(exc => exc.attrLabel!);
+    // De-duplicate labels that arrive in different formats from different sources
+    // (e.g. `entity_name` from the schema vs `entity name` from an exception field).
+    // Collapse by canonical key, preferring the form that resolves to a live Forge
+    // attribute so the value lookup in SimpleFieldRow still works.
+    const byCanon = new Map<string, string>();
+    for (const lbl of [...forgeLabels, ...dbAttrLabels]) {
+      const key = canonicalAttrKey(lbl);
+      const existing = byCanon.get(key);
+      if (!existing) { byCanon.set(key, lbl); continue; }
+      if (!forgeAttrs[existing] && forgeAttrs[lbl]) byCanon.set(key, lbl);
+    }
+    // Exclude flattened numbered person attributes (corporate_officer_1_…,
+    // key_controller_2_…). Those exist only to power the review/diff screen;
+    // the Attributes view shows people via the structured person tables instead.
+    const PERSON_NUMBERED = /^(acting_person|authorized_signatory|beneficial_owner|board_director|corporate_officer|investment_advisor|key_controller|power_of_attorney|trustee)_\d+(_|$)/;
     return {
       entity: e.name,
       kyc: e.kyc,
-      attrs: Array.from(new Set([...profileLabels, ...forgeLabels, ...excTitleLabels, ...dbAttrLabels])),
+      attrs: Array.from(byCanon.values()).filter(l => !PERSON_NUMBERED.test(l)),
     };
   });
 
-  // Status strip — aggregate across all attributes
-  const allAttrs = entitiesForTree.flatMap(e => ENTITY_PROFILES[e.entity]?.attrs ?? []);
-  const idPendingCount = allAttrs.filter(a => a.status === "alert").length;
-  const vPendingCount  = allAttrs.filter(a => a.status === "warn" || a.status === "alert").length;
+  // Status strip — use real DB id_flag / verification_flag, not mock status values.
+  // Count collected (DB-present) core attrs that haven't been ID/V confirmed yet.
+  const collectedCoreAttrs = Object.values(forgeAttrs).filter(a => a.attribute_group === 'core');
+  const idPendingCount = collectedCoreAttrs.filter(a => !a.id_flag && !OPTIONAL_CORE_ATTRS.has(a.attribute_name)).length;
+  const vPendingCount  = collectedCoreAttrs.filter(a => !a.verification_flag && !OPTIONAL_CORE_ATTRS.has(a.attribute_name)).length;
+
+  // Durably confirm an attribute (set its ID flag). Persists to the backend so
+  // the attribute stays verified across future sourcing runs; updates local
+  // state optimistically so the row turns green immediately.
+  const handleConfirmAttribute = async (label: string, entity: string) => {
+    const kycRef = selectedEntities.find(e => e.name === entity)?.kyc;
+    const fa = forgeAttrs[label];
+    if (!kycRef || !fa) return;
+    try {
+      await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/attributes/${encodeURIComponent(label)}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: fa.display_value ?? null }),
+      });
+    } catch { /* keep optimistic update even if the request fails */ }
+    setForgeAttrs(prev => ({
+      ...prev,
+      [label]: { ...prev[label], id_flag: true, verification_flag: true, exception_flag: false, exception_type: null, confirmed: true },
+    }));
+  };
 
   const handleSaveOverride = (draftKey: string) => {
     const d = new Date();
     const now = `${d.toISOString().slice(0, 10)} · ${d.toISOString().slice(11, 16)} UTC`;
-    setSavedOverrides(prev => ({ ...prev, [draftKey]: { value: overrideDraft, actor: "You", timestamp: now, note: overrideNote || undefined } }));
+    const value = overrideDraft;
+    const note  = overrideNote;
+    // Optimistic update — show immediately without waiting for the server.
+    setSavedOverrides(prev => ({ ...prev, [draftKey]: { value, actor: "You", timestamp: now, note: note || undefined } }));
     setOpenOverrideFor(null);
     setOverrideDraft("");
     setOverrideNote("");
+    // Persist to DB: creates an entity_attributes row + attribute_confirmations
+    // so the value survives page refresh and future sourcing runs.
+    const [entity, ...labelParts] = draftKey.split("::");
+    const attrName = labelParts.join("::"); // attribute name (snake_case)
+    const kycRef = selectedEntities.find(e => e.name === entity)?.kyc ?? active.kyc;
+    if (kycRef && attrName) {
+      apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/attributes/override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attributeName: attrName, attributeGroup: "core", displayValue: value, note: note || undefined }),
+      })
+        .then(() => setOverrideVersion(v => v + 1))
+        .catch(() => { /* optimistic override is already visible */ });
+    }
   };
 
-  const refreshPersons = () => {
-    if (selectedEntities.length === 0) return;
-    Promise.all(
-      selectedEntities.map(e =>
-        apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(e.kyc)}/persons`).then(r => r.ok ? r.json() : {})
-      )
-    ).then(results => {
-      const personMap: Record<string, ForgePersonRow[]> = {};
-      for (const persons of results) Object.assign(personMap, persons as Record<string, ForgePersonRow[]>);
-      setForgePersons(personMap);
-    }).catch(() => {});
-  };
-
-  const handlePersonPersist = (kyc: string | undefined, role: string, personIndex: number, values: Record<string, string>) => {
-    const ref = kyc ?? selectedEntities[0]?.kyc;
-    if (!ref) return;
-    apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(ref)}/persons/${encodeURIComponent(role)}/${personIndex}/override`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  // Durably persist analyst edits to a person/entity row (values keyed by short
+  // field name). Updates are optimistic in the table; this writes them back.
+  const persistPersonEdit = (kyc: string | undefined, role: string, personIndex: number, values: Record<string, string>) => {
+    if (!kyc) return;
+    apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kyc)}/persons/${encodeURIComponent(role)}/${personIndex}/override`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ values }),
-    }).then(() => refreshPersons()).catch(console.error);
+    }).catch(() => { /* keep optimistic table edit even if offline */ });
   };
-
-  const personRoleEntries = PERSON_ROLE_LABELS
-    .map(({ role, label }) => ({ role, label, persons: forgePersons[role] ?? [] }))
-    .filter(({ persons }) => persons.length > 0);
 
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: openTraceFor ? "minmax(0,1fr) 360px" : "1fr" }}>
     <div className="space-y-0 min-w-0">
-      {/* Sub-tab selector: Attributes | Persons */}
-      <div className="flex items-center gap-1 mb-4 border-b border-border pb-2">
-        <button
-          onClick={() => setAttrSubTab('attrs')}
-          className={cn(
-            "px-3 py-1.5 text-sm rounded-md transition-colors",
-            attrSubTab === 'attrs'
-              ? "bg-primary/10 text-primary font-semibold"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Database className="size-3.5 inline mr-1.5" />
-          Attributes
-        </button>
-        <button
-          onClick={() => setAttrSubTab('persons')}
-          className={cn(
-            "px-3 py-1.5 text-sm rounded-md transition-colors",
-            attrSubTab === 'persons'
-              ? "bg-primary/10 text-primary font-semibold"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <UserCircle2 className="size-3.5 inline mr-1.5" />
-          Persons
-          {Object.values(forgePersons).reduce((s, arr) => s + arr.length, 0) > 0 && (
-            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
-              {Object.values(forgePersons).reduce((s, arr) => s + arr.length, 0)}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Persons view */}
-      {attrSubTab === 'persons' && (
-        <div className="space-y-6 pb-4">
-          {personRoleEntries.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic px-1">No person records loaded. Trigger a sourcing agent to populate.</p>
-          ) : (
-            personRoleEntries.map(({ role, label, persons }) => (
-              <div key={role}>
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">{label}</h4>
-                <PersonRoleTable persons={persons} role={role} onPersist={handlePersonPersist} />
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Attributes view (hidden when Persons tab is active) */}
-      {attrSubTab === 'attrs' && <>
       {/* Status strip */}
       <div className="flex items-center gap-2 px-1 pb-3 flex-wrap">
         <span className={cn(
@@ -3275,6 +2436,7 @@ const AttributeFormView = ({
         );
       })()}
 
+
       {/* ── Core attribute sections ─────────────────────────────────────── */}
       {attrTab === 'core' && (
         <>
@@ -3289,15 +2451,23 @@ const AttributeFormView = ({
                   const catKey = `${entity}::${category}`;
                   const open = isCatOpen(catKey, idx);
                   const pendingInCat = items.filter(i => i.flagged).length;
+                  // Count attrs that actually have a value (from DB or analyst override).
+                  const populatedCount = items.filter(({ label }) =>
+                    !!(forgeAttrs[label]?.display_value ?? savedOverrides[`${entity}::${label}`]?.value)
+                  ).length;
+                  // Skip sections where nothing is populated yet — avoids misleading "0/8" headers.
+                  if (populatedCount === 0 && pendingInCat === 0) return null;
                   return (
-                    <div key={category} className="rounded-xl border border-border bg-card mb-3 overflow-hidden">
+                    <div key={category} className="rounded-lg border border-border bg-card mb-3 overflow-hidden">
                       <button
                         onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
                         className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/60 hover:bg-secondary/80 transition-colors text-left border-b border-border"
                       >
                         <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform shrink-0", !open && "-rotate-90")} />
                         <span className="text-[11px] font-bold uppercase tracking-widest text-foreground flex-1">{category}</span>
-                        <span className="text-[10px] text-muted-foreground">{items.length} attr{items.length !== 1 ? "s" : ""}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {populatedCount} of {items.length} populated
+                        </span>
                         {pendingInCat > 0 && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{pendingInCat}</span>
                         )}
@@ -3305,28 +2475,11 @@ const AttributeFormView = ({
                       {open && (
                         <div className="grid grid-cols-2 [&>*]:border-b [&>*]:border-border/60">
                           {items.map(({ label }) =>
-                            NESTED_ATTR_PROFILES[label] ? (
-                              <div key={label} className="col-span-2 p-3">
-                                <NestedObjectBlock
-                                  label={label}
-                                  entity={entity}
-                                  openTraceFor={openTraceFor}
-                                  setOpenTraceFor={setOpenTraceFor}
-                                  savedOverrides={savedOverrides}
-                                  trace={trace}
-                                  traceDocs={traceDocs}
-                                  runAgents={runAgents}
-                                  openOverrideFor={openOverrideFor}
-                                  setOpenOverrideFor={setOpenOverrideFor}
-                                  overrideDraft={overrideDraft}
-                                  setOverrideDraft={setOverrideDraft}
-                                  setOverrideNote={setOverrideNote}
-                                />
-                              </div>
-                            ) : (
+                            (
                               <SimpleFieldRow
                                 key={label}
                                 label={label}
+                                optional={OPTIONAL_CORE_ATTRS.has(label)}
                                 entity={entity}
                                 forgeAttr={forgeAttrs[label] ?? null}
                                 savedOverrides={savedOverrides}
@@ -3342,6 +2495,9 @@ const AttributeFormView = ({
                                 trace={trace}
                                 traceDocs={traceDocs}
                                 runAgents={runAgents}
+                                pendingProposal={proposalByAttr[label] ?? null}
+                                onAcceptProposal={() => {}}
+                                onRejectProposal={() => {}}
                               />
                             )
                           )}
@@ -3354,16 +2510,20 @@ const AttributeFormView = ({
             );
           })}
 
-          {/* ── Person role sections ──────────────────────────────────────── */}
-          {PERSON_ROLE_LABELS.map(({ role, label: roleLabel }) => {
-            const persons = forgePersons[role];
-            if (!persons?.length) return null;
+          {/* ── Party sections ─── master-driven: always show the applicable
+               party tables for the entity type (populated if records exist,
+               empty-state otherwise), keyed case-insensitively to DB roles. */}
+          {visibleParties().map(({ role, label: roleLabel, columns }) => {
+            const persons =
+              forgePersons[role] ??
+              forgePersons[Object.keys(forgePersons).find(k => k.toLowerCase() === role.toLowerCase()) ?? ""] ??
+              [];
             const catKey = `persons::${role}`;
-            const open = catKey in openCats ? openCats[catKey] : true;
+            const open = catKey in openCats ? openCats[catKey] : false; // collapsed by default
             const excCount = persons.reduce((n, p) =>
-              n + Object.values(p.attributes).filter((a: { exception_flag?: boolean }) => a.exception_flag).length, 0);
+              n + Object.values(p.attributes ?? {}).filter((a: { exception_flag?: boolean }) => a.exception_flag).length, 0);
             return (
-              <div key={role} className="rounded-xl border border-border bg-card mb-3 overflow-hidden">
+              <div key={role} className="rounded-lg border border-border bg-card mb-3 overflow-hidden">
                 <button
                   onClick={() => setOpenCats(prev => ({ ...prev, [catKey]: !open }))}
                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-secondary/60 hover:bg-secondary/80 transition-colors text-left border-b border-border"
@@ -3376,13 +2536,13 @@ const AttributeFormView = ({
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-alert-soft text-alert border border-alert-soft-border font-semibold">{excCount}</span>
                   )}
                 </button>
-                {open && (
-                  <div className="divide-y divide-border/60">
-                    {persons.map((p, i) => (
-                      <ForgePersonCard key={i} person={p} role={role} />
-                    ))}
+                {open && (persons.length > 0 ? (
+                  <PersonRoleTable persons={persons} role={role} onPersist={persistPersonEdit} applicableColumns={columns} />
+                ) : (
+                  <div className="px-4 py-4 text-[11px] text-muted-foreground italic">
+                    No {roleLabel.toLowerCase()} on record yet — run sourcing or due diligence to populate.
                   </div>
-                )}
+                ))}
               </div>
             );
           })}
@@ -3397,21 +2557,16 @@ const AttributeFormView = ({
       {entitiesForTree.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-10">No entities selected.</p>
       )}
-      </>}
     </div>
 
     {/* Trace / Audit right pane */}
     {openTraceFor && (
-      <aside className="rounded-xl border border-border bg-card shadow-sm flex flex-col overflow-hidden self-start sticky top-4">
+      <aside className="rounded-lg border border-border bg-card shadow-sm flex flex-col overflow-hidden self-start sticky top-4">
         {/* Pane header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none mb-0.5">
-              {(() => {
-                const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(a => a.label === openTraceFor.label);
-                const isOverridden = !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`];
-                return (pa?.source === "CRM" || isOverridden) ? "Audit Trail" : "Agent Trace";
-              })()}
+              {(!forgeAttrs[openTraceFor.label] && !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`]) ? "Audit Trail" : "Agent Trace"}
             </p>
             <p className="text-[13px] font-semibold truncate">{openTraceFor.label}</p>
             <p className="text-[10px] text-muted-foreground truncate">{openTraceFor.entity}</p>
@@ -3430,14 +2585,33 @@ const AttributeFormView = ({
           {forgeTrace && (
             <ForgeLineagePanel trace={forgeTrace} />
           )}
+          {/* Conflict resolution — sources disagree and not yet ID-confirmed */}
+          {(() => {
+            const fa = forgeAttrs[openTraceFor.label];
+            const conflict = lineageConflict(fa?.lineage);
+            if (!fa || !conflict || fa.id_flag) return null;
+            return (
+              <div className="px-4 py-3 border-b border-border bg-warning-soft/30">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-warning mb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="size-3" /> {conflict.length} sources differ — needs review
+                </p>
+                <p className="text-[11px] text-muted-foreground mb-3 leading-snug">
+                  Sources disagree on this value. Accept the displayed value to lock it and protect it from future sourcing agent overrides.
+                </p>
+                <button
+                  onClick={() => handleConfirmAttribute(openTraceFor.label, openTraceFor.entity)}
+                  className="w-full text-[11px] font-semibold px-3 py-2 rounded-md bg-success text-white hover:bg-success/90 transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="size-3.5" /> Accept value
+                </button>
+              </div>
+            );
+          })()}
           <InlineTraceDrawer
             label={openTraceFor.label}
             entity={openTraceFor.entity}
-            isAuditOnly={(() => {
-              const pa = ENTITY_PROFILES[openTraceFor.entity]?.attrs.find(a => a.label === openTraceFor.label);
-              const isOverridden = !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`];
-              return (pa?.source === "CRM") || isOverridden;
-            })()}
+            kycRef={selectedEntities.find(e => e.name === openTraceFor.entity)?.kyc ?? null}
+            isAuditOnly={!forgeAttrs[openTraceFor.label] && !!savedOverrides[`${openTraceFor.entity}::${openTraceFor.label}`]}
             forgeAttr={forgeAttrs[openTraceFor.label] ?? null}
             savedOverrides={savedOverrides}
             trace={trace}
@@ -4215,24 +3389,4 @@ const EscalationDialog = ({
 
 export default ExceptionReview;
 
-// ── Merge entities from entities.md (auto-generated at build time) ─────────────
-// Static data takes precedence; generated data only adds entities not already here.
-{
-  const _staticKycs = new Set(exceptions.map(e => e.kyc));
-  const _genExcToKyc = Object.fromEntries(GENERATED_EXCEPTIONS.map(e => [e.id, e.kyc]));
-  for (const e of GENERATED_EXCEPTIONS) {
-    if (!_staticKycs.has(e.kyc)) (exceptions as unknown[]).push(e);
-  }
-  for (const [k, v] of Object.entries(GENERATED_COMPARISONS)) {
-    const kyc = _genExcToKyc[k];
-    if (kyc && !_staticKycs.has(kyc) && !COMPARISONS[k]) (COMPARISONS as Record<string, typeof v>)[k] = v;
-  }
-  const _staticProfiles = new Set(Object.keys(ENTITY_PROFILES));
-  for (const [k, v] of Object.entries(GENERATED_ENTITY_PROFILES)) {
-    if (!_staticProfiles.has(k)) (ENTITY_PROFILES as Record<string, typeof v>)[k] = v;
-  }
-  for (const [k, v] of Object.entries(GENERATED_COMMENTS))  { if (!COMMENTS_BY_KYC[k])  (COMMENTS_BY_KYC as Record<string, typeof v>)[k]  = v; }
-  for (const [k, v] of Object.entries(GENERATED_WATCHERS))  { if (!WATCHERS_BY_KYC[k])  (WATCHERS_BY_KYC as Record<string, typeof v>)[k]  = v; }
-  for (const [k, v] of Object.entries(GENERATED_ACTIVITY))  { if (!ACTIVITY_BY_KYC[k])  (ACTIVITY_BY_KYC as Record<string, typeof v>)[k]  = v; }
-}
 
