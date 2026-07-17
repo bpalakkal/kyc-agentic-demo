@@ -2206,9 +2206,16 @@ const AttributeFormView = ({
   const [forgeTrace, setForgeTrace] = useState<ForgeTraceRow | null>(null);
   const [attrTab, setAttrTab] = useState<'core' | 'wgq'>('core');
 
-  const { runAgents } = useAgents();
+  const { runAgents, isRunning } = useAgents();
   // Bumped after analyst saves an override so the attribute view re-fetches from DB.
   const [overrideVersion, setOverrideVersion] = useState(0);
+
+  // Bump overrideVersion when an agent run completes so attributes auto-refresh.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !isRunning) setOverrideVersion(v => v + 1);
+    wasRunning.current = isRunning;
+  }, [isRunning]);
 
   // Stable key so the effect only re-runs when the set of selected entities changes
   const entityKycKey = selectedEntities.map(e => e.kyc).join(',');
@@ -2455,8 +2462,7 @@ const AttributeFormView = ({
                   const populatedCount = items.filter(({ label }) =>
                     !!(forgeAttrs[label]?.display_value ?? savedOverrides[`${entity}::${label}`]?.value)
                   ).length;
-                  // Skip sections where nothing is populated yet — avoids misleading "0/8" headers.
-                  if (populatedCount === 0 && pendingInCat === 0) return null;
+                  // Always show all schema-driven sections so analyst can see what's expected.
                   return (
                     <div key={category} className="rounded-lg border border-border bg-card mb-3 overflow-hidden">
                       <button

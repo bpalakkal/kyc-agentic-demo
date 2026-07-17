@@ -1,18 +1,21 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   Bot, Play, Zap, Sparkles, ClipboardList, Database, ShieldCheck,
-  ChevronRight, FileText, Paperclip, GitMerge, Pencil,
+  ChevronRight, FileText, Paperclip, GitMerge, Loader2, CheckCircle2, Circle, XCircle, Pencil,
 } from "lucide-react";
 import type { ForgeLineageEntry } from "@/types/forgeTypes";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { AgentId } from "@/components/AgentSystem";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { apiFetch } from "@/lib/apiFetch";
+import { AGENT_API_BASE } from "@/components/AgentSystem";
+import type { AgentId, InlineProposal } from "@/components/AgentSystem";
 import type { ForgeAttrRow } from "@/types/forgeTypes";
+import { prettifyAttrLabel, lineageConflict } from "@/lib/attrLabel";
 import {
   type AttrTrace, type EntityAttr, type AttrDoc, type AuditEntry,
-  ENTITY_PROFILES, ATTRIBUTE_TRACES, SOURCE_STYLE, DOT_STYLE,
-  DOC_KIND_META, ATTR_AUDIT_LOG, NESTED_ATTR_PROFILES,
+  SOURCE_STYLE, DOC_KIND_META,
 } from "@/data/kycMockData";
 
 // ─── SourceStrip ─────────────────────────────────────────────────────────────
@@ -41,20 +44,12 @@ const SourceStrip = ({ lineage, displayValue }: SourceStripProps) => {
 
   const primary = (displayValue ?? "").toLowerCase().trim();
   const allAgree = sources.every(s => s.value.toLowerCase().trim() === primary);
+  if (allAgree) return null;
 
   return (
     <div className="mt-1.5 flex items-center gap-1 flex-wrap">
       <GitMerge className="size-2.5 text-muted-foreground/40 shrink-0" />
-      {allAgree ? (
-        <>
-          {sources.map((s, i) => (
-            <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-full bg-success-soft text-success border border-success/20 font-medium">
-              {s.source}
-            </span>
-          ))}
-          <span className="text-[9px] text-muted-foreground/50 italic">agree</span>
-        </>
-      ) : (
+      {(
         sources.map((s, i) => {
           const matches = s.value.toLowerCase().trim() === primary;
           const label = s.value.length > 28 ? s.value.slice(0, 28) + "…" : s.value;
@@ -93,6 +88,12 @@ export type SimpleFieldRowProps = {
   overrideNote: string;
   setOverrideNote: Dispatch<SetStateAction<string>>;
   handleSaveOverride: (draftKey: string) => void;
+  /** Attribute is optional for this entity type (collect if provided, no IDV). */
+  optional?: boolean;
+  /** A pending sourcing proposal for this attribute (inline review). */
+  pendingProposal?: InlineProposal | null;
+  onAcceptProposal?: () => void;
+  onRejectProposal?: () => void;
 };
 
 export const SimpleFieldRow = ({
@@ -101,23 +102,30 @@ export const SimpleFieldRow = ({
   savedOverrides, openTraceFor, setOpenTraceFor, openOverrideFor, setOpenOverrideFor,
   trace, traceDocs,
   runAgents, overrideDraft, setOverrideDraft, overrideNote, setOverrideNote, handleSaveOverride,
+  optional, pendingProposal, onAcceptProposal, onRejectProposal,
 }: SimpleFieldRowProps) => {
-  const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
   const overrideKey = `${entity}::${label}`;
   const override = savedOverrides[overrideKey];
-  const currentValue = override?.value ?? forgeAttr?.display_value ?? pa?.value ?? "";
+  const currentValue = override?.value ?? forgeAttr?.display_value ?? "";
   const isOverridden = !!override;
-  const isAlert = !isOverridden && (forgeAttr?.exception_flag || pa?.status === "alert");
-  const isWarn  = !isOverridden && !forgeAttr && pa?.status === "warn";
+  const conflict = lineageConflict(forgeAttr?.lineage);
+  // Sources disagree and the attribute has not been ID-confirmed → needs review.
+  // Once the ID flag is set (confirmed), differing values no longer flag it.
+  const conflictReview = !isOverridden && !!conflict && !!forgeAttr && !forgeAttr.id_flag && !forgeAttr.exception_flag;
+  const isAlert = !isOverridden && !!forgeAttr?.exception_flag;
+  const isWarn  = conflictReview;
   const isOpen  = openTraceFor?.label === label && openTraceFor?.entity === entity;
   const isOverrideOpen = openOverrideFor?.label === label && openOverrideFor?.entity === entity;
-  const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa || forgeAttr);
-  const isAuditOnly = !forgeAttr && (pa?.source === "CRM" || isOverridden);
+  // A trace is available if there is live DB data for this attribute.
+  const hasTrace = !!forgeAttr;
+  // Show audit trail only when there is an analyst override and no live DB data.
+  const isAuditOnly = !forgeAttr && isOverridden;
 
-  const idOk  = isOverridden ? true : (forgeAttr ? forgeAttr.id_flag : !!pa);
-  const vOk   = isOverridden ? true : (forgeAttr ? forgeAttr.verification_flag : pa?.status === "ok");
-  const vWarn = !isOverridden && !forgeAttr && pa?.status === "warn";
-  const vAlert = !isOverridden && (forgeAttr ? (!forgeAttr.verification_flag && forgeAttr.exception_flag) : pa?.status === "alert");
+  // ID/V badges are only green from real DB flags.
+  const idOk  = forgeAttr?.id_flag ?? false;
+  const vOk   = !conflictReview && (forgeAttr?.verification_flag ?? false);
+  const vWarn = conflictReview || (!!forgeAttr && !forgeAttr.verification_flag && !forgeAttr.exception_flag && forgeAttr.id_flag);
+  const vAlert = forgeAttr ? (!forgeAttr.verification_flag && forgeAttr.exception_flag) : false;
 
   const idLabel = idOk
     ? <span className="text-success font-bold">ID✓</span>
@@ -136,7 +144,24 @@ export const SimpleFieldRow = ({
     <>
       <div className={cn("p-3 transition-colors", (isOpen || isOverrideOpen) && "col-span-2")}>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none">{label}</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none flex items-center gap-1.5">
+            {prettifyAttrLabel(label)}
+            {optional && (
+              <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border normal-case tracking-normal">
+                optional
+              </span>
+            )}
+            {conflictReview && (
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-warning-soft text-warning border border-warning-soft-border normal-case tracking-normal">
+                {conflict!.length} sources differ
+              </span>
+            )}
+            {pendingProposal && (
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-warning-soft text-warning border border-warning-soft-border normal-case tracking-normal inline-flex items-center gap-0.5">
+                <Sparkles className="size-2.5" /> conflict
+              </span>
+            )}
+          </label>
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] whitespace-nowrap">
               {idLabel}<span className="text-muted-foreground/30 mx-0.5">/</span>{vLabel}
@@ -144,11 +169,6 @@ export const SimpleFieldRow = ({
             {forgeAttr?.exception_flag && (
               <span className="text-[9px] px-1.5 py-0.5 rounded border font-semibold bg-warning-soft text-warning border-warning/40">
                 {forgeAttr.exception_type ?? "Exception"}
-              </span>
-            )}
-            {!forgeAttr && pa && (
-              <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold", SOURCE_STYLE[pa.source])}>
-                {pa.source}
               </span>
             )}
           </div>
@@ -206,7 +226,47 @@ export const SimpleFieldRow = ({
             </button>
           )}
         </div>
-        <SourceStrip lineage={forgeAttr?.lineage} displayValue={forgeAttr?.display_value} />
+        {conflictReview && <SourceStrip lineage={forgeAttr?.lineage} displayValue={forgeAttr?.display_value} />}
+
+        {/* Conflict proposal — agent found a different value; analyst must decide */}
+        {pendingProposal && (
+          <div className="mt-1.5 rounded-md border border-warning/30 overflow-hidden">
+            <div className="grid grid-cols-2 divide-x divide-border/50">
+              {/* Current stored value */}
+              <div className="px-2.5 py-2 bg-secondary/60">
+                <div className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Stored</div>
+                <div className="text-[11px] text-muted-foreground/70 line-through leading-snug">
+                  {pendingProposal.currentValue || <span className="not-italic no-underline text-muted-foreground/40">—</span>}
+                </div>
+              </div>
+              {/* Agent-found value */}
+              <div className="px-2.5 py-2 bg-warning-soft/30">
+                <div className="text-[8px] font-bold uppercase tracking-widest text-warning/80 mb-1 flex items-center gap-1">
+                  <Sparkles className="size-2.5" /> Agent found
+                </div>
+                <div className="text-[11px] font-semibold text-warning leading-snug" title={pendingProposal.proposedValue}>
+                  {pendingProposal.proposedValue || <span className="italic font-normal text-muted-foreground">empty</span>}
+                </div>
+              </div>
+            </div>
+            {/* Footer: source + action buttons */}
+            <div className="flex items-center gap-2 px-2.5 py-1 bg-secondary/20 border-t border-border/40">
+              <span className="text-[9px] text-muted-foreground flex-1 truncate">{pendingProposal.source || pendingProposal.agentSlug}</span>
+              <button
+                onClick={onAcceptProposal}
+                className="text-[9px] font-bold px-2.5 py-0.5 rounded bg-success text-white hover:bg-success/90 transition-colors shrink-0"
+              >
+                Accept
+              </button>
+              <button
+                onClick={onRejectProposal}
+                className="text-[9px] font-semibold px-2 py-0.5 rounded border border-border/60 text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors shrink-0"
+              >
+                Keep current
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       {isOverrideOpen && (
         <div className="col-span-2 px-4 py-3 border-l-2 border-warning bg-warning-soft/20 border-b border-border/60">
@@ -269,6 +329,7 @@ type InlineTraceDrawerProps = {
   label: string;
   entity: string;
   isAuditOnly: boolean;
+  kycRef?: string | null;
   forgeAttr?: ForgeAttrRow | null;
   savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
   trace: AttrTrace | null;
@@ -283,16 +344,29 @@ type InlineTraceDrawerProps = {
 };
 
 export const InlineTraceDrawer = ({
-  label, entity, isAuditOnly,
+  label, entity, isAuditOnly, kycRef,
   forgeAttr,
   savedOverrides, trace, traceDocs,
   runAgents, setOpenTraceFor,
   openOverrideFor, setOpenOverrideFor,
   overrideDraft, setOverrideDraft, setOverrideNote,
 }: InlineTraceDrawerProps) => {
+  // Source-document viewer (opens a datastore PDF via the auth-guarded proxy).
+  const [docView, setDocView] = useState<{ file: string; blobUrl: string } | null>(null);
+  const [docOpening, setDocOpening] = useState<string | null>(null);
+  const openDoc = async (file: string) => {
+    if (!kycRef) return;
+    setDocOpening(file);
+    try {
+      const r = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/artifact?file=${encodeURIComponent(file)}`);
+      if (!r.ok) return;
+      setDocView({ file, blobUrl: URL.createObjectURL(await r.blob()) });
+    } catch { /* ignore */ } finally { setDocOpening(null); }
+  };
+  const closeDoc = () => { if (docView) URL.revokeObjectURL(docView.blobUrl); setDocView(null); };
   const isManualOverride = !!savedOverrides[`${entity}::${label}`];
-  // Prefer real DB confidence (0-100 int) over mock trace confidence
-  const rawConf = forgeAttr?.confidence ?? (trace?.confidence ?? null);
+  // Use real DB confidence (0-100 int)
+  const rawConf = forgeAttr?.confidence ?? null;
   const displayConf = isManualOverride ? 100 : (rawConf ?? 0);
   const confLabel = isManualOverride ? "1.0" : `${Math.round(displayConf)}%`;
   const confColor = isManualOverride ? "text-success"
@@ -304,7 +378,8 @@ export const InlineTraceDrawer = ({
     : displayConf >= 70 ? "bg-warning"
     : "bg-alert";
 
-  const auditLog: AuditEntry[] = ATTR_AUDIT_LOG[label] ?? [];
+  // Audit log is always empty — real audit history comes from the DB lineage / Forge trace.
+  const auditLog: AuditEntry[] = [];
 
   return (
     <div className="flex flex-col">
@@ -327,10 +402,84 @@ export const InlineTraceDrawer = ({
         </div>
       )}
 
+      {/* ── ID & Verification status — completed? by which source? ── */}
+      {!isAuditOnly && forgeAttr && (() => {
+        const idDone = forgeAttr.id_flag;
+        const vDone  = forgeAttr.verification_flag;
+        const vFailed = !vDone && forgeAttr.exception_flag;
+        const vSources = Array.isArray(forgeAttr.verification_source)
+          ? forgeAttr.verification_source.filter(Boolean)
+          : (forgeAttr.verification_source ? [forgeAttr.verification_source] : []);
+        const docEntry = forgeAttr.lineage?.find(l => l.document);
+        const sourceDoc = docEntry?.document ?? null;
+        const sourceDocType = docEntry?.document_type ?? null;
+        return (
+          <div className="px-4 py-3 border-b border-border/60 space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <ShieldCheck className="size-3 text-primary" /> ID &amp; Verification
+              {forgeAttr.confirmed && (
+                <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-success-soft text-success border border-success/30 normal-case tracking-normal">
+                  Analyst-confirmed
+                </span>
+              )}
+            </p>
+
+            {/* Identification */}
+            <div className="flex items-start gap-2">
+              {idDone ? <CheckCircle2 className="size-3.5 text-success shrink-0 mt-0.5" /> : <Circle className="size-3.5 text-muted-foreground/40 shrink-0 mt-0.5" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Identification — <span className={idDone ? "text-success" : "text-muted-foreground"}>{idDone ? "Completed" : "Not completed"}</span>
+                </p>
+                {idDone && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                    <Database className="size-2.5 shrink-0" />
+                    {forgeAttr.id_source ? <>Source: <span className="text-foreground font-medium">{forgeAttr.id_source}</span></> : "Source not recorded"}
+                  </p>
+                )}
+                {sourceDoc && (
+                  <button
+                    onClick={() => openDoc(sourceDoc)}
+                    disabled={!kycRef}
+                    className="mt-1 inline-flex items-center gap-1 text-[10px] text-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
+                  >
+                    {docOpening === sourceDoc ? <Loader2 className="size-3 animate-spin" /> : <FileText className="size-3" />}
+                    View source document{sourceDocType ? ` · ${sourceDocType}` : ""}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Verification */}
+            <div className="flex items-start gap-2">
+              {vDone ? <CheckCircle2 className="size-3.5 text-success shrink-0 mt-0.5" />
+                : vFailed ? <XCircle className="size-3.5 text-alert shrink-0 mt-0.5" />
+                : <Circle className="size-3.5 text-muted-foreground/40 shrink-0 mt-0.5" />}
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Verification — <span className={vDone ? "text-success" : vFailed ? "text-alert" : "text-muted-foreground"}>
+                    {vDone ? "Verified" : vFailed ? "Failed" : "Not verified"}
+                  </span>
+                </p>
+                {vDone && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                    <Database className="size-2.5 shrink-0" />
+                    {vSources.length ? <>Source: <span className="text-foreground font-medium">{vSources.join(", ")}</span></> : "Source not recorded"}
+                  </p>
+                )}
+                {vFailed && forgeAttr.exception_type && (
+                  <p className="text-[10px] text-alert mt-0.5">{forgeAttr.exception_type}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/60 bg-secondary/20">
         {!isAuditOnly && (
           <button
-            onClick={() => trace && runAgents(trace.agents.map(a => a.id), `Re-verify: ${label}`)}
+            onClick={() => trace && runAgents(trace.agents.map(a => a.id as AgentId), `Re-verify: ${label}`)}
             className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Play className="size-3" /> Re-run Agent
@@ -338,10 +487,8 @@ export const InlineTraceDrawer = ({
         )}
         <button
           onClick={() => {
-            const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
             const current = savedOverrides[`${entity}::${label}`]?.value
               ?? forgeAttr?.display_value
-              ?? pa?.value
               ?? "";
             setOverrideDraft(current);
             setOverrideNote("");
@@ -382,6 +529,44 @@ export const InlineTraceDrawer = ({
             ) : (
               <p className="text-[11px] text-muted-foreground italic text-center py-3">No agent trace available for this attribute.</p>
             )}
+          </div>
+        )}
+
+        {/* ── Per-source values from real DB lineage ── */}
+        {!isAuditOnly && forgeAttr?.lineage && forgeAttr.lineage.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+              <GitMerge className="size-3 text-primary" /> Source Data
+            </p>
+            <div className="space-y-1.5">
+              {(forgeAttr.lineage as ForgeLineageEntry[])
+                .filter(l => l.value != null && String(l.value).trim())
+                .map((l, i) => {
+                  const val = String(l.value ?? "").trim();
+                  const isPrimary = val.toLowerCase() === (forgeAttr.display_value ?? "").toLowerCase().trim();
+                  const conf = l.confidence_score != null ? Math.round(Number(l.confidence_score) * (Number(l.confidence_score) <= 1 ? 100 : 1)) : null;
+                  return (
+                    <div key={i} className={cn(
+                      "rounded-md border px-3 py-2 text-[11px]",
+                      isPrimary ? "border-success/30 bg-success-soft/20" : "border-border bg-secondary/40",
+                    )}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", isPrimary ? "text-success" : "text-muted-foreground")}>
+                          {l.source ?? "Unknown source"}
+                        </span>
+                        {isPrimary && <span className="text-[8px] px-1 rounded bg-success/10 text-success border border-success/20">primary</span>}
+                        {conf != null && (
+                          <span className={cn("ml-auto text-[9px] font-semibold", conf >= 90 ? "text-primary" : conf >= 70 ? "text-warning" : "text-muted-foreground")}>
+                            {conf}%
+                          </span>
+                        )}
+                      </div>
+                      <p className={cn("font-medium", isPrimary ? "text-foreground" : "text-muted-foreground")}>{val}</p>
+                      {l.note && <p className="text-[10px] text-muted-foreground/70 mt-0.5 italic">{l.note}</p>}
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         )}
 
@@ -470,120 +655,20 @@ export const InlineTraceDrawer = ({
           </div>
         )}
       </div>
-    </div>
-  );
-};
 
-// ─── NestedObjectBlock ────────────────────────────────────────────────────────
-
-type NestedObjectBlockProps = {
-  label: string;
-  entity: string;
-  openTraceFor: { label: string; entity: string } | null;
-  setOpenTraceFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
-  savedOverrides: Record<string, { value: string; actor: string; timestamp: string; note?: string }>;
-  trace: AttrTrace | null;
-  traceDocs: { entity: string; attr: EntityAttr; doc: AttrDoc }[];
-  runAgents: (agentIds: AgentId[], label?: string) => void;
-  openOverrideFor: { label: string; entity: string } | null;
-  setOpenOverrideFor: React.Dispatch<React.SetStateAction<{ label: string; entity: string } | null>>;
-  overrideDraft: string;
-  setOverrideDraft: React.Dispatch<React.SetStateAction<string>>;
-  setOverrideNote: React.Dispatch<React.SetStateAction<string>>;
-};
-
-export const NestedObjectBlock = ({
-  label, entity,
-  openTraceFor, setOpenTraceFor,
-  savedOverrides, trace, traceDocs,
-  runAgents, openOverrideFor, setOpenOverrideFor,
-  overrideDraft, setOverrideDraft, setOverrideNote,
-}: NestedObjectBlockProps) => {
-  const entries = NESTED_ATTR_PROFILES[label];
-  if (!entries) return null;
-
-  const pa = ENTITY_PROFILES[entity]?.attrs.find(a => a.label === label);
-  const groupStatus: EntityAttr["status"] = entries.flatMap(e => e.fields).some(f => f.status === "alert")
-    ? "alert" : entries.flatMap(e => e.fields).some(f => f.status === "warn") ? "warn" : "ok";
-  const hasTrace = !!(ATTRIBUTE_TRACES[label] || pa);
-  const isGroupOpen = openTraceFor?.label === label && openTraceFor?.entity === entity;
-
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <div className={cn(
-        "flex items-center gap-2 px-4 py-2.5 border-b border-border",
-        groupStatus === "alert" ? "bg-alert-soft/20" : groupStatus === "warn" ? "bg-warning-soft/20" : "bg-secondary/30"
-      )}>
-        <div className={cn("size-1.5 rounded-full shrink-0", DOT_STYLE[groupStatus])} />
-        <span className="text-[11px] font-semibold text-foreground flex-1">{label}</span>
-        <span className="text-[9px] font-bold">
-          <span className="text-success">ID✓</span>
-          <span className="text-muted-foreground/30 mx-0.5">/</span>
-          <span className={groupStatus === "ok" ? "text-success" : groupStatus === "warn" ? "text-warning" : "text-alert"}>
-            {groupStatus === "ok" ? "V✓" : groupStatus === "warn" ? "V⚠" : "V✕"}
-          </span>
-        </span>
-        {pa && <span className={cn("text-[9px] px-1.5 py-0.5 rounded border font-semibold", SOURCE_STYLE[pa.source])}>{pa.source}</span>}
-        <button
-          disabled={!hasTrace}
-          onClick={() => setOpenTraceFor(isGroupOpen ? null : { label, entity })}
-          className={cn(
-            "flex items-center gap-1 text-[9px] font-semibold px-2 py-1 rounded border transition-colors",
-            isGroupOpen ? "bg-primary text-primary-foreground border-primary"
-              : hasTrace ? "border-border text-muted-foreground hover:border-primary hover:text-primary bg-card"
-              : "border-border/30 text-muted-foreground/30 cursor-not-allowed"
-          )}
-        >
-          <Bot className="size-3" />{isGroupOpen ? "▲" : "Trace"}
-        </button>
-      </div>
-
-      {entries.map((entry, ei) => (
-        <div key={ei} className="border-b border-border/50 last:border-b-0">
-          <div className="flex items-center gap-2 px-4 py-1.5 bg-secondary/20">
-            <div className={cn(
-              "size-1.5 rounded-full shrink-0",
-              entry.fields.some(f => f.status === "alert") ? "bg-alert"
-                : entry.fields.some(f => f.status === "warn") ? "bg-warning"
-                : "bg-success"
-            )} />
-            <span className="text-[10px] font-semibold text-foreground">{entry.name}</span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground font-semibold">{entry.tag}</span>
-          </div>
-          {entry.fields.map(field => {
-            const vOk = field.status === "ok";
-            const vWarn = field.status === "warn";
-            return (
-              <div key={field.label} className={cn(
-                "flex items-center gap-3 pl-8 pr-4 py-2 border-t border-border/30 hover:bg-secondary/20 transition-colors",
-                field.status === "alert" ? "bg-alert-soft/10" : ""
-              )}>
-                <div className={cn("size-1.5 rounded-full shrink-0", DOT_STYLE[field.status])} />
-                <span className="text-[10px] font-medium text-muted-foreground w-[120px] shrink-0">{field.label}</span>
-                <span className={cn(
-                  "flex-1 text-[10px]",
-                  field.status === "alert" ? "text-alert font-semibold" : field.status === "warn" ? "text-warning" : "text-foreground"
-                )}>{field.value}</span>
-                <span className="text-[8px] font-bold whitespace-nowrap">
-                  <span className="text-success">ID✓</span>
-                  <span className="text-muted-foreground/30 mx-0.5">/</span>
-                  <span className={vOk ? "text-success" : vWarn ? "text-warning" : "text-alert"}>
-                    {vOk ? "V✓" : vWarn ? "V⚠" : "V✕"}
-                  </span>
-                </span>
-                <span className={cn("text-[8px] px-1 py-0.5 rounded border font-semibold", SOURCE_STYLE[field.source])}>{field.source}</span>
-                <button
-                  disabled
-                  className="flex items-center gap-1 text-[8px] font-semibold px-1.5 py-0.5 rounded border border-border/30 text-muted-foreground/30 cursor-not-allowed"
-                  title="Trace available on the object level above"
-                >
-                  <Bot className="size-2.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      ))}
+      {/* PDF / image source-document viewer */}
+      {docView && (
+        <Dialog open onOpenChange={(o) => { if (!o) closeDoc(); }}>
+          <DialogContent className="max-w-4xl p-0 overflow-hidden gap-0">
+            <DialogHeader className="px-4 py-2.5 border-b border-border">
+              <DialogTitle className="text-[13px] truncate">{docView.file}</DialogTitle>
+            </DialogHeader>
+            <div className="bg-secondary/20 overflow-auto" style={{ height: "76vh" }}>
+              <iframe src={docView.blobUrl} title={docView.file} className="w-full h-full border-0" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
