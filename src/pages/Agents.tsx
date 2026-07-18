@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
-import { useAgentRegistry } from "@/hooks/useAgentRegistry";
+import { isAgentAvailable, useAgentRegistry } from "@/hooks/useAgentRegistry";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,10 +99,10 @@ export default function Agents() {
                       <TableCell className="text-sm">{a.output_type ?? "—"}</TableCell>
                       <TableCell>
                         <Badge
-                          variant={a.available ? "default" : "secondary"}
+                          variant={isAgentAvailable(a) ? "default" : "secondary"}
                           title={a.readiness_error ?? undefined}
                         >
-                          {!a.enabled ? "Disabled" : a.available ? "Ready" : "Unavailable"}
+                          {!a.enabled ? "Disabled" : isAgentAvailable(a) ? "Ready" : "Unavailable"}
                         </Badge>
                       </TableCell>
                     </TableRow>

@@ -21,6 +21,15 @@ export type RegistryAgent = {
   readiness_error?: string | null;
 };
 
+/**
+ * During rolling deployments an older backend may omit runtime readiness.
+ * Treat an enabled legacy row as runnable, but honor an explicit `available:
+ * false` from the database-backed backend.
+ */
+export function isAgentAvailable(agent: RegistryAgent): boolean {
+  return agent.available ?? (agent.enabled && agent.runner_registered !== false);
+}
+
 export function useAgentRegistry() {
   return useQuery<RegistryAgent[]>({
     queryKey: ["agent-registry"],

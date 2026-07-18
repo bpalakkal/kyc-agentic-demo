@@ -15,7 +15,7 @@ import {
 import { ChevronDown, Zap, Database, ClipboardList, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAgents } from "@/components/AgentSystem";
-import { useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
+import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { apiFetch } from "@/lib/apiFetch";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
@@ -56,7 +56,7 @@ function CategorySection({
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {triggerAll && (
         <DropdownMenuItem
-          disabled={!triggerAll.available}
+          disabled={!isAgentAvailable(triggerAll)}
           title={triggerAll.readiness_error ?? undefined}
           onClick={() => runAgents([triggerAll.slug as Parameters<typeof runAgents>[0][number]], triggerAll.display_name)}
         >
@@ -67,7 +67,7 @@ function CategorySection({
       {individual.map((a) => (
         <DropdownMenuItem
           key={a.slug}
-          disabled={!a.available}
+          disabled={!isAgentAvailable(a)}
           title={a.readiness_error ?? undefined}
           onClick={() => runAgents([a.slug as Parameters<typeof runAgents>[0][number]], a.display_name)}
         >
