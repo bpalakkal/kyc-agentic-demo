@@ -1,14 +1,25 @@
-# KYC Sentinel — Project Context
+# KYC Sentinel — No-Forge Build (Project Context)
+
+## Governing Principle
+
+This is the **no-Forge replica** of the Forge KYC platform.
+- **UI behaviour**: identical to the Forge version — same layouts, same agent trigger panels, same attribute grid, same screening flow.
+- **What's different**: no Forge platform dependency. Agents run via direct REST API calls or Claude API. No `proposals` / `acceptProposals` / `rejectProposals` proposal system. No `RegisterAgentDialog`. No `forge_slug` column.
+- **Governing rule**: _"This should behave exactly the same as the Forge version with the exception that the agents are running directly using direct API calls where available or using Claude API directly plus additional MCPs and tools."_
+
+---
 
 ## What This App Does
 
-AI-powered KYC (Know Your Customer) compliance platform for financial analysts. Surfaces KYC exceptions, lets analysts review and resolve them, and dispatches AI agents for investigative due diligence.
+AI-powered KYC (Know Your Customer) compliance platform for financial analysts. Surfaces KYC exceptions, lets analysts review and resolve them, and dispatches AI agents for investigative due diligence and verification.
+
+---
 
 ## Architecture
 
 ### Frontend
 - **Framework**: React 18 + TypeScript + Vite (dev port 8080)
-- **Deployed to**: GitHub Pages at `/kyc-agentic2/` base path
+- **Deployed to**: GitHub Pages at `/kyc-agentic/` base path (BrowserRouter basename)
 - **UI**: shadcn/ui (Radix + Tailwind), Lucide icons, Recharts
 - **State**: React Context (Auth, Agents, theme) + TanStack Query
 
@@ -23,79 +34,116 @@ AI-powered KYC (Know Your Customer) compliance platform for financial analysts. 
 - **Neo4j** — ownership/relationship graph
 
 ### AI
-- **Anthropic Claude** (claude-sonnet-4-6) — floating chat assistant + tool use
-- **AWS ELB agents** — autonomous agents invoked via HTTP; async polling pattern
+- **Anthropic Claude** (`claude-sonnet-4-6`) — floating chat assistant + tool use, CompaniesHouseRunner PDF digitization, all DD agent runs
+- No AWS ELB or Forge platform
+
+---
 
 ## Source Layout
 
 ```
-my-app/
-├── agents/                          # Server-side agent ecosystem (Node.js ESM)
-│   ├── types.ts                     # AgentRunOutput, AttributeOutput, ExceptionOutput, FileOutput
-│   ├── registry.ts                  # Agent slug → metadata map
+kyc-agentic/
+├── agents/                                # Server-side agent ecosystem (Node.js ESM)
+│   ├── types.ts                           # AgentRunOutput, AttributeOutput, ExceptionOutput, FileOutput
 │   ├── base/
-│   │   ├── ApiRunner.js             # Abstract base for synchronous API runners
-│   │   └── AutonomousRunner.js      # Abstract base for async AWS ELB agents
+│   │   └── ApiRunner.js                   # Abstract base: startPreview / commit / run
+│   ├── dd/
+│   │   ├── entityData.js                  # buildEntityDataJson — reconstructs entity_data.json from DB
+│   │   └── gate.js                        # agentsToRun() — which DD agents still have work
+│   ├── policy/
+│   │   ├── dd-guidance-reader.md          # System prompt for all DD agents
+│   │   └── registered_investment_advisor/ # Per-attribute policy .md files
 │   ├── publishers/
-│   │   ├── AttributePublisher.js    # Writes AttributeOutput[] → entity_attributes
-│   │   ├── ExceptionPublisher.js    # Writes ExceptionOutput[] → exceptions
-│   │   ├── FilePublisher.js         # Uploads files → Supabase Storage + case_files
-│   │   └── index.js
+│   │   ├── AttributePublisher.js          # Writes AttributeOutput[] → entity_attributes
+│   │   ├── ExceptionPublisher.js          # Writes ExceptionOutput[] → exceptions
+│   │   └── FilePublisher.js               # Uploads files → Supabase Storage + case_files
 │   └── runners/
-│       ├── api/                     # Synchronous REST API runners
-│       │   ├── CompaniesHouseRunner.js
-│       │   ├── FCARunner.js         # Pure-code FCA Register runner (no LLM)
-│       │   └── index.js
-│       └── autonomous/              # AWS ELB autonomous agent wrappers
-│           ├── UKParentFlowRunner.js
-│           └── index.js
+│       └── api/                           # Synchronous REST / Claude API runners
+│           ├── CompaniesHouseRunner.js    # CH REST + Claude PDF digitization
+│           ├── FCARunner.js               # FCA Register REST (no LLM)
+│           ├── GLEIFRunner.js             # GLEIF REST (no LLM)
+│           ├── IAPDRunner.js              # IAPD REST (no LLM)
+│           ├── JerseyFSCRunner.js         # JFSC REST (no LLM)
+│           ├── NYSERunner.js              # NYSE REST (no LLM)
+│           ├── SECEDGARRunner.js          # SEC EDGAR REST (no LLM)
+│           ├── UKSourcingFlowRunner.js    # FCA + CH in parallel
+│           ├── USSourcingFlowRunner.js    # SEC + IAPD + NYSE in parallel
+│           ├── ScreeningRunner.js         # OpenSanctions + Claude discounting
+│           ├── DdRunner.js                # Base DD orchestrator (Claude API)
+│           ├── dd/                        # Per-attribute DD runner classes
+│           │   ├── DdAllInOneRunner.js    # Runs all applicable DD agents sequentially
+│           │   ├── RiaEntityNameIdvRunner.js
+│           │   └── ... (17 total DD runners)
+│           └── index.js                   # Re-exports all runner classes
+│
+├── schema/                                # Anti-drift contract (shared frontend + backend)
+│   ├── kyc_master_attribute_schema.json  # Canonical master (RIA entity type, per-CIP applicability)
+│   ├── dd-registry.json                  # 18 DD agents → attributes they govern
+│   ├── schema-meta.json + schema-meta.js # GENERATED by scripts/build-schema-meta.mjs
+│   └── index.js + index.d.ts             # Typed accessor (@schema alias)
 │
 ├── src/
 │   ├── pages/
-│   │   ├── Dashboard.tsx            # Stats, priority cases, AI action recommendations
-│   │   ├── WorkQueue.tsx            # Entity table grouped by DRG, filter by status/risk
-│   │   ├── ExceptionReview.tsx      # Deep-dive: flag + evidence + attributes + resolve actions
-│   │   │                            #   Right panel tabs: Document Locker / Collaboration / Files
-│   │   ├── Reports.tsx              # Analytics (placeholder)
-│   │   └── Login.tsx                # Supabase auth
+│   │   ├── Dashboard.tsx                 # Stats, priority cases, AI action recommendations
+│   │   ├── WorkQueue.tsx                 # Entity table grouped by DRG, filter by status/risk
+│   │   ├── ExceptionReview.tsx           # Deep-dive: attributes + exceptions + agents + files
+│   │   ├── Agents.tsx                    # Agent registry table (no RegisterAgentDialog)
+│   │   ├── Reports.tsx                   # Analytics (placeholder)
+│   │   └── Login.tsx                     # Supabase auth
 │   ├── components/
-│   │   ├── AppLayout.tsx            # Main shell: header, nav, floating AI chat dock
-│   │   ├── AgentSystem.tsx          # Agent registry + orchestration + dock UI
-│   │   ├── GraphView.tsx            # Neo4j ownership graph via Cytoscape + DAGRE layout
-│   │   ├── kyc/
-│   │   │   ├── SimpleFieldRow.tsx   # Attribute display with override + trace drawer
-│   │   │   ├── AttributeDiffModal.tsx  # Preview/commit diff modal for API runner output
-│   │   │   ├── ForgeLineagePanel.tsx   # Attribute lineage / audit trail view
-│   │   │   ├── ForgePersonCard.tsx  # Person role card
-│   │   │   ├── CollabPanel.tsx      # Comments, watchers, activity feed
-│   │   │   ├── WgqTabContent.tsx    # WGQ questionnaire tab
-│   │   │   ├── DocumentViewer.tsx   # PDF / image viewer dialog (signed URL from Supabase)
-│   │   │   ├── FileCard.tsx         # Single file card (type icon, view/download buttons)
-│   │   │   └── EntityFiles.tsx      # File grid for an entity (All / Documents / Screenshots)
-│   │   └── ui/                      # shadcn/ui primitives
+│   │   ├── AppLayout.tsx                 # Main shell: header, nav tabs (Dashboard/Work Queue/Agents/Reports)
+│   │   ├── AgentSystem.tsx               # Agent registry + orchestration + compact dock UI
+│   │   │                                 #   Auto-commits on pending_review (no diff modal shown)
+│   │   ├── GraphView.tsx                 # Neo4j ownership graph via Cytoscape + DAGRE
+│   │   └── kyc/
+│   │       ├── SimpleFieldRow.tsx        # Attribute display with override + trace drawer
+│   │       │                             #   SourceStrip: hidden when all sources agree
+│   │       │                             #   ID/V flags: DB-only (DD agents must set them)
+│   │       ├── AttributeDiffModal.tsx    # Exists but NOT used — auto-commit bypasses it
+│   │       ├── AgentTriggers.tsx         # Agent trigger panel (sourcing / DD / screening tabs)
+│   │       ├── AgentRunsPanel.tsx        # Historical agent runs list
+│   │       ├── ForgeLineagePanel.tsx     # Attribute lineage / audit trail
+│   │       ├── ForgePersonCard.tsx       # Person role card
+│   │       ├── CollabPanel.tsx           # Comments, watchers, activity feed
+│   │       ├── WgqTabContent.tsx         # WGQ questionnaire tab
+│   │       ├── DatastoreDocuments.tsx    # Agent-produced files from /api/entity/:kycRef/artifacts
+│   │       ├── PersonRoleTable.tsx       # Party tables (beneficial owners, officers, etc.)
+│   │       ├── DocumentViewer.tsx        # PDF / image viewer dialog (signed URL from Supabase)
+│   │       ├── FileCard.tsx              # Single file card (view/download buttons)
+│   │       └── EntityFiles.tsx           # File grid for an entity
 │   ├── contexts/
 │   │   └── AuthContext.tsx
 │   ├── db/
-│   │   ├── supabase.js              # Server-side Supabase helpers (imported by server.js)
-│   │   └── neo4j.js                 # Neo4j driver + Cypher runner
-│   ├── data/
-│   │   └── entities-generated.ts    # Mock entity/exception/activity data
-│   └── lib/
-│       ├── apiFetch.ts              # Auth-aware fetch wrapper (injects Supabase JWT)
-│       ├── supabase.ts              # Frontend Supabase client
-│       └── utils.ts
+│   │   ├── supabase.js                   # Server-side Supabase helpers (imported by server.js)
+│   │   └── neo4j.js                      # Neo4j driver + Cypher runner
+│   ├── lib/
+│   │   ├── apiFetch.ts                   # Auth-aware fetch wrapper (injects Supabase JWT)
+│   │   ├── attrLabel.ts                  # canonicalAttrKey, prettifyAttrLabel, lineageConflict
+│   │   ├── schemaAttrs.ts                # entityLevelCoreAttrs(), optionalCoreAttrs(), visibleParties()
+│   │   ├── supabase.ts                   # Frontend Supabase client
+│   │   └── utils.ts
+│   └── data/
+│       └── kycMockData.ts                # Type definitions only (AttrTrace, EntityAttr, etc.) — no mock data
 │
 ├── scripts/
-│   ├── migrations/
-│   │   ├── 001_agent_runs_and_case_files.sql   # Creates agent_runs, case_files; patches entity_attributes
-│   │   ├── 002_agent_runs_status_constraint.sql # Widens status CHECK to include pending_review, cancelled
-│   │   └── 003_entity_attributes_confidence.sql # Adds confidence column (0–100) to entity_attributes
-│   ├── seed-supabase.js             # Seed entities/DRGs/exceptions (includes Barclays Bank PLC KYC-30230)
-│   └── setup-storage.js            # Create 'kyc-files' Supabase Storage bucket
+│   ├── migrations/                        # Run each once in Supabase SQL Editor, in order
+│   │   ├── 000_base_schema.sql
+│   │   ├── 001_agent_runs_and_case_files.sql
+│   │   ├── 002_agent_runs_status_constraint.sql
+│   │   ├── 003_entity_attributes_confidence.sql
+│   │   ├── 006_screening.sql
+│   │   ├── 007_kyc_ref_from_ids.sql      # ⚠ WIPES all case data (TRUNCATE entities CASCADE)
+│   │   ├── 008_persons_and_dd_columns.sql
+│   │   └── 009_person_overrides_and_runs_columns.sql  # person_overrides + agent_runs.steps/raw_output
+│   ├── seed-supabase.js
+│   └── setup-storage.js
 │
-├── server.js                        # Express server (all backend logic)
-└── .env.example                     # All required environment variables
+├── server.js                              # Express server (all backend logic)
+├── vite.config.ts                         # @schema alias + base: /kyc-agentic/
+└── .env.example                           # All required environment variables
 ```
+
+---
 
 ## Database Schema
 
@@ -105,34 +153,27 @@ my-app/
 | `entities` | kyc_ref, entity_name, risk_rating, priority, drg_id, status, due_date |
 | `drgs` | id, name |
 | `entity_snapshots` | id, kyc_ref, data (JSON), agent_id, run_id, created_at |
-| `entity_attributes` | kyc_ref, snapshot_id, **agent_run_id**, attribute_name, attribute_group, display_value, **confidence**, id_flag, verification_flag, exception_flag, lineage |
-| `entity_persons` | kyc_ref, snapshot_id, role, person_index, full_name, ownership_pct, nationality, attributes |
-| `exceptions` | kyc_ref, exception_number, **agent_run_id**, attribute_name, field_name, source_type, **severity**, status, title, reasoning, recommended_actions |
+| `entity_attributes` | kyc_ref, snapshot_id, agent_run_id, attribute_name, attribute_group, display_value, confidence, id_flag, verification_flag, exception_flag, lineage, id_reasoning, verification_reasoning, verification_source (jsonb) |
+| `entity_persons` | kyc_ref, snapshot_id (nullable), role, person_index, full_name, ownership_pct, nationality, attributes (jsonb) |
+| `exceptions` | kyc_ref, exception_number, agent_run_id, attribute_name, field_name, source_type, severity, status, title, reasoning, recommended_actions |
 | `exception_audit_log` | kyc_ref, exception_number, action, actor, occurred_at |
+| `person_overrides` | kyc_ref, role, person_index, field, value, overridden_by, overridden_at — PK: (kyc_ref, role, person_index, field) |
 
-### Agent + file tables (migration 001)
-| Table | Purpose |
-|-------|---------|
-| `agent_runs` | Persists every agent invocation — id, kyc_ref, agent_slug, runner_type ('api'\|'autonomous'), external_run_id, output_type, status, sources_consulted, initiated_by, started_at, completed_at |
-| `case_files` | Metadata for every document/screenshot — id, kyc_ref, agent_run_id, file_category ('document'\|'screenshot'), mime_type, filename, storage_path, source_url, title, caption |
+### Agent + file tables
+| Table | Key columns |
+|-------|-------------|
+| `agent_runs` | id, kyc_ref, agent_slug, runner_type ('api'∣'autonomous'), external_run_id, output_type, status, error, steps (jsonb), raw_output (jsonb), sources_consulted, initiated_by, started_at, completed_at |
+| `case_files` | id, kyc_ref, agent_run_id, file_category ('document'∣'screenshot'), mime_type, filename, storage_path, source_url, title, caption |
 
-**Bold columns** were added to existing tables by migrations.
+### agent_runs status flow
+`running` → `pending_review` → auto-committed immediately → `complete` | `failed` | `cancelled`
 
-### Migration 008 additions
-- `entity_persons.snapshot_id` is now **nullable** — agent-run runners (no Forge snapshot) can write party records directly.
-- `entity_attributes.id_reasoning text` — DD agent reasoning for why id_flag was set.
-- `entity_attributes.verification_reasoning text` — DD agent reasoning for why verification_flag was set.
-- `entity_attributes.verification_source` type changed from `text` → **`jsonb`** to hold an array of independent verification sources.
-
-### agent_runs status values
-`running` → `pending_review` → `complete` | `failed` | `cancelled`
-
-- `pending_review` — API runner finished execution; awaiting analyst accept/reject in the diff modal
-- Widened by migration 002 (original migration only had running/complete/failed)
+- No diff modal shown to analyst. The frontend's `startApiRunnerPolling` calls `POST /api/agent-run-api/:runId/commit` immediately when it sees `pending_review`.
+- `error` column stores the failure message when status is `failed`.
+- `steps` (jsonb) + `raw_output` (jsonb) stored after successful commit — added by migration 009.
 
 ### entity_attributes.confidence
-- `smallint` 0–100, nullable. Added by migration 003.
-- API runners always write 100. Autonomous LLM agents write model-provided confidence.
+- `smallint` 0–100, nullable. API runners write 100. LLM runners write model-provided score.
 
 ### Supabase Storage
 - Bucket: `kyc-files` (private — all access via signed URLs)
@@ -140,22 +181,21 @@ my-app/
 
 ### getAttributes() — two-layer merge
 `src/db/supabase.js` `getAttributes(kycRef)` merges:
-1. **Layer 1**: latest Forge snapshot attributes (`snapshot_id` set, `agent_run_id` null)
-2. **Layer 2**: completed (`status='complete'`) agent-run attributes (`snapshot_id` null, `agent_run_id` set) — most recent run wins per attribute_name
+1. Latest snapshot attributes (`snapshot_id` set, `agent_run_id` null)
+2. Completed (`status='complete'`) agent-run attributes (`snapshot_id` null, `agent_run_id` set) — most recent run wins per attribute_name
 
-### getPersons() — two-layer merge (migration 008+)
+### getPersons() — two-layer merge
 `src/db/supabase.js` `getPersons(kycRef)` merges:
-1. **Layer 1**: latest Forge snapshot persons (`snapshot_id` set)
-2. **Layer 2**: agent-run persons (`snapshot_id IS NULL` — written by no-Forge API runners) — override per role+person_index
+1. Snapshot persons (`snapshot_id` set)
+2. Agent-run persons (`snapshot_id IS NULL`) — override per role+person_index
 
-### Party data pattern (nested, NOT flat)
-Sourcing agents (CompaniesHouseRunner etc.) write party data to **`entity_persons`** (one row per person), NOT as flat `beneficial_owner_1_name` rows in `entity_attributes`.
-- `entity_persons.attributes` (jsonb): child attributes keyed by full name, e.g. `{ "beneficial_owner_name": { lineage:[...], id_flag: false, ... }, ... }`
-- `buildEntityDataJson(attrs, persons)` in `agents/dd/entityData.js` reconstructs the full nested entity_data.json format for DD agent input
-- DD agents update `entity_persons.attributes` in-place for party results (record_index present)
-- Scalar DD results still emit as entity_attributes rows via the normal publisher pipeline
+### Party data pattern
+Sourcing agents write party data to `entity_persons` (one row per person), not as flat `beneficial_owner_1_name` rows.
+- `entity_persons.attributes` (jsonb): child attributes keyed by full name
+- `buildEntityDataJson(attrs, persons)` in `agents/dd/entityData.js` reconstructs the entity_data.json for DD agent input
+- DD party results update `entity_persons.attributes` in-place (record_index present)
 
-Agent-run attributes override snapshot attributes for the same `attribute_name`.
+---
 
 ## Backend API Routes (`server.js`)
 
@@ -163,15 +203,10 @@ Agent-run attributes override snapshot attributes for the same `attribute_name`.
 | Route | Purpose |
 |-------|---------|
 | `POST /api/zoom/create-meeting` | Zoom Server-to-Server OAuth, create meeting |
-| `POST /api/agent/:slug` | Invoke autonomous agent via AWS ELB (existing frontend polling flow) |
-| `GET /api/agent-steps/:runId` | Poll agent thinking steps (AWS ELB) |
-| `GET /api/agent-run/:runId` | Poll agent run status (AWS ELB) |
-| `GET /api/agent-artifacts/:runId` | List agent output artifacts |
-| `GET /api/artifact-download` | Stream artifact file |
 | `GET /api/entities` | All entities for work queue |
 | `GET /api/entity/:kycRef` | Single entity detail |
-| `GET /api/entity/:kycRef/snapshot` | Latest KYC Forge JSON |
-| `POST /api/entity/:kycRef/snapshot` | Save Forge JSON + extract attrs/persons/exceptions |
+| `GET /api/entity/:kycRef/snapshot` | Latest KYC JSON snapshot |
+| `POST /api/entity/:kycRef/snapshot` | Save JSON snapshot + extract attrs/persons/exceptions |
 | `GET /api/entity/:kycRef/attributes` | Merged attributes (snapshot + completed agent runs) |
 | `GET /api/entity/:kycRef/attributes/trace/:attrName` | Full lineage for one attribute |
 | `GET /api/entity/:kycRef/persons` | Person records grouped by role |
@@ -179,126 +214,156 @@ Agent-run attributes override snapshot attributes for the same `attribute_name`.
 | `PATCH /api/entity/:kycRef/exception/:num/resolve` | Mark exception resolved |
 | `GET /api/neo4j/entity/:kycId/graph` | Cytoscape-ready ownership graph |
 | `POST /api/neo4j/expand` | Expand a node by elementId |
-| `POST /api/chat` | Claude SSE streaming chat with tool use (max_tokens: 4096) |
+| `POST /api/chat` | Claude SSE streaming chat with tool use |
 
-### API runner routes (preview/commit pattern)
+### API runner routes (two-phase: run → auto-commit)
 | Route | Purpose |
 |-------|---------|
-| `POST /api/agent-run/api/:slug` | Start API runner; returns `{ runId, status: 'running' }` immediately |
-| `GET /api/agent-run-api-steps/:runId` | Live step log (in-memory Map); returns `{ steps: [] }` if Map miss (server restart) |
-| `GET /api/agent-run-api-status/:runId` | Run status from DB; detects orphaned `running` runs and marks them `failed` |
-| `GET /api/agent-run-api/:runId/diff` | Proposed vs current attributes for diff modal |
-| `POST /api/agent-run-api/:runId/commit` | Accept approved attributes, publish to DB, mark `complete` |
+| `POST /api/agent-run/api/:slug` | Start runner; returns `{ runId, status: 'running' }` immediately |
+| `GET /api/agent-run-api-steps/:runId` | Live step log (in-memory Map); empty if server restarted |
+| `GET /api/agent-run-api-status/:runId` | Status from DB; marks orphaned `running` runs `failed` |
+| `POST /api/agent-run-api/:runId/commit` | Accept all output, publish to DB, mark `complete` |
 | `DELETE /api/agent-run-api/:runId` | Cancel a `pending_review` run |
 
-### File + run history routes
+### Screening routes
 | Route | Purpose |
 |-------|---------|
-| `POST /api/agent-run/async/:slug` | Start an autonomous AWS agent and persist the run |
+| `POST /api/entity/:kycRef/screening/run` | Read parties from DB, call OpenSanctions, discount with Claude |
+| `GET /api/entity/:kycRef/screening` | Latest screening run + analyst dispositions |
+| `PATCH /api/entity/:kycRef/screening/disposition` | Set a hit's analyst disposition |
+
+### DD routes
+| Route | Purpose |
+|-------|---------|
+| `GET /api/entity/:kycRef/dd/plan` | Which DD agents still have work remaining |
+| `POST /api/entity/:kycRef/dd/run` | Kick off DD agents (all or specific slugs) |
+| `GET /api/entity-data/:kycRef` | entity_data.json shape used by DD agents |
+
+### Other routes
+| Route | Purpose |
+|-------|---------|
 | `GET /api/entity/:kycRef/runs` | List agent_runs for entity |
-| `GET /api/entity/:kycRef/files` | List case_files; `?category=document\|screenshot` |
-| `GET /api/file/:fileId/url` | Short-lived signed URL for a private file |
-| `DELETE /api/file/:fileId` | Remove file from storage + DB |
+| `GET /api/entity/:kycRef/files` | List case_files |
+| `GET /api/file/:fileId/url` | Short-lived signed URL |
+| `DELETE /api/file/:fileId` | Remove file |
+| `POST /api/entity/:kycRef/persons/:role/:index/override` | Persist analyst person edits |
+| `POST /api/entity/:kycRef/attributes/override` | Persist analyst attribute override |
+| `POST /api/entity/:kycRef/attributes/:name/confirm` | Set ID+V flags manually |
+| `GET /api/agents` | Static agent registry (hardcoded in server.js) |
+| `GET /api/health` | Supabase + Neo4j health check |
 
 ### In-memory Maps (server.js)
 Two Maps survive only for the lifetime of the Railway process:
 - `apiRunnerSteps` — `runId → string[]` live progress steps
 - `apiRunnerOutput` — `runId → { output, kycRef, initiatedBy }` pending preview
 
-On Railway restart these are cleared. The status endpoint handles this gracefully: any run with `status='running'` and no Map entry is immediately marked `failed`.
+On Railway restart: Maps cleared. Status endpoint handles orphans: `running` + no Map entry → immediately marked `failed`.
 
-## Agent Ecosystem (`agents/`)
+---
+
+## Agent Ecosystem
+
+### Agent registry (server.js `/api/agents`)
+Hardcoded static list of 28 agents:
+- **Sourcing** (9): `uk-sourcing-flow` (trigger_all UK), `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `sec`, `iapd`, `nyse`, `gleif`
+- **Due Diligence** (18): `dd-all-in-one` (trigger_all DD), `ria-entity-name-idv`, `ria-cip-classification-id`, etc. — all have `cip_classification: 'Registered Investment Advisor or Commodity Trading Advisor'`
+- **Screening** (1): `screening` (trigger_all Screening) — routed via `/api/entity/:kycRef/screening/run`
+
+`cip_classification` must be the FULL string `'Registered Investment Advisor or Commodity Trading Advisor'` — this is what the DB stores and what the UI filters on. Never use short aliases like `'RIA'`.
+
+### Runner class map (server.js `loadRunnerClass()`)
+Slug → runner class lookup. If a slug isn't in this map, the server returns 404 and the run shows ⚠ in the dock.
 
 ### How a new runner is added
 1. Create `agents/runners/api/MyRunner.js` extending `ApiRunner`
 2. Set `get slug()` and `get outputType()`
-3. Implement `async execute(ctx)` → return `AgentRunOutput`
+3. Implement `async execute(ctx)` → return `AgentRunOutput`; call `this.step(msg)` at each phase
 4. Export from `agents/runners/api/index.js`
-5. Add to the `RunnerMap` in `server.js` `/api/agent-run/api/:slug` route
-6. Add `AgentApiConfig` entry in `AgentSystem.tsx` with `apiRunner: true`
+5. Add to `loadRunnerClass()` map in `server.js`
+6. Add `AgentApiConfig` entry in `AgentSystem.tsx` with `asyncMode: true, apiRunner: true`
 
-### Runner output contract (`agents/types.ts`)
+### Runner output contract
 ```
 AgentRunOutput {
   agentSlug, kycRef, outputType
   attributes?: AttributeOutput[]   → entity_attributes (snapshot_id=null, agent_run_id set)
-  exceptions?: ExceptionOutput[]   → exceptions (source_type='agent:<slug>')
+  exceptions?: ExceptionOutput[]   → exceptions
   files: FileOutput[]              → Supabase Storage + case_files
   metadata: { completedAt, durationMs, sourcesConsulted }
 }
 ```
 
-### Attribute group convention — **mandatory for all runners**
-Every `AttributeOutput` must set `attributeGroup` to exactly one of:
-- `'core'` — any factual / regulatory / structural attribute shown in the Attributes tab
-- `'wgq'`  — questionnaire fields shown in the Questionnaire tab
+### Attribute group convention — mandatory
+Every `AttributeOutput` must set `attributeGroup` to `'core'` or `'wgq'`. A custom group name silently hides all attributes from that runner in the UI.
 
-**Never invent new group names.** The frontend (`ExceptionReview` `AttributeFormView`) filters on
-`attribute_group === 'core'` to build the attribute list for entities that have no curated profile.
-A custom group name silently causes all attributes from that runner to be invisible in the UI.
+### Auto-commit flow (replaces diff modal)
+1. `POST /api/agent-run/api/:slug` → runner executes in background, status → `pending_review`
+2. Frontend polls steps + status
+3. On `pending_review` → frontend immediately calls `POST /api/agent-run-api/:runId/commit` (no body = accept all)
+4. Attributes published to DB, status → `complete`
+5. Dock shows `✓ Saved: N attrs · M exceptions`
+6. `AttributeFormView` auto-refreshes attributes via `overrideVersion` bump (wasRunning ref pattern)
 
-### Confidence field
-Every `AttributeOutput` should set `confidence: 100` for pure-code/API runners. LLM-driven runners should set whatever score the model provides. Stored in `entity_attributes.confidence` (0–100 smallint, nullable).
+`AttributeDiffModal.tsx` exists in the codebase but is NOT invoked by this flow. It remains for potential future use.
 
-### API runner two-phase flow
-1. `POST /api/agent-run/api/:slug` → runner executes, status becomes `pending_review`
-2. Frontend polls steps + status; on `pending_review` → `AttributeDiffModal` opens
-3. Analyst reviews diff (new vs current values); multi-value attrs compared by value-set (reordering not flagged)
-4. Accept → `POST /api/agent-run-api/:runId/commit` → attributes published, status → `complete`
-5. Cancel → `DELETE /api/agent-run-api/:runId` → status → `cancelled`, nothing written
+### ID/V flags
+- `id_flag` and `verification_flag` in `entity_attributes` are set ONLY by DD agent runs
+- They are NEVER auto-set when an analyst manually overrides a value
+- `SimpleFieldRow.tsx` reads them directly from DB — the `isOverridden ? true :` pattern was intentionally removed
 
-### Publisher pipeline
-`ApiRunner.run()` calls publishers automatically after `execute()`:
-- `AttributePublisher` — bulk insert into entity_attributes
-- `ExceptionPublisher` — deduplicates against open exceptions, uses `alloc_exception_numbers` RPC for sequential numbering
-- `FilePublisher` — resolves file content (Buffer or artifact download from AWS), uploads to `kyc-files`, inserts case_files row
+### Attribute display — CIP filtering
+`schemaAttrs.ts` `entityLevelCoreAttrs()` drives the attribute grid. It reads the master schema and excludes `not_applicable` attributes for the RIA entity type. All required + optional scalar attributes are shown, even before any agent has run (empty value, section visible). Categories default collapsed except the first.
 
-### Autonomous agent flow
-- Frontend calls `POST /api/agent/:slug` (existing) OR the new `POST /api/agent-run/async/:slug`
-- When the frontend calls `POST /api/entity/:kycRef/snapshot` at run completion, the server automatically creates an `agent_runs` row and harvests any artifact files from the AWS ELB
+---
 
 ## Frontend Routing
 
-Routes live in `src/App.tsx` (BrowserRouter basename `/kyc-agentic2`):
+Routes in `src/App.tsx` (BrowserRouter basename `/kyc-agentic`):
 - `/` — Dashboard
 - `/work-queue` — Work Queue
 - `/work-queue/review/:kycRef` — Exception Review for a specific entity
-- `/work-queue/review` — redirects to `/work-queue` (no entity in URL)
+- `/work-queue/review` — redirects to `/work-queue`
 
-The `:kycRef` param is required so page refresh preserves the entity. `ExceptionReview` reads it via `useParams()` and re-fetches the entity from the API if `location.state` is absent.
+Nav order: Dashboard → Work Queue → Agents → Reports (matches Forge).
 
-## AI Chat Tools (`/api/chat`)
-- `get_entity` — fetch single entity by KYC ref
-- `list_entities` — list entities with optional risk/priority filters
-- `get_exceptions` — get exceptions for an entity
-- `search_entities` — search by name
-- `query_graph` — run Cypher against Neo4j
+---
 
-## Key Workflows
+## Schema
 
-1. **Dashboard** → open/overdue cases, AI-recommended actions
-2. **Work Queue** → browse entities by DRG group, filter, select for review; click entity name → `/work-queue/review/:kycRef`
-3. **Exception Review** → view flag + narrative + evidence; right panel: Document Locker / Collaboration / **Files**
-4. **Agent Dispatch** → run API runners; dock shows live steps; `pending_review` triggers diff modal; accept/reject before DB write
-5. **Attribute View** → merged grid of Forge snapshot + completed agent-run attributes; groups from all non-wgq sources
-6. **Files Tab** → `EntityFiles` component fetches `GET /api/entity/:kycRef/files`; click a card → `DocumentViewer` fetches signed URL and renders PDF/image inline
-7. **Ownership Graph** → explore entity relationships via Neo4j
+`schema/` is the anti-drift contract shared by frontend + backend.
+
+| File | Purpose |
+|------|---------|
+| `schema/kyc_master_attribute_schema.json` | Canonical master (RIA entity type). Owns attribute definitions, per-attribute value-enums (`$defs`), and `x-entity-type-applicability`. |
+| `schema/dd-registry.json` | 18 DD agents → attributes they govern. |
+| `schema/schema-meta.json` + `schema/schema-meta.js` | **Generated** by `scripts/build-schema-meta.mjs`. Never hand-edit. |
+| `schema/index.js` + `schema/index.d.ts` | Typed accessor: `getVisibleAttributes(entityType)`, `applicability`, `enumFor`, `isVerifiable`, `arrayAttributes`, `entityTypeByAlias('RIA')`. Import via `@schema` alias. |
+
+```bash
+npm run generate   # Regenerate schema-meta.* after editing the canonical master
+```
+
+---
 
 ## Environment Variables
 
 See `.env.example`. All required:
 ```
-SUPABASE_URL, SUPABASE_SERVICE_KEY        — Supabase backend (service key)
-VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — Supabase frontend (anon key)
-ANTHROPIC_API_KEY                         — Claude API
-AWS_AGENT_BASE                            — AWS ELB base URL (no trailing slash)
+SUPABASE_URL, SUPABASE_SERVICE_KEY          — Supabase backend (service key)
+VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY  — Supabase frontend (anon key)
+ANTHROPIC_API_KEY                           — Claude API (DD agents + CH PDF digitization)
+COMPANIES_HOUSE_API_KEY                     — Companies House REST API
+FCA_AUTH_EMAIL, FCA_API_KEY                 — FCA Register API (set in Railway Variables)
+OPENSANCTIONS_API_KEY                       — OpenSanctions /match/default (screening)
+VITE_AGENT_API_BASE                         — Express server URL (Railway URL in production)
+NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD      — Neo4j (optional — graph tab only)
 ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET
-NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
-COMPANIES_HOUSE_API_KEY                   — developer.company-information.service.gov.uk
-FCA_AUTH_EMAIL, FCA_API_KEY               — FCA Register API (set in Railway Variables, not .env)
-VITE_AGENT_API_BASE                       — Express server URL (default: http://localhost:3001)
-OPENSANCTIONS_API_KEY                     — OpenSanctions /match/default batch API (screening agent)
 ```
+
+**Railway-only** (not in .env file):
+- `FCA_AUTH_EMAIL`, `FCA_API_KEY`, `OPENSANCTIONS_API_KEY`
+
+---
 
 ## Dev Commands
 
@@ -307,83 +372,108 @@ npm run start    # Vite (8080) + Express (3001) concurrently
 npm run dev      # Vite only
 npm run server   # Express only
 npm run build    # Production build
-npm run deploy   # Build + push to GitHub Pages
-node scripts/seed-supabase.js    # Seed entities/DRGs/exceptions (run once)
-node scripts/setup-storage.js    # Create kyc-files bucket (run once)
+npm run generate # Regenerate schema-meta from master schema
 ```
 
-Migrations — paste each into Supabase SQL Editor and run once, in order:
+Migrations — paste each into Supabase SQL Editor and run once, in order (001 → 009):
 ```
-scripts/migrations/001_agent_runs_and_case_files.sql
-scripts/migrations/002_agent_runs_status_constraint.sql
-scripts/migrations/003_entity_attributes_confidence.sql
-scripts/migrations/006_screening.sql
-scripts/migrations/007_kyc_ref_from_ids.sql    ← WIPES all case data (TRUNCATE entities CASCADE)
-scripts/migrations/008_persons_and_dd_columns.sql  ← entity_persons nullable + DD reasoning cols
+000_base_schema.sql
+001_agent_runs_and_case_files.sql
+002_agent_runs_status_constraint.sql
+003_entity_attributes_confidence.sql
+006_screening.sql
+007_kyc_ref_from_ids.sql    ← WIPES all case data (TRUNCATE entities CASCADE)
+008_persons_and_dd_columns.sql
+009_person_overrides_and_runs_columns.sql  ← person_overrides table + agent_runs.steps/raw_output
 ```
+
+---
+
+## Deployment
+
+- **Frontend**: GitHub Pages (`git push origin main` → GitHub Actions builds + deploys to `gh-pages` branch → Pages source = "GitHub Actions")
+- **Backend**: Railway (`Procfile`: `web: npm run server`) — auto-deploys on `git push origin main`
+
+**VITE_AGENT_API_BASE** must be set as a GitHub Actions secret (repository secret `VITE_AGENT_API_BASE` = Railway URL) so it is injected at build time. The frontend compiled JS cannot read Railway env vars at runtime.
+
+---
 
 ## API Authentication & Connectivity
 
 ### Critical: All API calls must use `apiFetch()`
-Every call to `AGENT_API_BASE/api/*` routes **must** use the `apiFetch()` wrapper from `src/lib/apiFetch.ts`, not direct `fetch()`. This is non-negotiable:
+Every call to `AGENT_API_BASE/api/*` **must** use `apiFetch()` from `src/lib/apiFetch.ts`, not direct `fetch()`.
 - `apiFetch()` injects the Supabase session Bearer token automatically
-- Direct `fetch()` will get 401 Unauthorized
-- **Files affected**: Dashboard.tsx, WorkQueue.tsx, GraphView.tsx, ExceptionReview.tsx, and any new pages making API calls
+- Direct `fetch()` gets 401 Unauthorized
+- Session tracked via `onAuthStateChange()` — NOT `getSession()` (which fails to retrieve sessions reliably)
 
 ### Supabase Configuration
-**Frontend client** (`src/lib/supabase.ts`):
-- Must point to the **current** Supabase project (currently `xnixtxpftxcehlbmgsga`)
-- Uses anon key for auth flow
-- Configured with `persistSession: true`, `autoRefreshToken: true`, `detectSessionInUrl: true`
+**Backend** (`src/db/supabase.js`): Node 20+ required — uses `ws` package for WebSocket transport.
 
-**Backend** (`server.js`, `src/db/supabase.js`):
-- Uses service key (has full database access)
-- **Node 20+ required**: Must configure WebSocket transport via `ws` package
-- See `src/db/supabase.js` for example: `realtime: { transport: ws }`
+---
 
-**Session tracking** (do NOT use `getSession()`):
-- Frontend uses `onAuthStateChange()` to track session in-memory (see `src/lib/apiFetch.ts`)
-- `supabase.auth.getSession()` fails to persist/retrieve sessions reliably (was root cause of 401 errors in June 2026 deployment)
-- Always read from the in-memory session updated by `onAuthStateChange()`
+## Troubleshooting Agent Failures
 
-### External API Credentials
-Set these in Railway dashboard variables (not `.env`):
-- `FCA_AUTH_EMAIL` — FCA Register API auth header
-- `FCA_API_KEY` — FCA Register API auth header
-- `FCA_BASE` — hardcoded to `https://register.fca.org.uk/services/V0.1` in FCARunner
+When most/all agents fail, check in this order:
 
-### Node Version
-- **Local**: `.nvmrc` = 20 (required for Supabase WebSocket support)
-- **Railway**: Automatically detected from `.nvmrc` or package.json `engines` field
-- If you see "Node.js 18 detected without native WebSocket support" error, redeploy to pick up `.nvmrc` change
+### 1. Read the error in the dock
+The bottom-right dock shows the last step for each run. A failed run shows something like:
+```
+⚠ Run failed: COMPANIES_HOUSE_API_KEY environment variable is not set
+```
+The specific error message tells you exactly what went wrong.
+
+### 2. Check Railway deployment logs
+Railway dashboard → service → active deployment → **View logs**. Filter for:
+```
+[api-runner] companies-house preview failed: <message>
+[dd-run] ria-entity-name-idv preview failed: <message>
+```
+
+### 3. Check health endpoint
+```
+GET https://<railway-url>/api/health
+```
+Returns `{ ok: true }` when Supabase is reachable. `ok: false` means DB is down — all agents will fail at the `_createRun()` insert step.
+
+### 4. Common failure causes by agent group
+
+| Agent group | Required env var | Typical error |
+|-------------|-----------------|---------------|
+| Companies House, UK sourcing | `COMPANIES_HOUSE_API_KEY` | `COMPANIES_HOUSE_API_KEY environment variable is not set` |
+| FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
+| All DD agents, CH PDF phase | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is not set` |
+| Screening | `OPENSANCTIONS_API_KEY` | `OPENSANCTIONS_API_KEY is not set` |
+| Any agent | Supabase down | `agent_runs insert error` or `Supabase unavailable` |
+
+### 5. Check migrations
+If migration 009 hasn't been run, the commit step fails with a column error. Verify in Supabase SQL Editor:
+```sql
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'agent_runs' ORDER BY column_name;
+```
+Expected columns include: `error`, `steps`, `raw_output`, `sources_consulted`.
+
+### 6. Server restart mid-run
+If Railway restarted between when the run was launched and when the frontend polls for status, the orphan detection marks it `failed` with the message `"Server restarted while run was in progress"`. Re-run the agent — this is expected behaviour.
+
+### 7. CORS error
+If the dock shows `⚠ API error: NetworkError when attempting to fetch resource` — the Railway server is down or CORS is blocking. Check:
+- Railway service is deployed and healthy
+- `VITE_AGENT_API_BASE` GitHub secret equals the current Railway URL (without trailing slash)
+- Rebuild + redeploy frontend after changing the secret
+
+---
 
 ## CSS / Styling Note
 
 Tailwind is compiled into `dist/assets/index-*.css`. If the UI looks unstyled, check that file is ~107 kB. A ~0.3 kB file means `index.css` was clobbered. Custom Tailwind colors: `alert`, `warning`, `success`, `info`, `risk-rating` variants (all with `.soft` and `.soft-border` sub-tokens).
 
-## Schema
+---
 
-`schema/` is the anti-drift contract shared by frontend + backend.
+## Key UI Behaviours (Forge-replica rules)
 
-| File | Purpose |
-|------|---------|
-| `schema/kyc_master_attribute_schema.json` | Canonical master (RIA entity type). Owns attribute definitions, per-attribute value-enums (`$defs`, e.g. `Country`), and `x-entity-type-applicability` (per-cip-classification: `required` / `optional` / `not_applicable`). |
-| `schema/dd-registry.json` | 18 DD agents → attributes (party + verifiable flags). |
-| `schema/schema-meta.json` + `schema/schema-meta.js` | **Generated** by `scripts/build-schema-meta.mjs`. Never hand-edit. |
-| `schema/index.js` + `schema/index.d.ts` | Typed accessor: `getVisibleAttributes(entityType)`, `applicability`, `enumFor`, `isVerifiable`, `arrayAttributes`, `entityTypeByAlias('RIA')`. Import via the `@schema` alias. |
-
-To regenerate `schema-meta.*` after editing the canonical master:
-```bash
-npm run generate
-```
-
-Import the schema accessor in Node or Vite:
-```js
-import { getVisibleAttributes, enumFor } from '@schema';
-```
-
-## Deployment
-
-- **Frontend**: GitHub Pages (`npm run deploy`)
-- **Backend**: Railway (`Procfile`: `web: npm run server`) — auto-deploys on `git push origin main`
-- **Migrations**: paste all SQL files into Supabase SQL Editor in order (001 → 007) before first deploy. **Migration 007 wipes all case data (TRUNCATE entities CASCADE).**
+- **Agent triggers**: sourcing and DD each have a "Run All" button + individual agents. Sourcing "Run All" = `uk-sourcing-flow`. DD "Run All" = `dd-all-in-one`. Both available only when an entity is loaded.
+- **Attribute grid**: always shows all schema-applicable categories (even empty). Sources agree → no SourceStrip shown. Sources disagree → amber pills per source. ID/V badges only light up from real DB flags set by DD agents.
+- **After agent run**: attributes auto-refresh in the Attributes tab via the `wasRunning` ref pattern — no page reload needed.
+- **Compact dock**: groups runs by entity; each run shows dot + name + elapsed time + attr count + status text. No thought log expansion.
+- **Nav order**: Dashboard → Work Queue → Agents → Reports.
