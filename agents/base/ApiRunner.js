@@ -153,14 +153,12 @@ export class ApiRunner {
 
     if (output.attributes?.length) {
       stats.attrCount = await new AttributePublisher(this.sb)
-        .publish(kycRef, agentRunId, output.attributes)
-        .catch(e => { console.error('[ApiRunner] AttributePublisher failed:', e.message); return 0; });
+        .publish(kycRef, agentRunId, output.attributes);
     }
 
     if (output.exceptions?.length) {
       stats.excCount = await new ExceptionPublisher(this.sb)
-        .publish(kycRef, agentRunId, this.slug, output.exceptions)
-        .catch(e => { console.error('[ApiRunner] ExceptionPublisher failed:', e.message); return 0; });
+        .publish(kycRef, agentRunId, this.slug, output.exceptions);
     }
 
     if (output.files?.length) {

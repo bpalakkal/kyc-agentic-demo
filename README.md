@@ -1,263 +1,193 @@
 # KYC Sentinel
 
-AI-powered KYC compliance platform for financial analysts. Surfaces compliance exceptions, lets analysts review and resolve them, and dispatches AI agents to pull due diligence data from external sources.
+KYC Sentinel is a no-Forge KYC compliance platform for financial analysts. It combines entity and exception review, traceable KYC attributes, direct data-sourcing agents, Claude-based due diligence, sanctions and PEP screening, ownership graphs, and analyst resolution workflows.
 
----
+## Architecture
 
-## Quick Start
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Copy and fill in environment variables
-cp .env.example .env
-
-# 3. Run DB migrations in order (paste each into Supabase SQL Editor)
-#    scripts/migrations/001_agent_runs_and_case_files.sql
-#    scripts/migrations/002_agent_runs_status_constraint.sql
-#    scripts/migrations/003_entity_attributes_confidence.sql
-
-# 4. Create the file storage bucket
-node scripts/setup-storage.js
-
-# 5. Seed initial entities and exceptions
-node scripts/seed-supabase.js
-
-# 6. Start dev server (Vite on :8080 + Express on :3001)
-npm run start
+```text
+React/Vite SPA
+  -> Express API on Railway
+     -> Supabase PostgreSQL, Auth, and private Storage
+     -> direct registry and market-data REST APIs
+     -> Anthropic Claude
+     -> OpenSanctions
+     -> Neo4j (optional)
 ```
 
----
-
-## Stack
+There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves the established KYC workflow while runners execute directly in the backend.
 
 | Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + TypeScript + Vite |
-| UI | shadcn/ui (Radix + Tailwind), Lucide icons |
-| Backend | Express (Node.js ESM, Railway) |
-| Primary DB | Supabase (PostgreSQL) |
-| File Storage | Supabase Storage (`kyc-files` bucket, private) |
-| Graph DB | Neo4j |
-| AI Assistant | Anthropic Claude (claude-sonnet-4-6) |
-| Agent Runtime | AWS ELB (async HTTP) + synchronous API runners |
-
----
+|---|---|
+| Frontend | React 18, TypeScript, Vite, TanStack Query |
+| UI | shadcn/ui, Radix, Tailwind, Lucide, Recharts |
+| Backend | Express 5, Node.js ESM, Railway |
+| Data and auth | Supabase PostgreSQL, Auth, private Storage |
+| Graph | Neo4j with Cytoscape visualization |
+| AI | Anthropic Claude `claude-sonnet-4-6` |
+| Screening | OpenSanctions REST API |
 
 ## Features
 
-### Exception Review
-Browse open KYC exceptions per entity. Each exception shows a confidence score, AI-generated narrative, reasoning steps, and supporting evidence. Resolve via QA sign-off, escalation, client outreach, or submission.
+- Authenticated dashboard and work queue backed by Supabase
+- Entity exception review and persisted resolutions
+- Schema-driven core and WGQ attribute views, including empty applicable fields
+- Attribute lineage, confidence, source conflicts, and analyst overrides
+- Beneficial-owner, officer, director, and signatory party tables
+- Direct UK, US, and global sourcing agents
+- Attribute-specific and all-in-one due-diligence agents
+- Sanctions and PEP screening with analyst dispositions
+- Private evidence-file storage and signed document URLs
+- Optional Neo4j ownership graph
+- Claude-powered KYC assistant chat
+- Compact live agent dock with progress and automatic result persistence
 
-### Attribute View
-Full attribute grid built from two merged layers: the latest KYC Forge snapshot and any accepted API runner results. Attributes carry lineage (source, confidence, agent actions) and support analyst overrides. Entities with no Forge snapshot show API runner attributes directly.
+## Quick start
 
-### Agent Dispatch — Preview / Commit Flow
-Run API agents (e.g. FCA Register) directly from the review screen. A live dock shows progress steps as they arrive. When the agent finishes, a **diff modal** appears showing proposed attribute values vs what is currently stored. The analyst can accept all, accept a subset, or reject entirely — nothing is written to the database until accepted.
+Prerequisites:
 
-Multi-value attributes (e.g. `corporate_officer_1`, `corporate_officer_2`) are compared by value-set membership, not position, so reordering does not appear as a change.
-
-### Attribute Confidence
-Every attribute carries a confidence score (0–100%). API runners always write 100%. Autonomous LLM-driven agents write whatever score the model provides.
-
-### Files Tab
-Every document and screenshot produced by an agent run is stored in Supabase Storage and listed in the Files tab on the Exception Review screen. Click to open an inline viewer (PDF iframe, image, or download fallback). Files are served via short-lived signed URLs — never public.
-
-### Ownership Graph
-Interactive Neo4j graph showing entity relationships, beneficial owners, and key controllers. Click any node to expand its connections.
-
-### AI Chat
-Floating chat assistant powered by Claude with tool use — can query entity data, list exceptions, search by name, and run Cypher against the graph.
-
----
-
-## Project Structure
-
-```
-my-app/
-├── agents/                  # Server-side agent ecosystem
-│   ├── types.ts             # Shared output types (AgentRunOutput, AttributeOutput, …)
-│   ├── registry.ts          # Agent slug → metadata
-│   ├── base/
-│   │   ├── ApiRunner.js     # Base class for synchronous API runners (preview/commit)
-│   │   └── AutonomousRunner.js  # Base class for async AWS agents
-│   ├── publishers/          # Write agent output to Supabase
-│   │   ├── AttributePublisher.js
-│   │   ├── ExceptionPublisher.js
-│   │   └── FilePublisher.js
-│   └── runners/
-│       ├── api/             # Direct REST API runners
-│       │   ├── FCARunner.js         # FCA Register (pure code, no LLM)
-│       │   └── CompaniesHouseRunner.js
-│       └── autonomous/      # AWS ELB agent wrappers
-│           └── UKParentFlowRunner.js
-├── src/
-│   ├── pages/               # Dashboard, WorkQueue, ExceptionReview, Login
-│   ├── components/
-│   │   ├── AgentSystem.tsx          # Agent orchestration + dock UI
-│   │   ├── GraphView.tsx            # Neo4j graph
-│   │   └── kyc/
-│   │       ├── AttributeDiffModal.tsx   # Preview/commit diff modal
-│   │       ├── DocumentViewer.tsx       # PDF / image viewer dialog
-│   │       ├── FileCard.tsx             # Single file card
-│   │       └── EntityFiles.tsx          # File grid with category tabs
-│   └── db/
-│       ├── supabase.js      # Server-side DB helpers (getAttributes merges snapshot + agent runs)
-│       └── neo4j.js         # Graph queries
-├── scripts/
-│   ├── migrations/
-│   │   ├── 001_agent_runs_and_case_files.sql
-│   │   ├── 002_agent_runs_status_constraint.sql
-│   │   └── 003_entity_attributes_confidence.sql
-│   ├── seed-supabase.js     # Seeds entities including Barclays Bank PLC (KYC-30230)
-│   └── setup-storage.js     # Create Supabase Storage bucket
-└── server.js                # All Express routes
-```
-
----
-
-## Adding a New API Runner
-
-1. Create `agents/runners/api/MySourceRunner.js`:
-
-```js
-import { ApiRunner } from '../../base/ApiRunner.js';
-
-export class MySourceRunner extends ApiRunner {
-  get slug()       { return 'my-source'; }
-  get outputType() { return 'attributes'; }
-
-  async execute({ kycRef, entityName }) {
-    this.step('Fetching data…');
-    // Call external API …
-    this.step('Processing results…');
-
-    return {
-      agentSlug:  this.slug,
-      kycRef,
-      outputType: this.outputType,
-      attributes: [
-        {
-          attributeName:  'entity_name',
-          attributeGroup: 'core',    // MUST be 'core' or 'wgq' — no other values
-          displayValue:   'Acme Ltd',
-          source:         'My Source',
-          confidence:     100,       // 0–100; always 100 for pure-code runners
-          idFlag:         false,
-          verificationFlag: false,
-          exceptionFlag:  false,
-          lineage: [{ source: 'My Source', sourceUrl: 'https://example.com', fetchedAt: new Date().toISOString(), confidence: 1.0 }],
-        },
-      ],
-      exceptions: [],
-      files:      [],
-      metadata:   { completedAt: new Date().toISOString(), durationMs: 0, sourcesConsulted: ['example.com'] },
-    };
-  }
-}
-```
-
-2. Export from `agents/runners/api/index.js`
-3. Add to the `RunnerMap` in `server.js` at `POST /api/agent-run/api/:slug`
-4. Add an `AgentApiConfig` entry in `src/components/AgentSystem.tsx`:
-
-```ts
-"my-source": {
-  slug: "my-source",
-  endpoint: "/api/agent-run/api/my-source",
-  buildBody: (ctx) => ({ entityName: ctx?.name ?? "", kycRef: ctx?.kyc ?? "" }),
-  fetchSteps: true,
-  asyncMode: true,
-  apiRunner: true,
-  skipSnapshot: true,
-},
-```
-
-### Attribute group rule
-`attributeGroup` must be **`'core'`** (attributes tab) or **`'wgq'`** (questionnaire tab). Any other value silently makes those attributes invisible in the UI.
-
----
-
-## Database Migrations
-
-Run all three in order in the Supabase SQL Editor:
-
-| File | What it does |
-|------|-------------|
-| `001_agent_runs_and_case_files.sql` | Creates `agent_runs` and `case_files`; patches `entity_attributes` and `exceptions` |
-| `002_agent_runs_status_constraint.sql` | Widens `agent_runs.status` CHECK to include `pending_review` and `cancelled` |
-| `003_entity_attributes_confidence.sql` | Adds `confidence smallint` (0–100) to `entity_attributes` |
-
-### agent_runs status lifecycle
-```
-running → pending_review → complete
-                        ↘ failed | cancelled
-```
-
----
-
-## Environment Variables
-
-See `.env.example` for the full list. Key variables:
-
-```
-SUPABASE_URL / SUPABASE_SERVICE_KEY       — backend DB access
-VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — frontend auth
-ANTHROPIC_API_KEY                         — Claude chat assistant
-AWS_AGENT_BASE                            — AWS ELB for autonomous agents
-COMPANIES_HOUSE_API_KEY                   — Companies House API runner
-VITE_AGENT_API_BASE                       — Express server URL (http://localhost:3001 in dev)
-FCA_AUTH_EMAIL / FCA_API_KEY              — FCA Register API (Railway Variables only, not .env)
-```
-
----
-
-## API Connectivity & Authentication
-
-### All API calls must use `apiFetch()`
-Every frontend call to `AGENT_API_BASE/api/*` must go through the `apiFetch()` wrapper:
-```js
-// Correct
-import { apiFetch } from '@/lib/apiFetch';
-const res = await apiFetch(`${AGENT_API_BASE}/api/entities`);
-
-// Wrong — will get 401
-const res = await fetch(`${AGENT_API_BASE}/api/entities`);
-```
-
-`apiFetch()` automatically injects the Supabase session Bearer token.
-
-### Session Management
-- **Frontend**: Uses `supabase.auth.onAuthStateChange()` to track session in-memory (not `getSession()`)
-- See `src/lib/apiFetch.ts` for implementation
-- Never rely on localStorage/IndexedDB for session state
-
-### Supabase Backend
-- **Node version**: Must be 20+ (required for WebSocket transport with `ws` package)
-- **Configuration**: `src/db/supabase.js` imports `ws` and passes `transport: ws` to Supabase client
-
-### External API Credentials (Railway only)
-Set these in Railway Variables dashboard, not `.env`:
-- `FCA_AUTH_EMAIL` — FCA Register API header `x-auth-email`
-- `FCA_API_KEY` — FCA Register API header `x-auth-key`
-
----
-
-## Dev Commands
+- Node.js 20 or newer
+- A Supabase project
+- Credentials for the external integrations you intend to run
 
 ```bash
-npm run start    # Vite (:8080) + Express (:3001)
-npm run dev      # Vite only
-npm run server   # Express only
-npm run build    # Production build
-npm run deploy   # Build + deploy to GitHub Pages
+npm install
+cp .env.example .env
+npm run start
 ```
 
----
+`npm run start` launches Vite on port 8080 and Express on port 3001.
+
+Before first use, run the SQL files in `scripts/migrations/` in numeric order through migration 010, then initialize storage and seed data if needed:
+
+```bash
+node scripts/setup-storage.js
+node scripts/seed-supabase.js
+```
+
+Migration `007_kyc_ref_from_ids.sql` truncates existing entity case data. Review it before applying it to any populated environment. Migration `009_person_overrides_and_runs_columns.sql` is required by the current agent commit flow.
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `npm run start` | Run Vite and Express together |
+| `npm run dev` | Run the Vite frontend only |
+| `npm run server` | Run the Express backend only |
+| `npm run generate` | Regenerate entity fixtures and schema metadata |
+| `npm run build` | Generate metadata and build the production frontend |
+| `npm test` | Run Vitest |
+| `npm run lint` | Run ESLint |
+
+## Agent model
+
+The Supabase `agent_registry` golden source exposes three groups:
+
+- Sourcing: Companies House, FCA, JFSC, SEC EDGAR, IAPD, NYSE, GLEIF, and UK/US aggregate flows
+- Due diligence: `dd-all-in-one` plus 18 policy-driven attribute runners
+- Screening: OpenSanctions matching with Claude-assisted discounting
+
+`GET /api/agents` reads the persisted registry and adds runtime readiness based on runner wiring and required environment variables. Unavailable agents remain visible in inventory but cannot be triggered.
+
+Sourcing and DD runners extend `ApiRunner`. The frontend starts a run, polls its steps and status, and automatically commits all output when the backend reaches `pending_review`:
+
+```text
+running -> pending_review -> complete
+```
+
+The active application does not present an analyst diff modal. `AttributeDiffModal.tsx` is retained but unused.
+
+### Adding a runner
+
+1. Add a class under `agents/runners/api/` that extends `ApiRunner`.
+2. Implement `slug`, `outputType`, and `execute(ctx)`.
+3. Emit progress through `this.step(message)`.
+4. Return the `AgentRunOutput` contract.
+5. Export the runner from `agents/runners/api/index.js`.
+6. Add it to `loadRunnerClass()` in `server.js`.
+7. Add the corresponding frontend configuration or registry behavior.
+
+Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. Pure REST runners use confidence `100`; LLM runners use the model-provided 0–100 score.
+
+## Data model
+
+- `entities` identifies a case by database-derived `kyc_ref`.
+- `entity_attributes` stores scalar values, confidence, flags, and lineage.
+- `entity_persons` stores party records and per-person JSON attributes.
+- `exceptions` stores review exceptions and their resolutions.
+- `agent_runs` stores runner status, steps, output, errors, and sources.
+- `case_files` points to private objects in the `kyc-files` Storage bucket.
+- Screening tables store party matches and analyst dispositions.
+
+Legacy snapshot tables and columns remain for backward-compatible data ingestion. Current no-Forge runners write through `agent_run_id` and do not require Forge snapshots.
+
+## Schema rules
+
+`schema/kyc_master_attribute_schema.json` is the single source of truth. Never edit generated `schema/schema-meta.json` or `schema/schema-meta.js` directly.
+
+The stored CIP classification must be exactly:
+
+```text
+Registered Investment Advisor or Commodity Trading Advisor
+```
+
+`id_flag` and `verification_flag` are set only by DD agent output, not by manual analyst overrides.
+
+## Authentication and API calls
+
+Application routes require Supabase authentication. `src/lib/apiFetch.ts` injects the current session token, and the backend validates it with Supabase.
+
+Always use `apiFetch()` for frontend calls to the Express `/api/*` routes. Direct `fetch()` calls will omit the bearer token and normally return `401`.
+
+## Environment
+
+Copy `.env.example` for the complete template. Important variables include:
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_KEY
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+VITE_AGENT_API_BASE
+ANTHROPIC_API_KEY
+COMPANIES_HOUSE_API_KEY
+FCA_AUTH_EMAIL
+FCA_API_KEY
+OPENSANCTIONS_API_KEY
+NEO4J_URI
+NEO4J_USER
+NEO4J_PASSWORD
+ZOOM_ACCOUNT_ID
+ZOOM_CLIENT_ID
+ZOOM_CLIENT_SECRET
+```
+
+Frontend `VITE_*` values are injected at build time. In production, configure them as GitHub Actions secrets. Backend secrets belong in Railway Variables.
+
+## Repository map
+
+```text
+agents/                    direct REST and Claude agent ecosystem
+  base/                    runner lifecycle
+  dd/                      DD planning and entity-data preparation
+  policy/                  shared and per-attribute DD policies
+  publishers/              attribute, exception, and file persistence
+  runners/api/             sourcing, DD, and screening implementations
+schema/                    canonical schema and generated accessors
+scripts/migrations/        Supabase migrations
+src/
+  components/              shell, agent system, graph, and shared UI
+  components/kyc/          review, attribute, party, file, and trigger UI
+  contexts/                Supabase authentication state
+  db/                      server-side Supabase and Neo4j helpers
+  pages/                   dashboard, queue, review, agents, reports, login
+server.js                  Express API and runner dispatch
+```
 
 ## Deployment
 
-- **Frontend**: GitHub Pages via `npm run deploy`
-- **Backend**: Railway — `Procfile` runs `npm run server`; auto-deploys on `git push origin main`
-- **Migrations**: run all three SQL migrations in Supabase dashboard before first deploy
+- Frontend: GitHub Pages under `/kyc-agentic/`, deployed by `.github/workflows/deploy.yml`
+- Backend: Railway, started through `Procfile`
+- Database: Supabase migrations are applied in numeric order
+- `VITE_AGENT_API_BASE`: GitHub Actions secret pointing to the Railway service
+
+See `PRODUCTION_NOTES.md` for the production handoff, operational checks, and troubleshooting guide. See `agents.md` for the detailed implementation contract.

@@ -1,255 +1,211 @@
-# KYC Platform — Production Handoff Notes
+# KYC Sentinel — Production Handoff Notes
 
-## What this is
+## Current production architecture
 
-A React + TypeScript SPA that orchestrates AI agents for KYC (Know Your Customer)
-exception review. It wraps a real AWS agent runtime with a reviewer-facing UI:
-work queue, exception detail, live agent console, and Zoom outreach.
+KYC Sentinel is a no-Forge KYC compliance application. Financial-crime analysts use it to review entities and exceptions, inspect KYC attributes and evidence, run sourcing and due-diligence agents, screen parties, and record resolutions.
 
-Current demo:  <https://bpalakkal.github.io/kyc-agentic2>  
-Proxy server:  Railway (Node.js / Express — temporary, see AWS migration below)  
-Agent runtime: AWS ELB (`gs-forge-agentic-runtime-lb-*.us-east-1.elb.amazonaws.com`)
+The application does not call Forge or an AWS ELB agent runtime. Agents execute in the Express service through direct third-party REST APIs or Anthropic Claude.
 
----
-
-## Current architecture (demo)
-
-```
-Browser (GitHub Pages — HTTPS)
-  │  HTTPS
-  ▼
-Railway proxy  (server.js — Express)
-  │  HTTP
-  ▼
-AWS ELB → Agent runtime
-  POST /api/invoke/<slug>                        ← invoke agent
-  GET  /api/runs/<runId>                         ← poll run status
-  GET  /api/execution-logs/<runId>/agent-steps   ← live thinking steps
+```text
+Browser (GitHub Pages, /kyc-agentic/)
+  |
+  | HTTPS + Supabase bearer token
+  v
+Express API (Railway)
+  |-- Supabase PostgreSQL and private Storage
+  |-- Neo4j ownership graph (optional)
+  |-- Anthropic Claude (chat, DD, document digitization)
+  |-- Companies House, FCA, GLEIF, SEC, IAPD, NYSE, JFSC
+  |-- OpenSanctions screening
+  `-- Zoom meeting creation
 ```
 
-The Railway proxy exists solely to solve two browser security constraints:
+### Production services
 
-1. **Mixed-content** — GitHub Pages is HTTPS but the ELB is plain HTTP.
-   Browsers block HTTP fetches from HTTPS pages.
-2. **CORS** — the ELB returns no `Access-Control-Allow-Origin` headers, so
-   direct browser requests are rejected.
-
----
-
-## Target architecture (AWS production)
-
-```
-Browser (CloudFront — HTTPS)
-  │  HTTPS
-  ▼
-API Gateway or ALB  (HTTPS termination + CORS headers)
-  │  HTTP / internal VPC
-  ▼
-AWS ELB → Agent runtime
-```
-
-With HTTPS + CORS handled at the API Gateway / ALB layer, **the Railway proxy
-is no longer needed**. The browser calls the API Gateway directly and
-`server.js` shrinks to only the Zoom credential proxy.
-
----
-
-## Migration: Railway → AWS
-
-### Step 1 — Frontend: GitHub Pages → S3 + CloudFront
-
-**Code changes required (3 lines):**
-
-| File | Current | Change to |
+| Layer | Service | Responsibility |
 |---|---|---|
-| `vite.config.ts` line 8 | `base: "/kyc-agentic2/"` | `base: "/"` |
-| `src/App.tsx` | `<BrowserRouter basename="/kyc-agentic2">` | `<BrowserRouter>` (no basename) |
-| `.github/workflows/deploy.yml` | `peaceiris/actions-gh-pages` deploy step | S3 sync + CloudFront invalidation |
+| Frontend | GitHub Pages | React/Vite SPA at `/kyc-agentic/` |
+| Backend | Railway | Express API and agent execution |
+| Primary data | Supabase | Authentication, PostgreSQL, private file storage |
+| Graph | Neo4j | Optional ownership and relationship graph |
+| AI | Anthropic | Assistant chat, DD agents, Companies House PDF digitization |
+| Screening | OpenSanctions | Sanctions and PEP matching |
 
-Example GitHub Actions deploy step replacement:
+## Application behavior
 
-```yaml
-- name: Deploy to S3
-  run: aws s3 sync dist/ s3://your-bucket-name --delete
+### Authentication
 
-- name: Invalidate CloudFront
-  run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CF_DIST_ID }} --paths "/*"
+Supabase email/password authentication protects application routes. The browser sends the active Supabase access token through `apiFetch()`; the Express `requireAuth` middleware validates it before serving data or agent endpoints. `/api/health` and the Zoom route are the intentional public exceptions.
+
+Every frontend request to `${VITE_AGENT_API_BASE}/api/*` must use `src/lib/apiFetch.ts`.
+
+### Agent execution and auto-commit
+
+The backend exposes 29 agents from the Supabase `agent_registry` table:
+
+- 9 sourcing agents, including UK and US aggregate flows
+- 19 due-diligence agents: one all-in-one runner and 18 attribute-focused runners
+- 1 sanctions and PEP screening agent
+
+Generic sourcing and DD runs follow this lifecycle:
+
+```text
+POST /api/agent-run/api/:slug
+  -> running
+  -> pending_review
+  -> frontend automatically calls POST /api/agent-run-api/:runId/commit
+  -> complete
 ```
 
-Add `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `CF_DIST_ID` to GitHub
-Secrets. Remove the `VITE_AGENT_API_BASE` secret once the proxy is eliminated
-(see Step 2).
+`pending_review` is an internal persistence boundary. There is no analyst proposal, accept/reject, or diff-modal step in the active UI. `AttributeDiffModal.tsx` remains unused compatibility code.
 
-**No React component or logic changes are required.**
+Run steps and uncommitted output are held in process memory. A Railway restart during a run can orphan that run; the next status poll detects a persisted `running` row with no in-memory execution and marks it failed so the analyst can rerun the agent.
 
----
+### Attribute and party persistence
 
-### Step 2 — Eliminate the Railway proxy
+- `entity_attributes` stores scalar KYC attributes and agent lineage.
+- `entity_persons` stores beneficial owners, officers, directors, and signatories.
+- Sourcing runners write persons as rows rather than numbered flat attributes.
+- DD results are the only source of `id_flag` and `verification_flag`.
+- Analyst overrides do not automatically set identification or verification flags.
+- `kyc_ref` is database-derived as `entity_id + '_' + case_id`.
 
-Put HTTPS + CORS on the ELB / place it behind API Gateway, then the browser
-can call the agent runtime directly.
+Legacy `entity_snapshots` and nullable `snapshot_id` columns remain in the schema for data compatibility. They do not indicate a live Forge dependency; current agents write rows through `agent_run_id`.
 
-**Option A — API Gateway in front of the ELB (recommended)**
+### Schema contract
 
-1. Create an HTTP API in API Gateway.
-2. Add routes: `POST /api/invoke/{slug}`, `GET /api/runs/{runId}`,
-   `GET /api/execution-logs/{runId}/agent-steps`.
-3. Set each route's integration to forward to the ELB.
-4. Enable CORS on the API Gateway with `Access-Control-Allow-Origin: https://your-cloudfront-domain`.
-5. Set `VITE_AGENT_API_BASE` (build-time GitHub Secret) to the API Gateway URL.
+`schema/kyc_master_attribute_schema.json` is the canonical schema. `schema/schema-meta.json` and `schema/schema-meta.js` are generated artifacts and must not be edited manually.
 
-The frontend's `AgentSystem.tsx` calls `AGENT_API_BASE/api/agent/:slug` etc. —
-these route names already match `server.js` which already matches the ELB paths.
-No frontend code changes are needed beyond updating the env var.
+After changing the canonical schema, run the metadata generator directly:
 
-**Option B — ACM certificate directly on the ELB**
+```bash
+node scripts/build-schema-meta.mjs
+```
 
-1. Attach an ACM certificate to the ELB's HTTPS listener.
-2. Add CORS response headers to the ELB listener rules.
-3. Set `VITE_AGENT_API_BASE` to `https://your-elb-domain`.
+`npm run generate` also regenerates the legacy entity fixture file from `entities.md`. Production data is read from Supabase, but that generated fixture is still part of the current build pipeline.
 
-Same result as Option A with less infrastructure.
+## Deployment
 
----
+### Frontend
 
-### Step 3 — Zoom proxy: Railway → Lambda
+`.github/workflows/deploy.yml` builds and publishes `dist` to GitHub Pages on pushes to `main`.
 
-`server.js` still handles Zoom meeting creation (browser cannot call Zoom
-directly — credentials must stay server-side). Move this to Lambda:
+The workflow requires these GitHub Actions secrets:
 
-1. Extract the Zoom routes from `server.js` into a Lambda handler
-   (or keep the full Express app and use `aws-serverless-express`).
-2. Store `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET` in
-   **AWS Secrets Manager** and inject them as Lambda environment variables.
-3. Expose via API Gateway: `POST /api/zoom/create-meeting`.
-4. Set the frontend's `VITE_AGENT_API_BASE` to this API Gateway URL
-   (or use a separate `VITE_ZOOM_API_BASE` if the agent runtime has its own URL).
+- `VITE_AGENT_API_BASE`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-`server.js` code requires **no changes** — it runs identically on Lambda,
-ECS Fargate, or EC2. Only the secrets injection method changes.
+`VITE_AGENT_API_BASE` is a build-time frontend value. Set it in GitHub Actions, not only in Railway.
 
----
+The current Vite and router base is `/kyc-agentic/`.
 
-### Migration checklist
+### Backend
 
-- [ ] S3 bucket + CloudFront distribution created
-- [ ] `vite.config.ts` `base` changed to `"/"`
-- [ ] `App.tsx` `basename` removed
-- [ ] GitHub Actions deploy step updated (S3 sync + CF invalidation)
-- [ ] API Gateway or ACM cert on ELB for HTTPS + CORS
-- [ ] `VITE_AGENT_API_BASE` GitHub Secret updated to API Gateway / ELB URL
-- [ ] Zoom proxy deployed to Lambda (or ECS), credentials in Secrets Manager
-- [ ] CORS restricted to CloudFront domain (in proxy + API Gateway)
-- [ ] Railway project decommissioned
+Railway starts `npm run server` through `Procfile`. Production variables belong in Railway Variables. Do not commit production credentials.
 
----
+### Database setup
 
-## Current limitations (demo → production gaps)
+Run migrations in `scripts/migrations` in numeric order:
 
-### 1. All case data is hard-coded
-| File | What to replace with |
-|---|---|
-| `src/pages/WorkQueue.tsx` `groups` | `GET /api/work-queue?analyst=<id>` |
-| `src/pages/ExceptionReview.tsx` `exceptions` | `GET /api/cases/:kycId/exceptions` |
-| `src/data/entities-generated.ts` | `GET /api/cases/:kycId/attributes` |
-| `src/pages/Dashboard.tsx` KPI cards, activity | `GET /api/dashboard` |
+```text
+000_base_schema.sql
+001_agent_runs_and_case_files.sql
+002_agent_runs_status_constraint.sql
+003_entity_attributes_confidence.sql
+006_screening.sql
+007_kyc_ref_from_ids.sql
+008_persons_and_dd_columns.sql
+009_person_overrides_and_runs_columns.sql
+010_agent_registry.sql
+```
 
-All generated data flows from `entities.md` → `scripts/parse-entities.cjs` →
-`src/data/entities-generated.ts`. This works for a demo with a small fixed
-entity set. In production, replace this pipeline with API calls using
-React Query (`useQuery`).
+Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase.
 
-### 2. No authentication
-The app has no login flow. Every route is public.  
-**Add:** Cognito (native AWS) or Auth0 / Clerk with role-based access
-(analyst / supervisor / read-only). The proxy should validate a JWT on every
-request. API Gateway can handle JWT authorisation natively.
+One-time environment setup:
 
-### 3. Proxy security
-`server.js` sets `cors({ origin: "*" })`. Anyone who discovers the Railway URL
-can call the AWS agent runtime through it.  
-**Add:**
-- Restrict CORS to the CloudFront / application domain
-- Require a JWT or API key header on every proxy request
-- Rate limiting via `express-rate-limit` (or API Gateway throttling)
-
-### 4. Resolution submission is local state only
-`ExceptionReview.tsx` tracks resolved exceptions in `useState`. Refreshing the
-page loses all decisions.  
-**Add:** `POST /api/cases/:kycId/exceptions/:excId/resolve` with resolution ID,
-rationale, and reviewer ID. Store in the case management backend.
-
-### 5. Escalation and Outreach are UI stubs
-The Escalate panel and Email outreach dialogs update local state but send nothing.  
-**Wire to:** SES (email) or an internal notification service.  
-Zoom meeting creation **is** wired to a real API (`server.js /api/zoom/create-meeting`).
-
-### 6. Search / filter / sort are non-functional
-The work queue search box and filter button render correctly but do nothing.  
-**Replace with:** server-side search against the case management backend.
-
-### 7. Simulated agents
-10 of 14 agents have no live API config and run in simulation mode (animated
-thought strings). These are: Identity, Document, Regulatory, Sanctions, PEP,
-Adverse Media, Beneficial Ownership, Risk Scoring, Outreach, Audit.  
-**Wire each one:** add an `AgentApiConfig` entry in `AgentSystem.tsx` when the
-corresponding agent is deployed. No other code changes required.
-
-### 8. Entity data pipeline
-Adding a new entity today requires editing `entities.md` and redeploying.
-In production, entities come from a database — delete `parse-entities.cjs`
-and `entities-generated.ts` once the API layer is in place.
-
----
-
-## Recommended next steps (priority order)
-
-1. **AWS infrastructure** — S3 + CloudFront, API Gateway, migrate proxy to Lambda
-2. **Add authentication** — Cognito or Auth0; blocks everything else
-3. **Create a case management API** — replace all hard-coded data
-4. **Wire resolution submission** — persist decisions to the backend
-5. **Lock down the proxy** — CORS restriction + JWT validation
-6. **Wire remaining agents** — as each AWS agent goes live
-7. **Replace entities.md pipeline** — move to API + database
-
----
-
-## Key files
-
-| File | Purpose |
-|---|---|
-| `src/components/AgentSystem.tsx` | Entire agent layer: registry, API wiring, polling, step parsing, dock UI |
-| `src/pages/ExceptionReview.tsx` | Main workspace (~4 300 lines — candidate for splitting into sub-components) |
-| `src/pages/Dashboard.tsx` | Dashboard KPIs and AI assistant chat |
-| `src/pages/WorkQueue.tsx` | Entity selection table |
-| `server.js` | Express proxy (Zoom + AWS agent runtime — moves to Lambda on AWS) |
-| `scripts/parse-entities.cjs` | Markdown → TypeScript data generator (remove when API layer is ready) |
-| `entities.md` | Source of truth for demo entity/exception data |
-| `.github/workflows/deploy.yml` | CI/CD: build + deploy (update for S3 + CloudFront) |
-| `Procfile` | Railway entry point — not needed on AWS |
-
----
+```bash
+node scripts/setup-storage.js
+node scripts/seed-supabase.js
+```
 
 ## Environment variables
 
-| Variable | Demo (current) | AWS production |
+| Variable | Location | Purpose |
 |---|---|---|
-| `VITE_AGENT_API_BASE` | GitHub Secret → Railway URL | GitHub Secret → API Gateway URL |
-| `ZOOM_ACCOUNT_ID` | Railway env + local `.env` | Secrets Manager → Lambda env |
-| `ZOOM_CLIENT_ID` | Railway env + local `.env` | Secrets Manager → Lambda env |
-| `ZOOM_CLIENT_SECRET` | Railway env + local `.env` | Secrets Manager → Lambda env |
-| `AWS_AGENT_BASE` | Railway env (overrides ELB URL) | Not needed once proxy is removed |
-| `PORT` | Railway auto-set (3001 default) | Not needed on Lambda |
+| `SUPABASE_URL` | Railway/local | Backend Supabase URL |
+| `SUPABASE_SERVICE_KEY` | Railway/local | Backend service-role access |
+| `VITE_SUPABASE_URL` | GitHub Actions/local | Frontend Supabase URL |
+| `VITE_SUPABASE_ANON_KEY` | GitHub Actions/local | Frontend authentication |
+| `VITE_AGENT_API_BASE` | GitHub Actions/local | Express API base URL |
+| `ANTHROPIC_API_KEY` | Railway/local | Chat, DD agents, PDF digitization |
+| `COMPANIES_HOUSE_API_KEY` | Railway/local | Companies House API |
+| `FCA_AUTH_EMAIL`, `FCA_API_KEY` | Railway/local | FCA Register API |
+| `SEC_API_KEY` | Railway/local | sec-api.io access for IAPD |
+| `OPENSANCTIONS_API_KEY` | Railway/local | Screening API |
+| `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Railway/local | Optional graph database |
+| `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET` | Railway/local | Zoom server-to-server OAuth |
+| `CORS_ORIGIN` | Railway | Additional allowed browser origins |
+| `HEALTH_SECRET` | Railway | Optional token enabling detailed health output |
+| `PORT` | Railway/local | Express port; defaults to 3001 |
 
----
+There is no `AWS_AGENT_BASE` or Forge credential in the current architecture.
+
+## Operations and troubleshooting
+
+Check failures in this order:
+
+1. Read the compact dock step log; it displays the runner's concrete error.
+2. Check Railway logs for `[api-runner]` and `[dd-run]` messages.
+3. Call `GET /api/health`. `ok: false` means Supabase is unavailable.
+4. Confirm migration `009` has run if commit reports missing `agent_runs` columns.
+5. Confirm the relevant third-party credential is present in Railway.
+6. For browser 401 responses, confirm the request uses `apiFetch()` and the session is active.
+7. For CORS or network failures, confirm the deployed frontend origin is allowed and `VITE_AGENT_API_BASE` points to the current Railway URL without a trailing slash.
+
+### Credential-to-agent mapping
+
+| Agent | Required credential |
+|---|---|
+| Companies House and UK aggregate sourcing | `COMPANIES_HOUSE_API_KEY` |
+| FCA and UK aggregate sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` |
+| IAPD and US aggregate sourcing | `SEC_API_KEY` |
+| DD agents and Companies House PDF processing | `ANTHROPIC_API_KEY` |
+| Screening | `OPENSANCTIONS_API_KEY` |
+| All persisted runs | Supabase backend variables |
+
+## Production considerations
+
+- Uncommitted run output is process-local; durable storage would improve restart resilience and horizontal scaling.
+- Agent availability is computed from the persisted registry, backend runner wiring, and `required_env`. An enabled row can still be reported as unavailable when production credentials are missing.
+- Detailed health checks require `HEALTH_SECRET` and an `x-health-token` request header; otherwise the endpoint returns only `{ ok }`.
+- Zoom creation is public at the API layer and should receive authentication or a narrowly scoped authorization policy before wider deployment.
+- CORS currently permits the GitHub Pages origin prefix plus configured origins; keep `CORS_ORIGIN` narrowly scoped.
+- Neo4j is optional. The graph tab degrades independently when it is unavailable.
+- Database migrations are applied manually through Supabase and require an operational release checklist.
+
+## Key files
+
+| File | Responsibility |
+|---|---|
+| `server.js` | Express routes, authentication, runner dispatch, chat, screening, Zoom |
+| `src/components/AgentSystem.tsx` | Frontend agent orchestration, polling, auto-commit, compact dock |
+| `src/pages/ExceptionReview.tsx` | Main entity review and attribute workspace |
+| `src/components/kyc/AgentTriggers.tsx` | Sourcing, DD, and screening controls |
+| `src/db/supabase.js` | Backend persistence helpers |
+| `agents/runners/api/` | Direct REST and Claude runner implementations |
+| `schema/kyc_master_attribute_schema.json` | Canonical attribute schema |
+| `scripts/migrations/` | Current Supabase migration sequence |
+| `.github/workflows/deploy.yml` | GitHub Pages build and deployment |
 
 ## Local development
 
+Use Node 20 or newer (Node 20 is the production baseline):
+
 ```bash
-cp .env.example .env          # fill in Zoom credentials
 npm install
-npm start                     # starts Vite (port 8080) + proxy (port 3001) concurrently
+cp .env.example .env
+npm run start
 ```
 
-`VITE_AGENT_API_BASE` defaults to `http://localhost:3001` in dev, so the
-Vite dev server and the Express proxy work together out of the box.
+Vite listens on port 8080 and Express on port 3001.

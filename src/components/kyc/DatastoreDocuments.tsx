@@ -1,11 +1,11 @@
 /**
- * DatastoreDocuments — documents & screenshots from the entity's Forge datastore.
+ * DatastoreDocuments — documents and screenshots associated with the entity.
  *
  * Lists GET /api/entity/:kycRef/artifacts and renders the PDFs / screenshots.
  * Files are fetched through the auth-guarded backend proxy
  * (GET /api/entity/:kycRef/artifact?file=…) as a blob → object URL, so they
  * render inline without copying anything into Supabase and without mixed-content
- * issues (the Forge ELB is http, the app is https).
+ * issues and keep private storage access on the authenticated backend.
  */
 import { useEffect, useState } from "react";
 import { FileText, Image as ImageIcon, Loader2, Inbox, Eye } from "lucide-react";

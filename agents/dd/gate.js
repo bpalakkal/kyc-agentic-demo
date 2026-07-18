@@ -12,7 +12,7 @@
  * Uses the effective attribute view (getAttributes) — snapshot + completed DD/
  * sourcing runs + confirmations already merged.
  *
- * Ported from Forge/kyc-agentic2 — no invokeForge/pollForge deps.
+ * Adapted for direct no-Forge execution with no remote-runtime dependencies.
  */
 import { createRequire } from 'module';
 import schemaMetaMod from '../../schema/schema-meta.js';

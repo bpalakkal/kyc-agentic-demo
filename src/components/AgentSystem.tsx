@@ -8,15 +8,13 @@
  *
  * Key concepts
  * ────────────
- * AGENTS            Catalogue of all known agents (simulated + live).
- *                   Each entry provides the display name, icon, and default
- *                   "thought" strings used while the real API warms up.
+ * AGENTS            Catalogue of the agent UI definitions.
+ *                   Each entry provides its display name, icon, and progress
+ *                   text while the backend runner starts.
  *
- * AGENT_API_CONFIGS Per-agent real API config (slug, request body builder,
- *                   async mode flag).  Only agents with an entry here hit a
- *                   live endpoint; all others run in simulation mode.
- *                   → To wire a new agent: add an AgentId value and an entry
- *                     in AGENT_API_CONFIGS.  No other changes required.
+ * AGENT_API_CONFIGS Per-agent API config (slug, request body builder, and
+ *                   polling behavior). All production agents use backend
+ *                   endpoints; screening has its own route.
  *
  * AgentProvider     React context that holds all run state and exposes
  *                   runAgents() to any child component.
@@ -28,10 +26,10 @@
  *                   4. Starts startApiRunnerPolling(runId) — polls every 2 s:
  *                        a. GET /api/agent-run-api-steps/:runId → live step strings
  *                        b. GET /api/agent-run-api-status/:runId → DB status
- *                   5. On pending_review, opens AttributeDiffModal for analyst review.
- *                   6. On accept, publishes to DB and marks done.
+ *                   5. On pending_review, automatically commits all output.
+ *                   6. Refreshes the entity view and marks the run done.
  *
- * All live agents use the apiRunner two-phase preview/commit flow.
+ * pending_review is an internal staging state; no diff modal is shown.
  */
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
@@ -53,6 +51,7 @@ export type AgentId =
   | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
   | "companies-house" | "jersey-fsc" | "fca" | "uk-sourcing-flow"
   | "gleif" | "sec" | "iapd" | "nyse" | "us-sourcing-flow"
+  | "screening"
   | "dd-all-in-one"
   | "ria-authorized-signatory-idv" | "ria-beneficial-owner-idv"
   | "ria-cip-classification-id" | "ria-commodities-indicator-id"
@@ -131,6 +130,9 @@ export const AGENTS: Agent[] = [
   { id: "us-sourcing-flow", name: "US Data Sourcing — All Sources", short: "US All", icon: Database,
     description: "Triggers GLEIF, SEC EDGAR, IAPD, and NYSE in parallel — merges all four sources with priority ordering.",
     defaultThoughts: ["Querying GLEIF, SEC EDGAR, IAPD, and NYSE in parallel…", "Merging attributes across 4 sources…", "Ready for review"] },
+  { id: "screening", name: "Sanctions & PEP Screening", short: "Screening", icon: ShieldCheck,
+    description: "Screens entity parties with OpenSanctions and applies Claude-assisted match discounting.",
+    defaultThoughts: ["Loading entity parties…", "Screening against OpenSanctions…", "Applying match discounting…"] },
   // ── DD agents (Claude-based, all via /api/agent-run/api/:slug) ──────────────
   { id: "dd-all-in-one", name: "Full DD Review (All-in-One)", short: "DD All", icon: Brain,
     description: "Runs all 18 DD checks in a single Claude call — entity name, legal structure, addresses, BO, officers, signatories, CIP, indicators, and more.",
@@ -262,7 +264,7 @@ type EntityCtx = { name: string; kyc?: string };
 // asyncMode   → true: POST returns {runId} immediately; poll for completion
 //               false: POST blocks until done (avoid for long-running flows)
 // fetchSteps  → whether to poll for live step updates
-// apiRunner   → true: uses /api/agent-run-api-* polling endpoints (not AWS ELB)
+// apiRunner   → true: uses the /api/agent-run-api-* polling endpoints
 //               These runners return steps as plain strings and reach
 //               'pending_review' status before prompting the user to commit.
 type AgentApiConfig = {
@@ -271,7 +273,7 @@ type AgentApiConfig = {
   fetchSteps: boolean;
   asyncMode?: boolean;
   apiRunner?: boolean;
-  endpoint?: string;    // overrides /api/agent/:slug when set
+  endpoint?: string | ((ctx: EntityCtx | null) => string); // overrides /api/agent/:slug
   skipSnapshot?: boolean; // skip saveSnapshot (API runners publish directly)
 };
 const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
@@ -354,6 +356,15 @@ const AGENT_API_CONFIGS: Partial<Record<AgentId, AgentApiConfig>> = {
     fetchSteps: true,
     asyncMode: true,
     apiRunner: true,
+    skipSnapshot: true,
+  },
+  "screening": {
+    slug: "screening",
+    endpoint: (ctx) => `/api/entity/${encodeURIComponent(ctx?.kyc ?? "")}/screening/run`,
+    buildBody: () => ({}),
+    fetchSteps: false,
+    asyncMode: false,
+    apiRunner: false,
     skipSnapshot: true,
   },
   // ── DD agents ────────────────────────────────────────────────────────────────
@@ -759,7 +770,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       };
 
       // Poll for API runner steps (plain string array) and status (from agent_runs table).
-      // When status reaches 'pending_review', open the diff modal instead of marking done.
+      // pending_review is an internal staging state; commit all output immediately.
       const startApiRunnerPolling = (runId: string, kycRef: string, cancelled: { current: boolean }) => {
         let latestSteps: string[] = [];
         let polls = 0;
@@ -800,15 +811,17 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                 });
-                const cd = cr.ok ? await cr.json() : {};
+                const cd = await cr.json().catch(() => ({})) as Record<string, unknown>;
+                if (!cr.ok) throw new Error(String(cd.error ?? `Commit HTTP ${cr.status}`));
                 const stats = (cd as Record<string, unknown>)?.stats as Record<string, unknown> | undefined;
                 const parts: string[] = [];
                 if (Number(stats?.attrCount)  > 0) parts.push(`${stats!.attrCount} attrs`);
                 if (Number(stats?.excCount)   > 0) parts.push(`${stats!.excCount} exceptions`);
                 if (Number(stats?.fileStored) > 0) parts.push(`${stats!.fileStored} files`);
                 markDone([...latestSteps, `✓ Saved: ${parts.join(" · ") || "complete"}`], cd);
-              } catch {
-                markDone([...latestSteps, "⚠ Auto-commit failed"], null);
+              } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                markDone([...latestSteps, `⚠ Auto-commit failed: ${message}`], null);
               }
               return;
             }
@@ -831,7 +844,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
       // H5: Track cancellation so polling stops if the component unmounts
       const cancelled = { current: false };
 
-      apiFetch(`${AGENT_API_BASE}${cfg.endpoint ?? `/api/agent/${cfg.slug}`}`, {
+      const endpoint = typeof cfg.endpoint === "function" ? cfg.endpoint(ctx) : (cfg.endpoint ?? `/api/agent/${cfg.slug}`);
+      apiFetch(`${AGENT_API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

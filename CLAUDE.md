@@ -46,7 +46,7 @@ kyc-agentic/
 ├── agents/                                # Server-side agent ecosystem (Node.js ESM)
 │   ├── types.ts                           # AgentRunOutput, AttributeOutput, ExceptionOutput, FileOutput
 │   ├── base/
-│   │   └── ApiRunner.js                   # Abstract base: startPreview / commit / run
+│   │   └── ApiRunner.js                   # Base lifecycle: execute, stage, auto-commit
 │   ├── dd/
 │   │   ├── entityData.js                  # buildEntityDataJson — reconstructs entity_data.json from DB
 │   │   └── gate.js                        # agentsToRun() — which DD agents still have work
@@ -249,13 +249,13 @@ Sourcing agents write party data to `entity_persons` (one row per person), not a
 | `POST /api/entity/:kycRef/persons/:role/:index/override` | Persist analyst person edits |
 | `POST /api/entity/:kycRef/attributes/override` | Persist analyst attribute override |
 | `POST /api/entity/:kycRef/attributes/:name/confirm` | Set ID+V flags manually |
-| `GET /api/agents` | Static agent registry (hardcoded in server.js) |
+| `GET /api/agents` | Persisted Supabase registry with runtime readiness |
 | `GET /api/health` | Supabase + Neo4j health check |
 
 ### In-memory Maps (server.js)
 Two Maps survive only for the lifetime of the Railway process:
 - `apiRunnerSteps` — `runId → string[]` live progress steps
-- `apiRunnerOutput` — `runId → { output, kycRef, initiatedBy }` pending preview
+- `apiRunnerOutput` — `runId → { output, kycRef, initiatedBy }` staged output awaiting automatic commit
 
 On Railway restart: Maps cleared. Status endpoint handles orphans: `running` + no Map entry → immediately marked `failed`.
 
@@ -263,10 +263,10 @@ On Railway restart: Maps cleared. Status endpoint handles orphans: `running` + n
 
 ## Agent Ecosystem
 
-### Agent registry (server.js `/api/agents`)
-Hardcoded static list of 28 agents:
+### Agent registry (`agent_registry` → `/api/agents`)
+Supabase `agent_registry` is the golden source. Migration 010 seeds 29 agents (9 sourcing, 19 due diligence, and 1 screening); `/api/agents` enriches those rows with runner and credential readiness.
 - **Sourcing** (9): `uk-sourcing-flow` (trigger_all UK), `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `sec`, `iapd`, `nyse`, `gleif`
-- **Due Diligence** (18): `dd-all-in-one` (trigger_all DD), `ria-entity-name-idv`, `ria-cip-classification-id`, etc. — all have `cip_classification: 'Registered Investment Advisor or Commodity Trading Advisor'`
+- **Due Diligence** (19): `dd-all-in-one` (trigger_all DD) plus 18 attribute agents — all have `cip_classification: 'Registered Investment Advisor or Commodity Trading Advisor'`
 - **Screening** (1): `screening` (trigger_all Screening) — routed via `/api/entity/:kycRef/screening/run`
 
 `cip_classification` must be the FULL string `'Registered Investment Advisor or Commodity Trading Advisor'` — this is what the DB stores and what the UI filters on. Never use short aliases like `'RIA'`.
@@ -281,6 +281,7 @@ Slug → runner class lookup. If a slug isn't in this map, the server returns 40
 4. Export from `agents/runners/api/index.js`
 5. Add to `loadRunnerClass()` map in `server.js`
 6. Add `AgentApiConfig` entry in `AgentSystem.tsx` with `asyncMode: true, apiRunner: true`
+7. Add the same slug and readiness metadata to the persistent registry migration/seed
 
 ### Runner output contract
 ```

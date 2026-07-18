@@ -13,8 +13,8 @@ function normalizeValue(attributeName, value) {
 /**
  * AttributePublisher — writes agent-run attribute data to entity_attributes.
  *
- * Agent-run rows differ from Forge-snapshot rows in two ways:
- *   - snapshot_id is NULL  (no Forge JSON was produced)
+ * Agent-run rows differ from imported-snapshot rows in two ways:
+ *   - snapshot_id is NULL  (no snapshot JSON was produced)
  *   - agent_run_id is set  (links back to the agent_runs row)
  *
  * getAttributes() merges these into the attribute view as its "Layer 2" override
@@ -49,7 +49,7 @@ export class AttributePublisher {
         : null;
       return {
         kyc_ref:                kycRef,
-        snapshot_id:            null,          // no Forge snapshot; use agent_run_id instead
+        snapshot_id:            null,          // direct runner output uses agent_run_id
         agent_run_id:           agentRunId,
         attribute_name:         attr.attributeName,
         attribute_group:        attr.attributeGroup,

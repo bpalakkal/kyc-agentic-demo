@@ -287,6 +287,7 @@ class BaseDdRunner extends ApiRunner {
     const { kycRef } = ctx;
     const startedAt = Date.now();
 
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required for due-diligence runners');
     this.step('Fetching attributes and person records from database…');
     const [allAttrs, allPersons, entity] = await Promise.all([
       getAttributes(kycRef),

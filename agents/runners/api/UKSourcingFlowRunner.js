@@ -5,7 +5,7 @@
  *   1. FCA Register    — direct REST API (fast, no LLM)
  *   2. Companies House — direct REST API via CompaniesHouseRunner (no LLM)
  *
- * Extends ApiRunner so the two-phase preview/commit flow (diff modal) works
+ * Extends ApiRunner so output uses the standard staged auto-commit lifecycle
  * identically to the standalone FCA/CH runners.
  */
 
@@ -30,6 +30,7 @@ export class UKSourcingFlowRunner extends ApiRunner {
     let chAttrs    = [];
     let chFiles    = [];
     let chSources  = [];
+    const failures = [];
 
     await Promise.all([
       (async () => {
@@ -42,6 +43,7 @@ export class UKSourcingFlowRunner extends ApiRunner {
           fcaSources = fcaOut.metadata?.sourcesConsulted ?? [];
           this.step(`  FCA ▸ ${fcaAttrs.length} attribute(s)`);
         } catch (err) {
+          failures.push(`FCA: ${err.message}`);
           this.step(`  FCA ▸ failed — ${err.message} (continuing with other sources)`);
         }
       })(),
@@ -56,12 +58,15 @@ export class UKSourcingFlowRunner extends ApiRunner {
           chSources = chOut.metadata?.sourcesConsulted ?? [];
           this.step(`  CH ▸ ${chAttrs.length} attribute(s), ${chFiles.length} file(s)`);
         } catch (err) {
+          failures.push(`Companies House: ${err.message}`);
           this.step(`  CH ▸ failed — ${err.message} (continuing with other sources)`);
         }
       })(),
     ]);
 
     this.step(`  FCA: ${fcaAttrs.length} attr(s) | CH: ${chAttrs.length} attr(s)`);
+    if (failures.length === 2) throw new Error(`All UK sourcing providers failed — ${failures.join(' | ')}`);
+    if (failures.length) this.step(`⚠ Partial result — ${failures.join(' | ')}`);
 
     const merged = mergeAttributeSources([
       { source: 'FCA Register',    attrs: fcaAttrs },

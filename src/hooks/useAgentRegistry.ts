@@ -14,16 +14,22 @@ export type RegistryAgent = {
   output_type?: string;
   enabled: boolean;
   trigger_all?: boolean;
-  forge_slug?: string;
+  execution_mode?: "generic" | "screening";
+  required_env?: string[];
+  runner_registered?: boolean;
+  available?: boolean;
+  readiness_error?: string | null;
 };
 
 export function useAgentRegistry() {
   return useQuery<RegistryAgent[]>({
     queryKey: ["agent-registry"],
-    queryFn: () =>
-      apiFetch(`${AGENT_API_BASE}/api/agents`)
-        .then((r) => r.json())
-        .then((d) => (Array.isArray(d) ? d : (d.agents ?? []))),
+    queryFn: async () => {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/agents`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? `Agent registry HTTP ${response.status}`);
+      return Array.isArray(data) ? data : (data.agents ?? []);
+    },
     staleTime: 5 * 60 * 1000,
   });
 }

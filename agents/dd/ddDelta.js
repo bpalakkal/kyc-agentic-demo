@@ -11,7 +11,7 @@
  *
  * Pure: takes the delta + a DB attribute map, returns { attributes, exceptions }.
  *
- * Ported from Forge/kyc-agentic2 — no invokeForge/pollForge deps.
+ * Adapted for direct no-Forge execution with no remote-runtime dependencies.
  */
 import { normalizeForAttribute } from './enumNormalizer.js';
 import { createRequire } from 'module';

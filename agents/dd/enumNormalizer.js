@@ -12,7 +12,7 @@
  *
  * Plain ESM (JS) so the JS backend / runners import it directly.
  *
- * Ported from Forge/kyc-agentic2 — no Forge deps.
+ * Adapted for direct no-Forge execution.
  */
 import { enumValues, enumFor } from '../../schema/index.js';
 

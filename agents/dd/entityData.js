@@ -5,7 +5,7 @@
  *
  * Pure functions (take DB rows as input) so they're testable without a DB.
  *
- * Ported from Forge/kyc-agentic2 — adapted for no-Forge deployment where schema/
+ * Adapted for the no-Forge deployment where schema/
  * lives at the repo root rather than a build alias.
  */
 import schemaMetaMod from '../../schema/schema-meta.js';

@@ -63,6 +63,7 @@ export class JerseyFSCRunner extends ApiRunner {
 
     this.step(`Searching JFSC registry for "${entityName}"…`);
 
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required for the Jersey FSC runner');
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const messages = [

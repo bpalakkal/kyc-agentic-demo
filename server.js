@@ -23,8 +23,7 @@
  * TODO (production hardening)
  * ─────────────────────────────
  * - Restrict CORS origin to the GitHub Pages domain instead of "*"
- * - Add request authentication (API key header or JWT) so the proxy cannot be
- *   called by arbitrary clients
+ * - Protect the Zoom route with an explicit authorization policy
  * - Add rate limiting (express-rate-limit) to prevent abuse
  * - Stream agent-step responses rather than buffering (EventSource / SSE)
  */
@@ -73,7 +72,19 @@ try {
     if (k && v.length) process.env[k.trim()] = v.join("=").trim();
   }
 } catch {
-  // .env not present — rely on shell / platform environment variables
+  // Workspace fallback: allow a shared parent .env for local development.
+  try {
+    const __dir = dirname(fileURLToPath(import.meta.url));
+    const env = readFileSync(resolve(__dir, "../.env"), "utf8");
+    for (const line of env.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const [k, ...v] = trimmed.split("=");
+      if (k && v.length && process.env[k.trim()] === undefined) process.env[k.trim()] = v.join("=").trim();
+    }
+  } catch {
+    // No local env file; rely on shell / platform environment variables.
+  }
 }
 
 // C2: Never disable TLS in production — prevents an accidental NODE_TLS_REJECT_UNAUTHORIZED=0
@@ -231,7 +242,7 @@ app.get('/api/entity/:kycRef', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/entity/:kycRef/snapshot — latest Forge JSON snapshot
+// GET /api/entity/:kycRef/snapshot — latest legacy-compatible JSON snapshot
 app.get('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
   try {
     const { getLatestSnapshot } = getSb();
@@ -244,7 +255,7 @@ app.get('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
 });
 
 // POST /api/entity/:kycRef/snapshot — save a KYC JSON snapshot
-// Body: { data: <Forge JSON object>, agentId?: string }
+// Body: { data: <KYC attribute JSON object>, agentId?: string }
 app.post('/api/entity/:kycRef/snapshot', requireAuth, async (req, res) => {
   const { data, agentId } = req.body ?? {};
   if (!data || typeof data !== 'object') {
@@ -376,6 +387,16 @@ async function loadRunnerClass(slug) {
   return map[slug] ?? null;
 }
 
+async function getAgentReadiness(slug) {
+  const registry = await getSb().getAgentRegistry();
+  const agent = registry.find((entry) => entry.slug === slug);
+  if (!agent) return { ok: false, status: 404, error: `Agent "${slug}" is not registered` };
+  if (!agent.enabled) return { ok: false, status: 409, error: `Agent "${slug}" is disabled` };
+  const missing = (agent.required_env ?? []).filter((key) => !process.env[key]);
+  if (missing.length) return { ok: false, status: 503, error: `Agent "${slug}" is unavailable: missing ${missing.join(', ')}` };
+  return { ok: true, agent };
+}
+
 // POST /api/agent-run/api/:slug — start an API runner in the background.
 // Returns { runId, status: 'running' } immediately; frontend polls for progress.
 app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
@@ -383,6 +404,16 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
   const { kycRef, entityName } = req.body ?? {};
   if (!kycRef)     return res.status(400).json({ error: 'kycRef is required' });
   if (!entityName) return res.status(400).json({ error: 'entityName is required' });
+
+  try {
+    const readiness = await getAgentReadiness(slug);
+    if (!readiness.ok) return res.status(readiness.status).json({ error: readiness.error });
+    if (readiness.agent.execution_mode !== 'generic') {
+      return res.status(400).json({ error: `Agent "${slug}" does not use the generic runner endpoint` });
+    }
+  } catch (err) {
+    return res.status(503).json({ error: `Agent registry unavailable: ${err.message}` });
+  }
 
   let RunnerClass;
   try {
@@ -445,7 +476,7 @@ app.get('/api/agent-run-api-steps/:runId', requireAuth, (req, res) => {
   res.json({ steps });
 });
 
-// GET /api/agent-run-api-status/:runId — status from agent_runs table (not AWS ELB).
+// GET /api/agent-run-api-status/:runId — status from the agent_runs table.
 // If a run is still 'running' but has no in-memory Map entry (server restart mid-run),
 // mark it failed so the frontend doesn't wait forever.
 app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
@@ -476,7 +507,7 @@ app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
 // GET /api/agent-run-api/:runId/diff — new vs current attributes for review modal
 app.get('/api/agent-run-api/:runId/diff', requireAuth, async (req, res) => {
   const pending = apiRunnerOutput.get(req.params.runId);
-  if (!pending) return res.status(404).json({ error: 'No pending preview for this run — it may have expired' });
+  if (!pending) return res.status(404).json({ error: 'No staged output for this run — it may have expired' });
 
   try {
     const { getAttributes } = getSb();
@@ -498,7 +529,7 @@ app.post('/api/agent-run-api/:runId/commit', requireAuth, async (req, res) => {
   // Delete from Map before committing to prevent concurrent double-commits.
   // A racing second request will see null and get 404.
   const pending = apiRunnerOutput.get(req.params.runId);
-  if (!pending) return res.status(404).json({ error: 'No pending preview for this run — it may have expired' });
+  if (!pending) return res.status(404).json({ error: 'No staged output for this run — it may have expired' });
   apiRunnerOutput.delete(req.params.runId);
 
   const { approvedNames } = req.body ?? {};
@@ -836,6 +867,8 @@ Always use tools to retrieve live data before answering. Then respond with analy
 // discount with Claude, persist results (incremental merge over prior run).
 app.post('/api/entity/:kycRef/screening/run', requireAuth, async (req, res) => {
   try {
+    const readiness = await getAgentReadiness('screening');
+    if (!readiness.ok) return res.status(readiness.status).json({ error: readiness.error });
     const { runScreening } = getSb();
     const initiatedBy = req.user.email ?? req.user.id;
     res.json(await runScreening(req.params.kycRef, { ...req.body, initiatedBy }));
@@ -868,8 +901,37 @@ app.patch('/api/entity/:kycRef/screening/disposition', requireAuth, async (req, 
 
 // ─── Agent registry ───────────────────────────────────────────────────────────
 
-// GET /api/agents — static agent list built from the runner map + metadata
-app.get('/api/agents', requireAuth, (_req, res) => {
+// GET /api/agents — persistent golden-source registry plus runtime readiness.
+app.get('/api/agents', requireAuth, async (_req, res) => {
+  try {
+    const agents = await getSb().getAgentRegistry();
+    const enriched = await Promise.all(agents.map(async (agent) => {
+      const requiredEnv = Array.isArray(agent.required_env) ? agent.required_env : [];
+      const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+      const runnerRegistered = agent.execution_mode === 'screening'
+        ? true
+        : !!(await loadRunnerClass(agent.slug));
+      return {
+        ...agent,
+        runner_registered: runnerRegistered,
+        available: agent.enabled && runnerRegistered && missingEnv.length === 0,
+        readiness_error: !runnerRegistered
+          ? `No backend runner registered for slug "${agent.slug}"`
+          : (missingEnv.length ? `Missing configuration: ${missingEnv.join(', ')}` : null),
+      };
+    }));
+    res.json(enriched);
+  } catch (err) {
+    const migrationHint = err.code === 'PGRST205'
+      ? ' Apply scripts/migrations/010_agent_registry.sql.'
+      : '';
+    res.status(500).json({ error: `Agent registry unavailable: ${err.message}.${migrationHint}` });
+  }
+});
+
+// Temporary in-code reference retained during migration 010 rollout. It is not
+// served to the frontend and can be removed after every environment is migrated.
+app.get('/api/agents-legacy', requireAuth, (_req, res) => {
   const CIP = 'Registered Investment Advisor or Commodity Trading Advisor';
   const agents = [
     // ── Sourcing ──────────────────────────────────────────────────────────────
@@ -1043,7 +1105,7 @@ app.post('/api/entity/:kycRef/dd/run', requireAuth, async (req, res) => {
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get("/api/health", async (_req, res) => {
+app.get("/api/health", async (req, res) => {
   const checks = {};
 
   if (!sbAvailable) {
@@ -1081,7 +1143,7 @@ app.get("/api/health", async (_req, res) => {
 const PORT = process.env.PORT ?? 3001;
 
 (async () => {
-  console.log(`[${ts()}] Starting KYC proxy server...`);
+  console.log(`[${ts()}] Starting KYC API server...`);
 
   // Log which credential groups are present so Railway deployment logs are informative
   const envCheck = {
@@ -1090,7 +1152,11 @@ const PORT = process.env.PORT ?? 3001;
     SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
     NEO4J_URI:          process.env.NEO4J_URI,
     ZOOM_ACCOUNT_ID:    process.env.ZOOM_ACCOUNT_ID,
-    AWS_AGENT_BASE:     process.env.AWS_AGENT_BASE,
+    COMPANIES_HOUSE_API_KEY: process.env.COMPANIES_HOUSE_API_KEY,
+    FCA_AUTH_EMAIL:     process.env.FCA_AUTH_EMAIL,
+    FCA_API_KEY:        process.env.FCA_API_KEY,
+    SEC_API_KEY:        process.env.SEC_API_KEY,
+    OPENSANCTIONS_API_KEY: process.env.OPENSANCTIONS_API_KEY,
   };
   for (const [k, v] of Object.entries(envCheck)) {
     console.log(`[${ts()}] ${v ? "✓" : "✗"} ${k}${v ? "" : " — MISSING"}`);
@@ -1107,6 +1173,23 @@ const PORT = process.env.PORT ?? 3001;
   } catch (err) {
     console.error(`[${ts()}] ✗ Supabase unavailable: ${err.message}`);
     console.error(`[${ts()}]   Supabase routes will return 503 until credentials are fixed`);
+  }
+
+  if (sbAvailable) {
+    try {
+      const registry = await sbModule.getAgentRegistry();
+      const unavailable = registry.filter((agent) =>
+        !agent.enabled || (agent.required_env ?? []).some((key) => !process.env[key])
+      );
+      console.log(`[${ts()}] ✓ Agent registry loaded: ${registry.length} agent(s), ${unavailable.length} unavailable`);
+      for (const agent of unavailable) {
+        const missing = (agent.required_env ?? []).filter((key) => !process.env[key]);
+        console.warn(`[${ts()}]   ${agent.slug}: ${!agent.enabled ? 'disabled' : `missing ${missing.join(', ')}`}`);
+      }
+    } catch (err) {
+      console.error(`[${ts()}] ✗ Agent registry unavailable: ${err.message}`);
+      console.error(`[${ts()}]   Apply scripts/migrations/010_agent_registry.sql before using agent routes`);
+    }
   }
 
   // ── Neo4j (optional) ──────────────────────────────────────────────────────
@@ -1126,6 +1209,6 @@ const PORT = process.env.PORT ?? 3001;
   }
 
   app.listen(PORT, () =>
-    console.log(`[${ts()}] ✓ KYC proxy server listening → http://localhost:${PORT}`)
+    console.log(`[${ts()}] ✓ KYC API server listening → http://localhost:${PORT}`)
   );
 })();

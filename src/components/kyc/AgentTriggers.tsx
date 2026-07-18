@@ -55,13 +55,22 @@ function CategorySection({
     <TriggerButton icon={icon} label={label}>
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {triggerAll && (
-        <DropdownMenuItem onClick={() => runAgents([triggerAll.slug], triggerAll.display_name)}>
+        <DropdownMenuItem
+          disabled={!triggerAll.available}
+          title={triggerAll.readiness_error ?? undefined}
+          onClick={() => runAgents([triggerAll.slug as Parameters<typeof runAgents>[0][number]], triggerAll.display_name)}
+        >
           <Zap className="size-3 mr-2" /> {triggerAll.display_name}
         </DropdownMenuItem>
       )}
       {individual.length > 0 && <DropdownMenuSeparator />}
       {individual.map((a) => (
-        <DropdownMenuItem key={a.slug} onClick={() => runAgents([a.slug], a.display_name)}>
+        <DropdownMenuItem
+          key={a.slug}
+          disabled={!a.available}
+          title={a.readiness_error ?? undefined}
+          onClick={() => runAgents([a.slug as Parameters<typeof runAgents>[0][number]], a.display_name)}
+        >
           {a.display_name}
         </DropdownMenuItem>
       ))}

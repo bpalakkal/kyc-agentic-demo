@@ -1,7 +1,7 @@
 /**
  * Shared types for the agent ecosystem.
  *
- * Every runner (API-based or autonomous) produces an AgentRunOutput.
+ * Every direct REST or Claude runner produces an AgentRunOutput.
  * Publishers consume that output and write to Supabase.
  */
 
@@ -75,13 +75,7 @@ export interface FileOutput {
   title: string;
   sourceUrl?: string;           // URL the file was downloaded/scraped from
   caption?: string;             // screenshot annotation or document description
-  /**
-   * For autonomous agents: relative path within the agent's artifact store,
-   * used to download the file via /api/artifact-download.
-   * Null for API runners that return file content directly as a Buffer.
-   */
-  artifactPath?: string;
-  /** Raw file content — provided by API runners that fetch files directly. */
+  /** Raw file content provided by the runner. */
   content?: Buffer;
 }
 
@@ -97,19 +91,9 @@ export interface ApiRunnerResult {
   output: AgentRunOutput;
 }
 
-export interface AutonomousRunnerResult {
-  /** The AWS runId — used for polling. */
-  externalRunId: string;
-  /**
-   * Resolves when the run completes (either polled to completion or timed out).
-   * The promise rejects on failure.
-   */
-  completion: Promise<AgentRunOutput>;
-}
-
 // ─── Agent registry entry ─────────────────────────────────────────────────────
 
-export type RunnerType = 'api' | 'autonomous';
+export type RunnerType = 'api';
 
 export interface AgentRegistryEntry {
   slug: string;

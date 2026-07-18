@@ -53,9 +53,9 @@ export async function getEntity(kycRef) {
   return data;
 }
 
-// ─── Forge JSON parsing helpers ───────────────────────────────────────────────
+// ─── Legacy-compatible KYC JSON parsing helpers ──────────────────────────────
 
-// Top-level keys that are person-role arrays in the Forge schema.
+// Top-level keys that are person-role arrays in the KYC schema.
 const PERSON_ROLES = new Set([
   'acting_person', 'authorized_signatory', 'beneficial_owner',
   'board_director', 'corporate_officer', 'investment_advisor',
@@ -80,7 +80,7 @@ function toDisplayValue(val) {
 }
 
 /**
- * Given an attribute object from the Forge JSON, return a flat record
+ * Given an attribute object from KYC JSON, return a flat record
  * suitable for inserting into entity_attributes.
  */
 function parseAttribute(attrName, attrObj, group) {
@@ -116,7 +116,7 @@ function personFieldValue(personObj, role, suffix) {
 // ─── Extraction: attributes ───────────────────────────────────────────────────
 
 /**
- * Parse all non-person top-level attributes from a Forge JSON and bulk-insert
+ * Parse all non-person top-level attributes from KYC JSON and bulk-insert
  * them into entity_attributes.
  */
 async function extractAndSaveAttributes(kycRef, snapshotId, forgeData) {
@@ -136,7 +136,7 @@ async function extractAndSaveAttributes(kycRef, snapshotId, forgeData) {
 // ─── Extraction: persons ──────────────────────────────────────────────────────
 
 /**
- * Parse all person-role arrays from a Forge JSON and bulk-insert them into
+ * Parse all person-role arrays from KYC JSON and bulk-insert them into
  * entity_persons.
  */
 async function extractAndSavePersons(kycRef, snapshotId, forgeData) {
@@ -176,7 +176,7 @@ async function extractAndSavePersons(kycRef, snapshotId, forgeData) {
 // ─── Extraction: exception sync ───────────────────────────────────────────────
 
 /**
- * For each attribute with exception_flag=true in the Forge JSON, insert a row
+ * For each attribute with exception_flag=true in KYC JSON, insert a row
  * in the exceptions table (source_type='forge') if none already exists for
  * that attribute+entity in an open state.
  */
@@ -190,7 +190,7 @@ async function syncForgeExceptions(kycRef, forgeData) {
   }
   if (candidates.length === 0) return 0;
 
-  // Check which attribute_names already have an open Forge exception.
+  // Check which attribute names already have an open imported-snapshot exception.
   const attrNames = candidates.map(c => c.key);
   const { data: existing } = await sb
     .from('exceptions')
@@ -232,7 +232,7 @@ async function syncForgeExceptions(kycRef, forgeData) {
 
 // ─── Snapshots ────────────────────────────────────────────────────────────────
 
-/** Return the most recent Forge JSON snapshot for an entity, or null. */
+/** Return the most recent legacy-compatible JSON snapshot for an entity, or null. */
 export async function getLatestSnapshot(kycRef) {
   const { data, error } = await sb
     .from('entity_snapshots')
@@ -283,14 +283,14 @@ export async function saveSnapshot(kycRef, data, { agentId, runId } = {}) {
 
 /**
  * Return all attribute rows for an entity, merging:
- *   1. Latest Forge snapshot attributes (base layer)
+ *   1. Latest imported snapshot attributes (base layer)
  *   2. Completed agent-run attributes (override layer — most recent run wins per attribute)
  * Optionally filter by group ('core', 'wgq').
  */
 export async function getAttributes(kycRef, { group } = {}) {
   const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, lineage';
 
-  // ── Layer 1: latest Forge snapshot ──────────────────────────────────────────
+  // ── Layer 1: latest imported snapshot ──────────────────────────────────────
   let snapshotAttrs = [];
   {
     const { data: snap } = await sb
@@ -387,7 +387,7 @@ export async function getAttributes(kycRef, { group } = {}) {
 export async function getAttributeTrace(kycRef, attributeName) {
   const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, lineage';
 
-  // Layer 1: latest Forge snapshot
+  // Layer 1: latest imported snapshot
   const { data: snap } = await sb
     .from('entity_snapshots')
     .select('id')
@@ -437,14 +437,14 @@ const PERSON_SELECT = 'id, role, person_index, full_name, ownership_pct, nationa
 
 /**
  * Return all person records for an entity, merging:
- *   1. Latest Forge snapshot persons (base layer)
+ *   1. Latest imported snapshot persons (base layer)
  *   2. Agent-run persons (snapshot_id IS NULL — override layer, written by no-Forge API runners)
  *
  * Shape: { beneficial_owner: [...], key_controller: [...], ... }
  * Within each role, records are sorted by person_index ascending.
  */
 export async function getPersons(kycRef) {
-  // Layer 1: latest Forge snapshot persons.
+  // Layer 1: latest imported snapshot persons.
   let snapshotPersons = [];
   {
     const { data: snap, error: snapErr } = await sb
@@ -525,7 +525,7 @@ export async function getPersons(kycRef) {
 }
 
 /**
- * Bulk-write agent-run person records for an entity (no Forge snapshot required).
+ * Bulk-write agent-run person records for an entity (no snapshot required).
  * Replaces all existing agent-run persons (snapshot_id IS NULL) for this kyc_ref,
  * then inserts the new rows.
  *
@@ -669,6 +669,18 @@ export async function getAgentRuns(kycRef, { limit = 20 } = {}) {
     .eq('kyc_ref', kycRef)
     .order('started_at', { ascending: false })
     .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Return the persistent agent registry in display order. */
+export async function getAgentRegistry() {
+  const { data, error } = await sb
+    .from('agent_registry')
+    .select('*')
+    .order('category')
+    .order('sort_order')
+    .order('display_name');
   if (error) throw error;
   return data ?? [];
 }

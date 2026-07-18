@@ -19,6 +19,7 @@ export class USSourcingFlowRunner extends ApiRunner {
     let secAttrs   = [], secSources   = [];
     let iapdAttrs  = [], iapdSources  = [];
     let nyseAttrs  = [], nyseSources  = [];
+    const failures = [];
 
     await Promise.all([
       (async () => {
@@ -30,6 +31,7 @@ export class USSourcingFlowRunner extends ApiRunner {
           gleifSources = out.metadata?.sourcesConsulted ?? [];
           this.step(`  GLEIF ▸ ${gleifAttrs.length} attribute(s)`);
         } catch (err) {
+          failures.push(`GLEIF: ${err.message}`);
           this.step(`  GLEIF ▸ failed — ${err.message} (continuing)`);
         }
       })(),
@@ -43,6 +45,7 @@ export class USSourcingFlowRunner extends ApiRunner {
           secSources = out.metadata?.sourcesConsulted ?? [];
           this.step(`  SEC EDGAR ▸ ${secAttrs.length} attribute(s)`);
         } catch (err) {
+          failures.push(`SEC EDGAR: ${err.message}`);
           this.step(`  SEC EDGAR ▸ failed — ${err.message} (continuing)`);
         }
       })(),
@@ -56,6 +59,7 @@ export class USSourcingFlowRunner extends ApiRunner {
           iapdSources = out.metadata?.sourcesConsulted ?? [];
           this.step(`  IAPD ▸ ${iapdAttrs.length} attribute(s)`);
         } catch (err) {
+          failures.push(`IAPD: ${err.message}`);
           this.step(`  IAPD ▸ failed — ${err.message} (continuing)`);
         }
       })(),
@@ -69,12 +73,15 @@ export class USSourcingFlowRunner extends ApiRunner {
           nyseSources = out.metadata?.sourcesConsulted ?? [];
           this.step(`  NYSE ▸ ${nyseAttrs.length} attribute(s)`);
         } catch (err) {
+          failures.push(`NYSE: ${err.message}`);
           this.step(`  NYSE ▸ failed — ${err.message} (continuing)`);
         }
       })(),
     ]);
 
     this.step(`  GLEIF: ${gleifAttrs.length} | SEC: ${secAttrs.length} | IAPD: ${iapdAttrs.length} | NYSE: ${nyseAttrs.length}`);
+    if (failures.length === 4) throw new Error(`All US sourcing providers failed — ${failures.join(' | ')}`);
+    if (failures.length) this.step(`⚠ Partial result — ${failures.join(' | ')}`);
 
     // Merge priority: GLEIF (ground truth for LEI) > SEC EDGAR > IAPD > NYSE
     const merged = mergeAttributeSources([

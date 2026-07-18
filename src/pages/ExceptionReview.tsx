@@ -2200,7 +2200,7 @@ const AttributeFormView = ({
   const [savedOverrides, setSavedOverrides] = useState<Record<string, { value: string; actor: string; timestamp: string; note?: string }>>({});
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({});
 
-  // Forge live data
+  // Live attribute and party data from the backend
   const [forgeAttrs, setForgeAttrs] = useState<Record<string, ForgeAttrRow>>({});
   const [forgePersons, setForgePersons] = useState<Record<string, ForgePersonRow[]>>({});
   const [forgeTrace, setForgeTrace] = useState<ForgeTraceRow | null>(null);
@@ -2224,7 +2224,7 @@ const AttributeFormView = ({
   const entityProposals: InlineProposal[] = [];
   const proposalByAttr: Record<string, InlineProposal> = {};
 
-  // Fetch Forge attributes + persons for ALL selected entities in parallel
+  // Fetch attributes and persons for all selected entities in parallel
   useEffect(() => {
     if (selectedEntities.length === 0) { setForgeAttrs({}); setForgePersons({}); return; }
     let cancelled = false;
@@ -2254,7 +2254,7 @@ const AttributeFormView = ({
     return () => { cancelled = true; };
   }, [entityKycKey, overrideVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch full lineage trace when user opens trace for a Forge attribute
+  // Fetch the full lineage trace when the user opens an attribute trace
   useEffect(() => {
     if (!openTraceFor) { setForgeTrace(null); return; }
     const kycRef = selectedEntities.find(e => e.name === openTraceFor.entity)?.kyc;
@@ -2587,7 +2587,7 @@ const AttributeFormView = ({
         </div>
         {/* Trace content */}
         <div className="overflow-y-auto flex-1" style={{ maxHeight: "calc(100vh - 260px)" }}>
-          {/* Forge lineage section — shown when live data is available */}
+          {/* Persisted agent lineage — shown when live trace data is available */}
           {forgeTrace && (
             <ForgeLineagePanel trace={forgeTrace} />
           )}
@@ -2728,7 +2728,7 @@ const EntityDetailPanel = ({ profile, onClose }: { profile: EntityProfile; onClo
             <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-warning" /> Review</span>
             <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-alert" /> Action</span>
           </span>
-          <span>Sources: <span className="text-primary">CRM</span> · <span className="text-warning">3rd-party</span> · Forge (internal)</span>
+          <span>Sources: <span className="text-primary">CRM</span> · <span className="text-warning">3rd-party</span> · agent-derived</span>
         </div>
       </div>
     </div>

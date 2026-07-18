@@ -98,8 +98,11 @@ export default function Agents() {
                       <TableCell className="text-sm">{a.runner_type ?? "—"}</TableCell>
                       <TableCell className="text-sm">{a.output_type ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant={a.enabled ? "default" : "secondary"}>
-                          {a.enabled ? "Enabled" : "Disabled"}
+                        <Badge
+                          variant={a.available ? "default" : "secondary"}
+                          title={a.readiness_error ?? undefined}
+                        >
+                          {!a.enabled ? "Disabled" : a.available ? "Ready" : "Unavailable"}
                         </Badge>
                       </TableCell>
                     </TableRow>

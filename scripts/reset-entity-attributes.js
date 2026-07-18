@@ -3,7 +3,7 @@
  *
  * Deletes all entity_attributes and entity_snapshots rows for the entity,
  * and marks any completed agent_runs as 'cancelled' so they no longer
- * appear as "current" data in the diff modal.
+ * appear as current data in the effective attribute view.
  *
  * Use this to start fresh before the first real agent run on an entity,
  * so all attributes show up as "new" rather than "unchanged".

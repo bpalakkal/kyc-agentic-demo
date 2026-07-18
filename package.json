@@ -10,7 +10,7 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "homepage": "https://bpalakkal.github.io/kyc-agentic2",
+  "homepage": "https://bpalakkal.github.io/kyc-agentic",
   "scripts": {
     "dev": "vite",
     "server": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 node server.js",

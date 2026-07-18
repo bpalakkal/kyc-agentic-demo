@@ -6,7 +6,7 @@ export const ForgeLineagePanel = ({ trace }: { trace: ForgeTraceRow }) => {
   const entries = trace.lineage ?? [];
   return (
     <div className="px-4 py-3 border-b border-border">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2">Forge Lineage</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2">Agent Lineage</p>
       <div className="flex items-center gap-3 mb-3 flex-wrap">
         <span className={cn(
           "flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border",
