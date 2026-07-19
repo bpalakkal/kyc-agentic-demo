@@ -451,10 +451,10 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
           if (apiRunnerOutput.has(runId)) {
             apiRunnerOutput.delete(runId);
             apiRunnerSteps.delete(runId);
-            await getSb().sb.from('agent_runs')
+            const { error: expiryError } = await getSb().sb.from('agent_runs')
               .update({ status: 'cancelled', completed_at: new Date().toISOString() })
-              .eq('id', runId)
-              .catch(() => {});
+              .eq('id', runId);
+            if (expiryError) console.error(`[api-runner] failed to expire ${runId}: ${expiryError.message}`);
           }
         }, 30 * 60 * 1000);
       })
@@ -491,10 +491,10 @@ app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
 
     // Detect orphaned run: status is 'running' but the process that started it is gone.
     if (data.status === 'running' && !apiRunnerSteps.has(req.params.runId)) {
-      await sb.from('agent_runs')
+      const { error: orphanError } = await sb.from('agent_runs')
         .update({ status: 'failed', error: 'Server restarted while run was in progress' })
-        .eq('id', req.params.runId)
-        .catch(() => {});
+        .eq('id', req.params.runId);
+      if (orphanError) console.error(`[api-runner] failed to mark orphan ${req.params.runId}: ${orphanError.message}`);
       return res.json({ ...data, status: 'failed', error: 'Server restarted while run was in progress' });
     }
 
@@ -548,10 +548,10 @@ app.post('/api/agent-run-api/:runId/commit', requireAuth, async (req, res) => {
 
     // Persist thinking steps and raw output for AgentRunsPanel history view.
     const steps = apiRunnerSteps.get(req.params.runId) ?? [];
-    await getSb().sb.from('agent_runs')
+    const { error: historyError } = await getSb().sb.from('agent_runs')
       .update({ steps, raw_output: output })
-      .eq('id', req.params.runId)
-      .catch(() => {});
+      .eq('id', req.params.runId);
+    if (historyError) console.error(`[api-runner] failed to persist history for ${req.params.runId}: ${historyError.message}`);
 
     apiRunnerSteps.delete(req.params.runId);
     res.json(result);
@@ -1084,9 +1084,10 @@ app.post('/api/entity/:kycRef/dd/run', requireAuth, async (req, res) => {
             if (apiRunnerOutput.has(runId)) {
               apiRunnerOutput.delete(runId);
               apiRunnerSteps.delete(runId);
-              await getSb().sb.from('agent_runs')
+              const { error: expiryError } = await getSb().sb.from('agent_runs')
                 .update({ status: 'cancelled', completed_at: new Date().toISOString() })
-                .eq('id', runId).catch(() => {});
+                .eq('id', runId);
+              if (expiryError) console.error(`[dd-run] failed to expire ${runId}: ${expiryError.message}`);
             }
           }, 30 * 60 * 1000);
         })
