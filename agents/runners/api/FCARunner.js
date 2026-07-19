@@ -30,11 +30,25 @@ export class FCARunner extends ApiRunner {
       'x-auth-key':   process.env.FCA_API_KEY    || '',
       'Content-Type': 'application/json',
     };
+    if (!process.env.FCA_AUTH_EMAIL || !process.env.FCA_API_KEY) {
+      throw new Error('FCA credentials missing: FCA_AUTH_EMAIL and FCA_API_KEY are required');
+    }
 
     // Phase 1: Resolve FRN from entity name
     this.step(`Searching FCA register for "${entityName}"…`);
     const frn = await this._resolveFrn(entityName, headers);
-    if (!frn) throw new Error(`FCA: FRN not found for entity "${entityName}"`);
+    if (!frn) {
+      const reason = `No FCA firm matched entity "${entityName}"`;
+      this.step(reason);
+      return {
+        agentSlug: this.slug, kycRef, outputType: 'attributes', attributes: [], files: [],
+        metadata: {
+          outcome: 'no_data', outcomeReason: reason,
+          completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt,
+          sourcesConsulted: [`${FCA_BASE}/Search`],
+        },
+      };
+    }
     this.step(`FRN resolved: ${frn}`);
 
     // Phase 2: Fetch firm-level data in parallel (mirrors persona 02)
@@ -138,12 +152,12 @@ export class FCARunner extends ApiRunner {
       if (!resp.ok) {
         const body = await resp.text().catch(() => '');
         console.error(`[FCA] HTTP ${resp.status} ${resp.statusText} for ${path} — ${body.slice(0, 300)}`);
-        return null;
+        throw new Error(`FCA API HTTP ${resp.status} ${resp.statusText} for ${path}: ${body.slice(0, 200)}`);
       }
       return await resp.json();
     } catch (err) {
-      console.error(`[FCA] Network error for ${path}: ${err.message}`);
-      return null;
+      if (err.message?.startsWith('FCA API HTTP')) throw err;
+      throw new Error(`FCA API network error for ${path}: ${err.message}`);
     }
   }
 }

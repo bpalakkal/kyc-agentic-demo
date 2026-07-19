@@ -109,7 +109,7 @@ export class SECEDGARRunner extends ApiRunner {
         lineage: [{ source: SOURCE, value: 'No', source_url: 'https://efts.sec.gov', timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }],
       }],
       files: [],
-      metadata: { completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: ['https://efts.sec.gov'] },
+      metadata: { outcome: 'no_data', outcomeReason: 'No matching SEC EDGAR 10-K filer', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: ['https://efts.sec.gov'] },
     };
   }
 }

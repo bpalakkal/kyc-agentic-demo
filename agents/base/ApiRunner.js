@@ -66,9 +66,10 @@ export class ApiRunner {
     const executionPromise = (async () => {
       try {
         const output = await this.execute(ctx);
+        const outcome = output.metadata?.outcome ?? this._inferOutcome(output);
         const { error: statusErr } = await this.sb
           .from('agent_runs')
-          .update({ status: 'pending_review' })
+          .update({ status: 'pending_review', outcome, outcome_reason: output.metadata?.outcomeReason ?? null })
           .eq('id', runId);
         if (statusErr) throw new Error(`Failed to set pending_review status: ${statusErr.message}`);
         return { runId, output };
@@ -96,8 +97,14 @@ export class ApiRunner {
       status:           'complete',
       outputType:       output.outputType,
       sourcesConsulted: output.metadata?.sourcesConsulted ?? [],
+      outcome:          output.metadata?.outcome ?? this._inferOutcome(output),
+      outcomeReason:    output.metadata?.outcomeReason ?? null,
     });
-    return { runId, outputType: output.outputType, stats };
+    return {
+      runId, outputType: output.outputType, stats,
+      outcome: output.metadata?.outcome ?? this._inferOutcome(output),
+      outcomeReason: output.metadata?.outcomeReason ?? null,
+    };
   }
 
   /**
@@ -113,6 +120,8 @@ export class ApiRunner {
         status:           'complete',
         outputType:       output.outputType,
         sourcesConsulted: output.metadata?.sourcesConsulted ?? [],
+        outcome:          output.metadata?.outcome ?? this._inferOutcome(output),
+        outcomeReason:    output.metadata?.outcomeReason ?? null,
       });
       return { runId: agentRun.id, outputType: output.outputType, stats };
     } catch (err) {
@@ -139,10 +148,18 @@ export class ApiRunner {
     return data;
   }
 
-  async _finalizeRun(runId, { status, outputType, sourcesConsulted, error: errMsg }) {
+  _inferOutcome(output) {
+    return (output.attributes?.length || output.exceptions?.length || output.files?.length)
+      ? 'data_found'
+      : 'no_data';
+  }
+
+  async _finalizeRun(runId, { status, outputType, sourcesConsulted, outcome, outcomeReason, error: errMsg }) {
     const patch = { status };
     if (outputType        !== undefined) patch.output_type       = outputType;
     if (sourcesConsulted  !== undefined) patch.sources_consulted = sourcesConsulted;
+    if (outcome           !== undefined) patch.outcome            = outcome;
+    if (outcomeReason     !== undefined) patch.outcome_reason     = outcomeReason;
     if (errMsg            !== undefined) patch.error             = errMsg;
     if (status === 'complete' || status === 'failed') patch.completed_at = new Date().toISOString();
     await this.sb.from('agent_runs').update(patch).eq('id', runId);

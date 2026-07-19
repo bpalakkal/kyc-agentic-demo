@@ -484,7 +484,7 @@ app.get('/api/agent-run-api-status/:runId', requireAuth, async (req, res) => {
     const { sb } = getSb();
     const { data, error } = await sb
       .from('agent_runs')
-      .select('id, status, kyc_ref, agent_slug, error, completed_at')
+      .select('id, status, kyc_ref, agent_slug, outcome, outcome_reason, error, completed_at')
       .eq('id', req.params.runId)
       .single();
     if (error) return res.status(404).json({ error: error.message });

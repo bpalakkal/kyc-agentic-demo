@@ -24,6 +24,9 @@ type AgentRun = {
   id: string;
   agent_slug: string;
   status: string;
+  outcome?: "data_found" | "no_data" | null;
+  outcome_reason?: string | null;
+  error?: string | null;
   completed_at?: string | null;
   started_at?: string | null;
   steps?: string[] | null;
@@ -138,9 +141,13 @@ export function AgentRunsPanel({ kycRef }: { kycRef: string }) {
               <span className="text-[11px] font-bold text-foreground flex-1 truncate">{displayName(run.agent_slug)}</span>
               <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border",
                 run.status === "failed" ? "bg-alert-soft text-alert border-alert/30"
+                : run.outcome === "no_data" ? "bg-warning-soft text-warning-foreground border-warning/30"
                 : run.status === "pending_review" ? "bg-primary/10 text-primary border-primary/20"
                 : "bg-success-soft text-success border-success/20")}>
-                {run.status === "pending_review" ? "awaiting review" : run.status}
+                {run.status === "failed" ? "failed"
+                  : run.outcome === "no_data" ? "no data"
+                  : run.status === "pending_review" ? "awaiting review"
+                  : run.status}
               </span>
             </button>
             <div className="flex items-center gap-1 px-3 py-1.5 text-[9px] text-muted-foreground border-b border-border/60 bg-secondary/20">
@@ -148,6 +155,11 @@ export function AgentRunsPanel({ kycRef }: { kycRef: string }) {
             </div>
             {isOpen && (
               <div>
+                {(run.outcome_reason || run.error) && (
+                  <p className={cn("mx-3 mt-3 rounded-lg border px-3 py-2 text-[10px]", run.status === "failed" ? "border-alert/25 bg-alert-soft text-alert" : "border-warning/25 bg-warning-soft text-warning-foreground")}>
+                    {run.status === "failed" ? run.error : run.outcome_reason}
+                  </p>
+                )}
                 {/* Section toggles */}
                 <div className="flex items-center gap-1 px-2 pt-2">
                   <SectionTab active={sec === "attributes"} onClick={() => toggleSec("attributes")} icon={ListTree} label={`Attributes (${attrs.length})`} />

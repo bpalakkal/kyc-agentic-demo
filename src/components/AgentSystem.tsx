@@ -814,11 +814,16 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                 const cd = await cr.json().catch(() => ({})) as Record<string, unknown>;
                 if (!cr.ok) throw new Error(String(cd.error ?? `Commit HTTP ${cr.status}`));
                 const stats = (cd as Record<string, unknown>)?.stats as Record<string, unknown> | undefined;
+                const outcome = String(cd.outcome ?? "");
+                const outcomeReason = String(cd.outcomeReason ?? "");
                 const parts: string[] = [];
                 if (Number(stats?.attrCount)  > 0) parts.push(`${stats!.attrCount} attrs`);
                 if (Number(stats?.excCount)   > 0) parts.push(`${stats!.excCount} exceptions`);
                 if (Number(stats?.fileStored) > 0) parts.push(`${stats!.fileStored} files`);
-                markDone([...latestSteps, `✓ Saved: ${parts.join(" · ") || "complete"}`], cd);
+                const finalMessage = outcome === "no_data"
+                  ? `ℹ No data found${outcomeReason ? `: ${outcomeReason}` : ""}`
+                  : `✓ Saved: ${parts.join(" · ") || "complete"}`;
+                markDone([...latestSteps, finalMessage], cd);
               } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 markDone([...latestSteps, `⚠ Auto-commit failed: ${message}`], null);

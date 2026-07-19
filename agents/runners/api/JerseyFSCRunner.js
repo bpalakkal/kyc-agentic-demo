@@ -140,6 +140,8 @@ export class JerseyFSCRunner extends ApiRunner {
       attributes,
       files:      [],
       metadata: {
+        outcome:         attributes.length ? 'data_found' : 'no_data',
+        outcomeReason:   attributes.length ? null : 'No matching Jersey FSC entity record',
         completedAt:      new Date().toISOString(),
         durationMs:       Date.now() - startedAt,
         sourcesConsulted: sources,

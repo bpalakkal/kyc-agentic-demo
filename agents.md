@@ -112,7 +112,11 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 008_persons_and_dd_columns.sql
 009_person_overrides_and_runs_columns.sql  ← person_overrides table + agent_runs.steps/raw_output
 010_agent_registry.sql                     ← persistent golden-source agent registry
+011_agent_run_outcomes.sql                 ← separates data_found/no_data from operational failures
 ```
+
+### Agent run status vs outcome
+`agent_runs.status` records execution lifecycle. `failed` is reserved for operational or technical failures such as credentials, HTTP errors, timeouts, invalid responses, persistence errors, or server restarts. A successful provider search that returns no matching record finishes with `status = 'complete'`, `outcome = 'no_data'`, and a human-readable `outcome_reason`. Successful searches with results use `outcome = 'data_found'`. Never throw solely because a valid search returned zero records; return a normal output with `metadata.outcome = 'no_data'`. Conversely, never swallow HTTP or network errors and turn them into no-data results.
 
 If migration 009 hasn't run, the commit step fails with a column error. Verify with:
 ```sql

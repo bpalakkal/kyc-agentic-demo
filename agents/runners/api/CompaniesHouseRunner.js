@@ -54,7 +54,16 @@ export class CompaniesHouseRunner extends ApiRunner {
     this.step(`Searching Companies House for "${entityName}"…`);
     const companyNumber = await this._resolveCompanyNumber(entityName, authHeader);
     if (!companyNumber) {
-      throw new Error(`Companies House: company not found for "${entityName}"`);
+      const reason = `No Companies House company matched "${entityName}"`;
+      this.step(reason);
+      return {
+        agentSlug: this.slug, kycRef, outputType: 'attributes', attributes: [], files: [],
+        metadata: {
+          outcome: 'no_data', outcomeReason: reason,
+          completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt,
+          sourcesConsulted: [`${CH_BASE}/search/companies`],
+        },
+      };
     }
     this.step(`Company number resolved: ${companyNumber}`);
 

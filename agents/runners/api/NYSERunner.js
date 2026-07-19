@@ -90,7 +90,7 @@ export class NYSERunner extends ApiRunner {
         { attributeName: 'verification_of_existence', attributeGroup: 'core', displayValue: 'No',          source: SOURCE, confidence: CONFIDENCE, idFlag: false, verificationFlag: true,  exceptionFlag: false, lineage: lin('No') },
       ],
       files: [],
-      metadata: { completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: [API_URL] },
+      metadata: { outcome: 'no_data', outcomeReason: 'No matching NYSE or NASDAQ listing', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: [API_URL] },
     };
   }
 }
