@@ -484,16 +484,17 @@ const Reports = () => {
   const [tab, setTab] = useState<Tab>("Overview");
 
   return (
-    <div className="px-6 py-6 max-w-[1280px]">
+    <div className="page-shell !max-w-[1320px]">
       {/* Header */}
       <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="text-[18px] font-bold tracking-tight">Reports</h1>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Intelligence</p>
+          <h1 className="page-title">Reports</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Compliance analytics and report exports · Last 30 days
           </p>
         </div>
-        <button className="h-9 px-4 rounded-full bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-95">
+        <button className="h-10 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-lg shadow-primary/20 flex items-center gap-2 hover:opacity-95">
           <Download className="size-3.5" /> Export
         </button>
       </div>

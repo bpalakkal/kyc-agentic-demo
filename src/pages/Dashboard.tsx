@@ -202,12 +202,13 @@ const Dashboard = () => {
   }, [entityByKyc]);
 
   return (
-    <div className="px-6 py-6 space-y-6">
+    <div className="page-shell space-y-6">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {firstName}</h1>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Command center</p>
+          <h1 className="page-title">Welcome back, {firstName}</h1>
           <p className="text-sm text-muted-foreground mt-1">KYC Entity Status and Forecast summary</p>
         </div>
         <div className="relative shrink-0">
@@ -228,7 +229,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         {/* Due this Month */}
-        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg">
           <div className="flex items-start justify-between mb-3">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Due this {selectedPeriod === "week" ? "Week" : "Month"}

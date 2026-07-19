@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 25% 12%;
+    --background: 216 38% 97%;
+    --foreground: 224 38% 12%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 25% 12%;
@@ -14,29 +14,29 @@
     --popover-foreground: 222 25% 12%;
 
     /* KPMG brand blue */
-    --primary: 220 88% 38%;
+    --primary: 224 78% 48%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 30% 96%;
+    --secondary: 216 35% 94%;
     --secondary-foreground: 222 25% 12%;
 
-    --muted: 210 25% 96%;
-    --muted-foreground: 215 14% 45%;
+    --muted: 216 30% 95%;
+    --muted-foreground: 218 15% 43%;
 
-    --accent: 210 30% 96%;
+    --accent: 219 65% 94%;
     --accent-foreground: 222 25% 12%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 22% 91%;
-    --input: 215 22% 91%;
-    --ring: 220 88% 38%;
+    --border: 216 27% 88%;
+    --input: 216 25% 84%;
+    --ring: 224 78% 48%;
 
-    --radius: 0.625rem;
+    --radius: 0.875rem;
 
     /* Status / semantic */
-    --nav: 222 28% 10%;
+    --nav: 225 46% 10%;
     --nav-foreground: 0 0% 100%;
     --nav-muted: 215 14% 65%;
 
@@ -74,16 +74,16 @@
   }
 
   .dark {
-    --background:           220 22% 12%;
+    --background:           225 32% 8%;
     --foreground:           215 30% 93%;
 
-    --card:                 220 22% 15%;
+    --card:                 224 28% 12%;
     --card-foreground:      215 30% 93%;
 
-    --popover:              220 22% 14%;
+    --popover:              224 28% 11%;
     --popover-foreground:   215 30% 93%;
 
-    --primary:              220 85% 60%;
+    --primary:              221 88% 64%;
     --primary-foreground:   0 0% 100%;
 
     --secondary:            220 18% 22%;
@@ -98,8 +98,8 @@
     --destructive:          0 72% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border:               220 18% 24%;
-    --input:                220 18% 24%;
+    --border:               221 22% 21%;
+    --input:                221 20% 27%;
     --ring:                 220 85% 60%;
 
     --nav:                  220 28% 8%;
@@ -146,4 +146,50 @@
     font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
     font-feature-settings: 'cv11', 'ss01';
   }
+  ::selection { @apply bg-primary/20 text-foreground; }
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / .3) transparent; }
+}
+
+@layer components {
+  .app-canvas {
+    background:
+      radial-gradient(circle at 8% 2%, hsl(var(--primary) / .08), transparent 28rem),
+      radial-gradient(circle at 92% 10%, hsl(184 80% 45% / .055), transparent 24rem),
+      hsl(var(--background));
+  }
+
+  .app-canvas::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .18;
+    background-image: linear-gradient(hsl(var(--foreground) / .025) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground) / .025) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(to bottom, black, transparent 42%);
+  }
+
+  .app-canvas > * { position: relative; }
+  .app-canvas .bg-card.border,
+  .app-canvas .rounded-lg.border.bg-background,
+  .app-canvas .rounded-lg.border.bg-card {
+    border-color: hsl(var(--border) / .78);
+    box-shadow: 0 1px 2px hsl(225 40% 10% / .03), 0 12px 34px -22px hsl(225 55% 25% / .28);
+  }
+
+  .page-shell { @apply mx-auto w-full max-w-[1600px] px-6 py-7 lg:px-8 lg:py-8; }
+  .page-title { @apply text-[28px] font-bold tracking-[-0.035em] text-foreground; }
+  .page-caption { @apply mt-1 text-sm leading-6 text-muted-foreground; }
+
+  label { @apply font-medium tracking-[-0.01em]; }
+  select:not([data-radix-select-trigger]), input:not([type="checkbox"]):not([type="radio"]), textarea {
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  }
+  select:not([data-radix-select-trigger]) {
+    @apply rounded-xl border border-input bg-card px-3 text-sm shadow-sm outline-none;
+  }
+  select:not([data-radix-select-trigger]):focus { @apply border-primary/60 ring-4 ring-primary/10; }
+
+  details { @apply rounded-2xl border border-border/80 bg-card shadow-sm; }
+  summary { @apply cursor-pointer rounded-2xl transition-colors hover:bg-muted/50; }
 }

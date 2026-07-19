@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
-import { Bell, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon, LogOut, Pencil } from "lucide-react";
+import { Bell, BotMessageSquare, Bot, Send, X, Sparkles, Sun, Moon, LogOut, Pencil, LayoutDashboard, ListChecks, BarChart3, ShieldCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,11 +22,11 @@ import { apiFetch } from "@/lib/apiFetch";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const tabs = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/work-queue", label: "Work Queue" },
-  { to: "/agents", label: "Agents" },
-  { to: "/reports", label: "Reports" },
-] as { to: string; label: string; end?: boolean; disabled?: boolean }[];
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/work-queue", label: "Work Queue", icon: ListChecks },
+  { to: "/agents", label: "Agents", icon: Bot },
+  { to: "/reports", label: "Reports", icon: BarChart3 },
+] as { to: string; label: string; icon: typeof Bot; end?: boolean; disabled?: boolean }[];
 
 // ─── AI Chat Floating ─────────────────────────────────────────────────────────
 
@@ -344,22 +344,29 @@ const AppLayout = () => {
   return (
     <AgentProvider>
       <div className="h-full bg-background flex flex-col min-w-0 overflow-x-hidden">
-        <header className="bg-nav text-nav-foreground">
-          <div className="px-6 h-14 flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-              <div className="w-[3px] h-[22px] rounded-full bg-gradient-to-b from-blue-500 to-indigo-500 shrink-0" />
+        <header className="relative z-40 border-b border-white/10 bg-[linear-gradient(110deg,hsl(var(--nav)),hsl(228_48%_14%))] text-nav-foreground shadow-[0_10px_30px_-20px_rgba(2,8,23,.9)]">
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-blue-400/60 to-transparent" />
+          <div className="px-6 lg:px-8 h-[68px] flex items-center gap-8">
+            <Link to="/" className="group flex min-w-[205px] items-center gap-3 transition-opacity hover:opacity-90">
+              <div className="relative grid size-10 place-items-center rounded-xl border border-white/15 bg-white/10 shadow-inner backdrop-blur-sm">
+                <ShieldCheck className="size-5 text-blue-300" />
+                <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-nav bg-emerald-400" />
+              </div>
               <div>
-                <div className="text-[17px] font-bold text-nav-foreground tracking-tight leading-tight">KYC Sentinel</div>
+                <div className="text-[16px] font-bold text-nav-foreground tracking-[-0.025em] leading-tight">KYC Sentinel</div>
+                <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-blue-200/65">Agentic compliance</div>
               </div>
             </Link>
 
-            <nav className="flex-1 flex items-center justify-center gap-8">
-              {tabs.map((t) =>
+            <nav className="flex flex-1 items-center justify-center gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.045] p-1.5 max-w-[540px] mx-auto">
+              {tabs.map((t) => {
+                const Icon = t.icon;
+                return (
                 t.disabled ? (
                   <span
                     key={t.to}
                     title="Coming soon"
-                    className="relative text-[14px] py-[18px] text-nav-muted/50 cursor-not-allowed flex items-center gap-1.5"
+                    className="relative text-[13px] px-4 py-2 text-nav-muted/50 cursor-not-allowed flex items-center gap-1.5"
                   >
                     {t.label}
                     <span className="text-[9px] px-1 py-0.5 rounded bg-white/10 uppercase tracking-wide leading-none">Soon</span>
@@ -371,34 +378,35 @@ const AppLayout = () => {
                     end={t.end}
                     className={({ isActive }) =>
                       cn(
-                        "relative text-[14px] py-[18px] transition-colors",
+                        "relative flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium transition-all",
                         isActive
-                          ? "text-nav-foreground after:absolute after:left-0 after:right-0 after:-bottom-px after:h-[2px] after:bg-nav-foreground"
-                          : "text-nav-muted hover:text-nav-foreground"
+                          ? "bg-white/[0.13] text-white shadow-sm"
+                          : "text-nav-muted hover:bg-white/[0.06] hover:text-nav-foreground"
                       )
                     }
                   >
-                    {t.label}
+                    <Icon className="size-3.5" />{t.label}
                   </NavLink>
                 )
-              )}
+              )})}
             </nav>
 
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-[205px] items-center justify-end gap-2">
               <button
                 onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-                className="text-nav-muted hover:text-nav-foreground transition-colors"
+                className="grid size-9 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-nav-muted transition-all hover:bg-white/10 hover:text-nav-foreground"
                 aria-label="Toggle theme"
               >
                 {resolvedTheme === "dark" ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
               </button>
-              <button className="text-nav-muted hover:text-nav-foreground transition-colors" aria-label="Notifications">
+              <button className="relative grid size-9 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-nav-muted transition-all hover:bg-white/10 hover:text-nav-foreground" aria-label="Notifications">
                 <Bell className="size-[18px]" />
+                <span className="absolute right-2 top-2 size-1.5 rounded-full bg-blue-400 ring-2 ring-nav" />
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-full" aria-label="Account menu">
-                    <Avatar className="size-8 border border-white/15 cursor-pointer hover:opacity-80 transition-opacity">
+                    <Avatar className="size-9 border border-white/20 cursor-pointer transition-opacity hover:opacity-80">
                       <AvatarFallback className="bg-primary/20 text-primary text-[11px] font-semibold">
                         {initials}
                       </AvatarFallback>
@@ -457,7 +465,7 @@ const AppLayout = () => {
 
         <AgentRecommendationStrip route={location.pathname} />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+        <main className="app-canvas flex-1 overflow-y-auto overflow-x-hidden min-h-0">
           <ErrorBoundary label="main-outlet">
             <Outlet />
           </ErrorBoundary>

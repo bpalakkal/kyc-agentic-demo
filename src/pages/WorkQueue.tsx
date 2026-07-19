@@ -300,10 +300,10 @@ const WorkQueue = () => {
   ];
 
   return (
-    <div className="px-6 py-6">
+    <div className="page-shell">
       <div className="mb-5">
         <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl font-bold tracking-tight">Work Queue</h1>
+          <h1 className="page-title">Work Queue</h1>
           <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
             {loading ? "…" : `${apiEntities.length} entities`}
           </span>
@@ -316,7 +316,7 @@ const WorkQueue = () => {
           <div className="relative w-[340px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <input
-              className="w-full h-10 pl-9 pr-12 text-sm rounded-lg border border-border bg-card outline-none focus:ring-2 focus:ring-ring/30"
+              className="w-full h-11 pl-10 pr-12 text-sm rounded-xl border border-input bg-card shadow-sm outline-none hover:border-foreground/20 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
               placeholder="Search entities…"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -324,12 +324,12 @@ const WorkQueue = () => {
             </span>
           </div>
 
-          <button className="h-10 px-4 rounded-lg border border-primary text-primary text-sm flex items-center gap-2 hover:bg-info-soft transition-colors">
+          <button className="h-11 px-4 rounded-xl border border-primary/40 bg-card text-primary text-sm font-semibold shadow-sm flex items-center gap-2 hover:bg-info-soft transition-colors">
             <SlidersHorizontal className="size-4" />
             Filter
           </button>
 
-          <div className="flex items-center gap-1 ml-2 p-1 rounded-lg bg-secondary/60 border border-border">
+          <div className="flex items-center gap-1 ml-2 p-1 rounded-xl bg-secondary/70 border border-border shadow-inner">
             {tabs.map((t) => (
               <button
                 key={t.id}
