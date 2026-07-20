@@ -35,10 +35,12 @@ function SubTable({
   person,
   role,
   onSave,
+  applicableColumns,
 }: {
   person: ForgePersonRow;
   role: string;
   onSave: (values: Record<string, string>) => void;
+  applicableColumns?: string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({
@@ -49,7 +51,10 @@ function SubTable({
 
   const state = rowState(person);
   const badge = STATE_BADGES[state];
-  const attrEntries = Object.entries(person.attributes ?? {});
+  const allowed = new Set(applicableColumns ?? []);
+  const attrEntries = Object.entries(person.attributes ?? {}).filter(([key]) =>
+    allowed.size === 0 || allowed.has(key) || allowed.has(key.replace(new RegExp(`^${role}_`), ""))
+  );
 
   const handleSave = () => {
     onSave(draft);
@@ -89,7 +94,7 @@ function SubTable({
             { key: "full_name", label: "Full Name" },
             { key: "nationality", label: "Nationality" },
             { key: "ownership_pct", label: "Ownership %" },
-          ].map(({ key, label }) => (
+          ].filter(({ key }) => key === "full_name" || allowed.size === 0 || allowed.has(key === "ownership_pct" ? "percentage_of_ownership" : key)).map(({ key, label }) => (
             <div key={key}>
               <label className="block text-xs text-gray-500 mb-1">{label}</label>
               <input
@@ -102,11 +107,11 @@ function SubTable({
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-3 mb-3 text-sm text-gray-700">
-          <div>
+          {(allowed.size === 0 || allowed.has("nationality")) && <div>
             <span className="text-xs text-gray-400 block">Nationality</span>
             {person.nationality ?? <em className="text-gray-300">—</em>}
-          </div>
-          {person.ownership_pct != null && (
+          </div>}
+          {person.ownership_pct != null && (allowed.size === 0 || allowed.has("percentage_of_ownership")) && (
             <div>
               <span className="text-xs text-gray-400 block">Ownership</span>
               {person.ownership_pct}%
@@ -154,6 +159,7 @@ export function PersonRoleTable({
   persons,
   role,
   onPersist,
+  applicableColumns,
 }: {
   persons: ForgePersonRow[];
   role: string;
@@ -163,6 +169,7 @@ export function PersonRoleTable({
     personIndex: number,
     values: Record<string, string>
   ) => void;
+  applicableColumns?: string[];
 }) {
   const individuals = persons.filter((p) => classify(p) === "individual");
   const entities    = persons.filter((p) => classify(p) === "entity");
@@ -181,6 +188,7 @@ export function PersonRoleTable({
               person={p}
               role={role}
               onSave={(values) => onPersist?.(p.kyc, role, p.person_index, values)}
+              applicableColumns={applicableColumns}
             />
           ))}
         </div>

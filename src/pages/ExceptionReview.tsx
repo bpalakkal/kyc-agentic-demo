@@ -54,7 +54,7 @@ import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
 import { DatastoreDocuments } from "@/components/kyc/DatastoreDocuments";
 import { SimpleFieldRow, InlineTraceDrawer } from "@/components/kyc/SimpleFieldRow";
 import { canonicalAttrKey, lineageConflict } from "@/lib/attrLabel";
-import { entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
+import { attributeChecks, entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
 import Screening from "@/pages/Screening";
 import { AgentTriggers } from "@/components/kyc/AgentTriggers";
 
@@ -2338,11 +2338,8 @@ const AttributeFormView = ({
     // type: every required + optional attribute is shown (not_applicable hidden via
     // entityLevelCoreAttrs()), even before any agent run has populated a value.
     // DB attribute names from completed agent runs are merged in on top.
-    const forgeLabels = Array.from(new Set([
-      ...MASTER_CORE_ATTRS,
-      ...Object.values(forgeAttrs).filter(a => a.attribute_group === 'core').map(a => a.attribute_name),
-    ]));
-    const dbAttrLabels = excs.filter(exc => exc.kyc === e.kyc && exc.attrLabel).map(exc => exc.attrLabel!);
+    const forgeLabels = [...MASTER_CORE_ATTRS];
+    const dbAttrLabels: string[] = [];
     // De-duplicate labels that arrive in different formats from different sources
     // (e.g. `entity_name` from the schema vs `entity name` from an exception field).
     // Collapse by canonical key, preferring the form that resolves to a live Forge
@@ -2366,10 +2363,10 @@ const AttributeFormView = ({
   });
 
   // Status strip — use real DB id_flag / verification_flag, not mock status values.
-  // Count collected (DB-present) core attrs that haven't been ID/V confirmed yet.
-  const collectedCoreAttrs = Object.values(forgeAttrs).filter(a => a.attribute_group === 'core');
-  const idPendingCount = collectedCoreAttrs.filter(a => !a.id_flag && !OPTIONAL_CORE_ATTRS.has(a.attribute_name)).length;
-  const vPendingCount  = collectedCoreAttrs.filter(a => !a.verification_flag && !OPTIONAL_CORE_ATTRS.has(a.attribute_name)).length;
+  // Count the full required schema contract, including attributes with no DB row.
+  const requiredCoreAttrs = MASTER_CORE_ATTRS.filter((name) => !OPTIONAL_CORE_ATTRS.has(name));
+  const idPendingCount = requiredCoreAttrs.filter((name) => attributeChecks(name).id && !forgeAttrs[name]?.id_flag).length;
+  const vPendingCount  = requiredCoreAttrs.filter((name) => attributeChecks(name).verification && !forgeAttrs[name]?.verification_flag).length;
 
   // Durably confirm an attribute (set its ID flag). Persists to the backend so
   // the attribute stays verified across future sourcing runs; updates local
@@ -2535,6 +2532,7 @@ const AttributeFormView = ({
                                 key={label}
                                 label={label}
                                 optional={OPTIONAL_CORE_ATTRS.has(label)}
+                                checks={attributeChecks(label)}
                                 entity={entity}
                                 forgeAttr={forgeAttrs[label] ?? null}
                                 savedOverrides={savedOverrides}

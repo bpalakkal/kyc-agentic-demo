@@ -90,6 +90,7 @@ export type SimpleFieldRowProps = {
   handleSaveOverride: (draftKey: string) => void;
   /** Attribute is optional for this entity type (collect if provided, no IDV). */
   optional?: boolean;
+  checks?: { id: boolean; verification: boolean };
   /** A pending sourcing proposal for this attribute (inline review). */
   pendingProposal?: InlineProposal | null;
   onAcceptProposal?: () => void;
@@ -102,7 +103,7 @@ export const SimpleFieldRow = ({
   savedOverrides, openTraceFor, setOpenTraceFor, openOverrideFor, setOpenOverrideFor,
   trace, traceDocs,
   runAgents, overrideDraft, setOverrideDraft, overrideNote, setOverrideNote, handleSaveOverride,
-  optional, pendingProposal, onAcceptProposal, onRejectProposal,
+  optional, checks = { id: true, verification: true }, pendingProposal, onAcceptProposal, onRejectProposal,
 }: SimpleFieldRowProps) => {
   const overrideKey = `${entity}::${label}`;
   const override = savedOverrides[overrideKey];
@@ -163,9 +164,13 @@ export const SimpleFieldRow = ({
             )}
           </label>
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] whitespace-nowrap">
-              {idLabel}<span className="text-muted-foreground/30 mx-0.5">/</span>{vLabel}
-            </span>
+            {(checks.id || checks.verification) && (
+              <span className="text-[9px] whitespace-nowrap">
+                {checks.id && idLabel}
+                {checks.id && checks.verification && <span className="text-muted-foreground/30 mx-0.5">/</span>}
+                {checks.verification && vLabel}
+              </span>
+            )}
             {forgeAttr?.exception_flag && (
               <span className="text-[9px] px-1.5 py-0.5 rounded border font-semibold bg-warning-soft text-warning border-warning/40">
                 {forgeAttr.exception_type ?? "Exception"}
