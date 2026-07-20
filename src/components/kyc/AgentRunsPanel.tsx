@@ -66,7 +66,7 @@ function groupBySource(attrs: RawAttr[]): { source: string; items: { name: strin
   return [...bySource.entries()].map(([source, items]) => ({ source, items }));
 }
 
-export function AgentRunsPanel({ kycRef }: { kycRef: string }) {
+export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; focusAgentSlug?: string | null }) {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [openRun, setOpenRun] = useState<Record<string, boolean>>({});
@@ -103,6 +103,18 @@ export function AgentRunsPanel({ kycRef }: { kycRef: string }) {
       (b.completed_at ?? b.started_at ?? "").localeCompare(a.completed_at ?? a.started_at ?? ""));
   }, [runs]);
 
+  useEffect(() => {
+    if (!focusAgentSlug) return;
+    const match = latest.find((run) => run.agent_slug === focusAgentSlug);
+    if (!match) return;
+    setOpenRun((prev) => ({ ...prev, [match.id]: true }));
+    setSection((prev) => ({ ...prev, [match.id]: "attributes" }));
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-agent-run-slug="${CSS.escape(focusAgentSlug)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }, [focusAgentSlug, latest]);
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
@@ -131,7 +143,11 @@ export function AgentRunsPanel({ kycRef }: { kycRef: string }) {
         const toggleSec = (s: "thinking" | "attributes") =>
           setSection((prev) => ({ ...prev, [run.id]: prev[run.id] === s ? null : s }));
         return (
-          <div key={run.id} className="rounded-lg border border-border bg-card overflow-hidden">
+          <div
+            key={run.id}
+            data-agent-run-slug={run.agent_slug}
+            className={cn("rounded-lg border border-border bg-card overflow-hidden transition-shadow", focusAgentSlug === run.agent_slug && "ring-2 ring-primary/35 shadow-md")}
+          >
             <button
               onClick={() => setOpenRun((prev) => ({ ...prev, [run.id]: !isOpen }))}
               className="w-full flex items-center gap-2 px-3 py-2.5 bg-secondary/50 hover:bg-secondary/70 transition-colors text-left border-b border-border"

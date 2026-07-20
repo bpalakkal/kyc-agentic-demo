@@ -36,7 +36,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import {
   Bot, Sparkles, ChevronDown, ChevronUp, X, Loader2, CheckCircle2, Play, Search,
   ShieldCheck, FileCheck2, Database, Mail, Scale, UserCheck, Globe, Brain, Zap, Minus, Building2,
-  Network, Landmark, FileText, BarChart2,
+  Network, Landmark, FileText, BarChart2, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
@@ -631,6 +631,11 @@ type AgentRun = {
   thoughts: string[];
   currentThought: number;
   startedAt: number;
+  completedAt?: number;
+  batchId: string;
+  kycRef?: string;
+  entityName?: string;
+  displayName?: string;
   isReal?: boolean;
   result?: unknown;
 };
@@ -694,6 +699,8 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   const isRunning = runs.some((r) => r.state !== "done");
 
   const runAgents = useCallback((agentIds: AgentId[], label?: string) => {
+    const ctx = entityContextRef.current;
+    const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newRuns: AgentRun[] = agentIds.map((id, i) => {
       const hasReal = !!AGENT_API_CONFIGS[id];
       return {
@@ -705,17 +712,25 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           : AGENTS_BY_ID[id].defaultThoughts,
         currentThought: 0,
         startedAt: Date.now(),
+        batchId,
+        kycRef: ctx?.kyc,
+        entityName: ctx?.name,
+        displayName: AGENTS_BY_ID[id]?.name,
         isReal: hasReal,
       };
     });
-    setRuns(newRuns);
+    setRuns((previous) => {
+      const replaced = new Set(newRuns.map((run) => `${run.kycRef ?? ""}:${run.agentId}`));
+      return [
+        ...previous.filter((run) => !replaced.has(`${run.kycRef ?? ""}:${run.agentId}`)),
+        ...newRuns,
+      ];
+    });
     setCurrentLabel(label ?? "Custom Agent Run");
     setDockOpen(true);
     setDockMinimized(false);
 
     // Snapshot entity context at call time (ref is always current)
-    const ctx = entityContextRef.current;
-
     newRuns.forEach(async (run) => {
       const cfg = AGENT_API_CONFIGS[run.agentId];
       if (!cfg) return;
@@ -761,10 +776,9 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           const idx = prev.findIndex((r) => r.id === run.id);
           if (idx === -1) return prev;
           const next = [...prev];
-          next[idx] = { ...next[idx], state: "done", thoughts, currentThought: thoughts.length - 1, result };
-          if (idx + 1 < next.length && next[idx + 1].state === "pending") {
-            next[idx + 1] = { ...next[idx + 1], state: "running" };
-          }
+          next[idx] = { ...next[idx], state: "done", completedAt: Date.now(), thoughts, currentThought: thoughts.length - 1, result };
+          const nextIdx = next.findIndex((candidate, candidateIdx) => candidateIdx > idx && candidate.batchId === run.batchId && candidate.state === "pending");
+          if (nextIdx !== -1) next[nextIdx] = { ...next[nextIdx], state: "running" };
           return next;
         });
       };
@@ -914,10 +928,10 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           next[runningIdx] = cur;
         } else if (!cur.isReal) {
           cur.state = "done";
+          cur.completedAt = Date.now();
           next[runningIdx] = cur;
-          if (runningIdx + 1 < next.length) {
-            next[runningIdx + 1] = { ...next[runningIdx + 1], state: "running" };
-          }
+          const nextIdx = next.findIndex((candidate, candidateIdx) => candidateIdx > runningIdx && candidate.batchId === cur.batchId && candidate.state === "pending");
+          if (nextIdx !== -1) next[nextIdx] = { ...next[nextIdx], state: "running" };
         }
         return next;
       });
@@ -1221,6 +1235,21 @@ const AgentDock = () => {
                           </span>
                         )}
                         <span className={cn("text-[9px] uppercase font-semibold tracking-wide shrink-0", statusColor)}>{statusText}</span>
+                        {r.state === "done" && r.kycRef && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              window.dispatchEvent(new CustomEvent("kyc:open-agent-run-results", {
+                                detail: { agentSlug: r.agentId, kycRef: r.kycRef },
+                              }));
+                              setDockMinimized(true);
+                            }}
+                            className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-primary hover:bg-primary/10"
+                            title={`Open ${name} result in Agent Runs`}
+                          >
+                            Results <ExternalLink className="size-2.5" />
+                          </button>
+                        )}
                       </div>
                     );
                   })}

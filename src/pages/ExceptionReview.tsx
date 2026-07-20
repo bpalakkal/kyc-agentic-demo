@@ -278,6 +278,20 @@ const ExceptionReview = () => {
   const [graphOpen, setGraphOpen] = useState(false);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"locker" | "collab" | "sourcing">("locker");
+  const [focusedAgentRun, setFocusedAgentRun] = useState<string | null>(null);
+  const [focusedAgentRunKyc, setFocusedAgentRunKyc] = useState<string | null>(null);
+
+  useEffect(() => {
+    const openResults = (event: Event) => {
+      const detail = (event as CustomEvent<{ agentSlug?: string; kycRef?: string }>).detail;
+      setRightPaneOpen(true);
+      setRightTab("sourcing");
+      setFocusedAgentRun(detail?.agentSlug ?? null);
+      setFocusedAgentRunKyc(detail?.kycRef ?? null);
+    };
+    window.addEventListener("kyc:open-agent-run-results", openResults);
+    return () => window.removeEventListener("kyc:open-agent-run-results", openResults);
+  }, []);
   const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes" | "screening">("exception");
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
@@ -464,7 +478,7 @@ const ExceptionReview = () => {
               <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{0}</span>
             </button>
             <button
-              onClick={() => setRightTab("sourcing")}
+              onClick={() => { setRightTab("sourcing"); setFocusedAgentRun(null); setFocusedAgentRunKyc(null); }}
               className={cn("pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
                 rightTab === "sourcing" ? "font-medium border-b-2 border-primary" : "text-muted-foreground hover:text-foreground")}
             >
@@ -481,7 +495,7 @@ const ExceptionReview = () => {
         </div>
         {rightTab === "locker" && <div className="h-full overflow-y-auto"><DatastoreDocuments kycRef={paneKyc} /></div>}
         {rightTab === "collab" && <CollabPanel entity={paneEntityName} kyc={paneKyc} />}
-        {rightTab === "sourcing" && <div className="h-full overflow-y-auto"><AgentRunsPanel kycRef={paneKyc} /></div>}
+        {rightTab === "sourcing" && <div className="h-full overflow-y-auto"><AgentRunsPanel kycRef={focusedAgentRunKyc ?? paneKyc} focusAgentSlug={focusedAgentRun} /></div>}
       </aside>
     ) : (
       <aside className="rounded-lg border border-border bg-card shadow-sm flex flex-col items-center py-4">
