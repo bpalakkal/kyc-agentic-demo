@@ -102,14 +102,19 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
     return () => { cancelled = true; };
   }, [kycRef, refreshKey]);
 
-  // Latest run per agent that produced something (attributes or a thinking log).
+  useEffect(() => {
+    if (!kycRef) return;
+    const timer = window.setInterval(() => setRefreshKey((key) => key + 1), 10000);
+    return () => window.clearInterval(timer);
+  }, [kycRef]);
+
+  // Latest terminal run per leaf agent. Older orchestrated runs may predate
+  // persisted raw_output/steps, but their status and timestamp still matter.
   const latest = useMemo(() => {
     const m = new Map<string, AgentRun>();
     for (const run of runs) {
       if (run.run_phase === "orchestrator") continue;
       if (!["complete", "pending_review", "failed"].includes(run.status)) continue;
-      const hasContent = (run.raw_output?.attributes?.length) || (run.steps?.length);
-      if (!hasContent) continue;
       const prev = m.get(run.agent_slug);
       const t = run.completed_at ?? run.started_at ?? "";
       const pt = prev ? (prev.completed_at ?? prev.started_at ?? "") : "";

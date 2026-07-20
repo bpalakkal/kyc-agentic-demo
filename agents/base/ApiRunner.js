@@ -115,20 +115,32 @@ export class ApiRunner {
    */
   async run(ctx) {
     const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy, ctx.parentRunId, ctx.runPhase);
+    const steps = [];
+    const externalOnStep = this._onStep;
+    this._onStep = (message) => {
+      steps.push(message);
+      if (externalOnStep) externalOnStep(message);
+    };
     try {
       const output = await this.execute(ctx);
       const stats  = await this._publish(ctx.kycRef, agentRun.id, output, ctx.initiatedBy);
+      const outcome = output.metadata?.outcome ?? this._inferOutcome(output);
+      const outcomeReason = output.metadata?.outcomeReason ?? null;
       await this._finalizeRun(agentRun.id, {
         status:           'complete',
         outputType:       output.outputType,
         sourcesConsulted: output.metadata?.sourcesConsulted ?? [],
-        outcome:          output.metadata?.outcome ?? this._inferOutcome(output),
-        outcomeReason:    output.metadata?.outcomeReason ?? null,
+        outcome,
+        outcomeReason,
+        steps,
+        rawOutput:        output,
       });
-      return { runId: agentRun.id, outputType: output.outputType, stats };
+      return { runId: agentRun.id, outputType: output.outputType, stats, outcome, outcomeReason };
     } catch (err) {
-      await this._finalizeRun(agentRun.id, { status: 'failed', error: err.message });
+      await this._finalizeRun(agentRun.id, { status: 'failed', error: err.message, steps });
       throw err;
+    } finally {
+      this._onStep = externalOnStep;
     }
   }
 
@@ -158,13 +170,15 @@ export class ApiRunner {
       : 'no_data';
   }
 
-  async _finalizeRun(runId, { status, outputType, sourcesConsulted, outcome, outcomeReason, error: errMsg }) {
+  async _finalizeRun(runId, { status, outputType, sourcesConsulted, outcome, outcomeReason, error: errMsg, steps, rawOutput }) {
     const patch = { status };
     if (outputType        !== undefined) patch.output_type       = outputType;
     if (sourcesConsulted  !== undefined) patch.sources_consulted = sourcesConsulted;
     if (outcome           !== undefined) patch.outcome            = outcome;
     if (outcomeReason     !== undefined) patch.outcome_reason     = outcomeReason;
     if (errMsg            !== undefined) patch.error             = errMsg;
+    if (steps             !== undefined) patch.steps             = steps;
+    if (rawOutput         !== undefined) patch.raw_output        = rawOutput;
     if (status === 'complete' || status === 'failed') patch.completed_at = new Date().toISOString();
     await this.sb.from('agent_runs').update(patch).eq('id', runId);
   }
