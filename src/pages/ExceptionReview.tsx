@@ -279,6 +279,7 @@ const ExceptionReview = () => {
   const [rightTab, setRightTab] = useState<"locker" | "collab" | "sourcing">("locker");
   const [focusedAgentRun, setFocusedAgentRun] = useState<string | null>(null);
   const [focusedAgentRunKyc, setFocusedAgentRunKyc] = useState<string | null>(null);
+  const [tabUnread, setTabUnread] = useState({ documents: 0, agentRuns: 0 });
 
   useEffect(() => {
     const openResults = (event: Event) => {
@@ -341,6 +342,33 @@ const ExceptionReview = () => {
     selectedEntities.find((e) => e.kyc === active.kyc) ??
     selectedEntities[0] ??
     { name: active.entity, kyc: active.kyc };
+
+  useEffect(() => {
+    const kycRef = contextEntity.kyc;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/tab-unread`);
+        if (response.ok && !cancelled) setTabUnread(await response.json());
+      } catch { /* unread badges are non-blocking */ }
+    };
+    void refresh();
+    const timer = window.setInterval(refresh, 15000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [contextEntity.kyc]);
+
+  useEffect(() => {
+    if (!rightPaneOpen || rightTab === "collab") return;
+    const tab = rightTab === "locker" ? "documents" : "agent_runs";
+    const countKey = rightTab === "locker" ? "documents" : "agentRuns";
+    const reviewedKyc = rightTab === "sourcing" ? (focusedAgentRunKyc ?? contextEntity.kyc) : contextEntity.kyc;
+    if (reviewedKyc === contextEntity.kyc) {
+      setTabUnread((current) => ({ ...current, [countKey]: 0 }));
+    }
+    void apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(reviewedKyc)}/tab-reviewed/${tab}`, {
+      method: "PUT",
+    }).catch(() => { /* the next poll restores the badge if persistence fails */ });
+  }, [rightPaneOpen, rightTab, contextEntity.kyc, focusedAgentRunKyc]);
 
   // Keep agent context in sync with the currently viewed entity so "Run Agent" dropdown knows what to search
   useEffect(() => {
@@ -455,7 +483,11 @@ const ExceptionReview = () => {
   // Right pane (Document Locker / Collaboration / Files / Sourcing Runs), rendered
   // across the Exception, Attribute and Screening views. Keyed off the reviewed
   // entity (paneKyc) so it works even for cases with no exceptions.
-  const docCount = 0;
+  const unreadBadge = (count: number) => count > 0 ? (
+    <span className="ml-0.5 min-w-4 rounded-full bg-alert px-1 py-0.5 text-center text-[9px] font-bold leading-none text-white">
+      {count > 99 ? "99+" : count}
+    </span>
+  ) : null;
   const renderRightPane = (paneKyc: string, paneEntityName: string) =>
     rightPaneOpen ? (
       <aside className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -466,7 +498,7 @@ const ExceptionReview = () => {
               className={cn("pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
                 rightTab === "locker" ? "font-medium border-b-2 border-primary" : "text-muted-foreground hover:text-foreground")}
             >
-              <FileText className="size-4" /> Documents
+              <FileText className="size-4" /> Documents {unreadBadge(tabUnread.documents)}
             </button>
             <button
               onClick={() => setRightTab("collab")}
@@ -481,7 +513,7 @@ const ExceptionReview = () => {
               className={cn("pb-2 text-sm flex items-center gap-1.5 -mb-px transition-colors",
                 rightTab === "sourcing" ? "font-medium border-b-2 border-primary" : "text-muted-foreground hover:text-foreground")}
             >
-              <Database className="size-3.5" /> Agent Runs
+              <Database className="size-3.5" /> Agent Runs {unreadBadge(tabUnread.agentRuns)}
             </button>
           </div>
           <button
@@ -514,6 +546,7 @@ const ExceptionReview = () => {
             >
               <FileText className="size-3" /> Documents
             </button>
+            {tabUnread.documents > 0 && <span className="absolute -right-1 -top-1 size-4 rounded-full bg-alert text-center text-[8px] font-bold leading-4 text-white">{tabUnread.documents > 9 ? "9+" : tabUnread.documents}</span>}
           </div>
           <div className="w-5 h-px bg-border/60" />
           <div className="relative">
@@ -526,6 +559,7 @@ const ExceptionReview = () => {
             </button>
           </div>
           <div className="w-5 h-px bg-border/60" />
+          <div className="relative">
           <button
             onClick={() => { setRightPaneOpen(true); setRightTab("sourcing"); }}
             className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary/60 [writing-mode:vertical-rl] rotate-180 flex items-center gap-1.5 py-3 px-1.5 rounded-md transition-colors"
@@ -533,6 +567,8 @@ const ExceptionReview = () => {
           >
             <Database className="size-3" /> Agent Runs
           </button>
+          {tabUnread.agentRuns > 0 && <span className="absolute -right-1 -top-1 size-4 rounded-full bg-alert text-center text-[8px] font-bold leading-4 text-white">{tabUnread.agentRuns > 9 ? "9+" : tabUnread.agentRuns}</span>}
+          </div>
         </div>
       </aside>
     );
@@ -731,7 +767,7 @@ const ExceptionReview = () => {
       <div className="flex items-end justify-between border-b border-border mb-4">
         <div className="flex items-center gap-6">
           <button
-            onClick={() => setAttrViewMode("exception")}
+            onClick={() => { setAttrViewMode("exception"); setRightPaneOpen(false); }}
             className={cn(
               "flex items-center gap-2 py-2.5 text-sm border-b-2 -mb-px transition-colors",
               attrViewMode === "exception"
@@ -749,7 +785,7 @@ const ExceptionReview = () => {
             })()}
           </button>
           <button
-            onClick={() => setAttrViewMode("attributes")}
+            onClick={() => { setAttrViewMode("attributes"); setRightPaneOpen(false); }}
             className={cn(
               "flex items-center gap-2 py-2.5 text-sm border-b-2 -mb-px transition-colors",
               attrViewMode === "attributes"
@@ -761,7 +797,7 @@ const ExceptionReview = () => {
             Attribute View
           </button>
           <button
-            onClick={() => setAttrViewMode("screening")}
+            onClick={() => { setAttrViewMode("screening"); setRightPaneOpen(false); }}
             className={cn(
               "flex items-center gap-2 py-2.5 text-sm border-b-2 -mb-px transition-colors",
               attrViewMode === "screening"

@@ -981,6 +981,16 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
   const { data: registry = [] } = useAgentRegistry();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<AgentId>>(new Set());
+  const triggerMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!triggerMenuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [open]);
 
   const topTriggers = registry
     .filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger)
@@ -1041,7 +1051,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
           >
             {entityBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />} Run Recommended
           </button>
-          <div className="relative">
+          <div ref={triggerMenuRef} className="relative">
             <button
               onClick={() => !entityBusy && setOpen((o) => !o)}
               disabled={entityBusy || topTriggers.length === 0}

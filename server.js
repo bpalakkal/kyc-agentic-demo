@@ -341,6 +341,52 @@ app.get('/api/entity/:kycRef/runs', requireAuth, async (req, res) => {
   }
 });
 
+// Per-analyst unread counters for the case Documents and Agent Runs tabs.
+app.get('/api/entity/:kycRef/tab-unread', requireAuth, async (req, res) => {
+  try {
+    const { sb } = getSb();
+    const kycRef = req.params.kycRef;
+    const { data: reviews, error: reviewError } = await sb.from('case_tab_reviews')
+      .select('tab, reviewed_at').eq('user_id', req.user.id).eq('kyc_ref', kycRef);
+    if (reviewError) throw reviewError;
+    const reviewed = Object.fromEntries((reviews ?? []).map((row) => [row.tab, row.reviewed_at]));
+
+    let documentQuery = sb.from('case_files').select('id', { count: 'exact', head: true })
+      .eq('kyc_ref', kycRef).in('file_category', ['document', 'screenshot']);
+    if (reviewed.documents) documentQuery = documentQuery.gt('created_at', reviewed.documents);
+
+    let runQuery = sb.from('agent_runs').select('id', { count: 'exact', head: true })
+      .eq('kyc_ref', kycRef).neq('run_phase', 'orchestrator')
+      .in('status', ['complete', 'pending_review', 'failed', 'cancelled']);
+    if (reviewed.agent_runs) runQuery = runQuery.gt('started_at', reviewed.agent_runs);
+
+    const [documents, agentRuns] = await Promise.all([documentQuery, runQuery]);
+    if (documents.error) throw documents.error;
+    if (agentRuns.error) throw agentRuns.error;
+    res.json({ documents: documents.count ?? 0, agentRuns: agentRuns.count ?? 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Opening a tab advances only that analyst's review cursor for this case.
+app.put('/api/entity/:kycRef/tab-reviewed/:tab', requireAuth, async (req, res) => {
+  const tab = req.params.tab;
+  if (!['documents', 'agent_runs'].includes(tab)) return res.status(400).json({ error: 'Invalid review tab' });
+  try {
+    const { error } = await getSb().sb.from('case_tab_reviews').upsert({
+      user_id: req.user.id,
+      kyc_ref: req.params.kycRef,
+      tab,
+      reviewed_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,kyc_ref,tab' });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── API runner async preview/commit infrastructure ──────────────────────────
 // In-memory stores for the two-phase preview → commit flow.
 // NOTE: These Maps are process-local. A Railway restart clears them; any run

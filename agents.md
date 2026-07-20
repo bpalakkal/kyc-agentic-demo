@@ -74,7 +74,7 @@ kyc-agentic/
 │   └── data/kycMockData.ts               # Type definitions only — no mock data
 │
 ├── scripts/
-│   └── migrations/                        # Current SQL migrations through 012; run in order
+│   └── migrations/                        # Current SQL migrations through 013; run in order
 │
 ├── server.js                              # All Express backend logic
 ├── vite.config.ts                         # @schema alias + base: /kyc-agentic/
@@ -114,6 +114,7 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 010_agent_registry.sql                     ← persistent golden-source agent registry
 011_agent_run_outcomes.sql                 ← separates data_found/no_data from operational failures
 012_agent_registry_orchestration.sql       ← registry-only visibility plus pre/main/post orchestration
+013_case_tab_review_state.sql              ← per-analyst Documents and Agent Runs unread cursors
 ```
 
 ### Agent run status vs outcome
@@ -125,6 +126,9 @@ Only enabled, available rows in `agent_registry` with `user_triggerable = true` 
 `pre_agents` and `post_agents` are ordered arrays of registry slugs. Virtual parents use `execution_mode = 'orchestrator'` with registry-owned `child_agents`, `child_execution` (`parallel` or `sequential`), and `failure_policy` (`fail_fast` or `continue`). The backend resolves these relationships recursively, rejects missing/disabled/unimplemented dependencies and cycles, then executes pre → children → post. Dependency-only utilities use `user_triggerable = false`. Chains are audited through `agent_runs.parent_run_id` and `run_phase` (`orchestrator`, `pre`, `main`, or `post`).
 
 `uk-sourcing-flow`, `us-sourcing-flow`, and `dd-all-in-one` are virtual orchestrators; they do not use their legacy aggregate runner classes. `dd-all-in-one` runs all 18 focused DD agents independently in parallel so each model call is limited to its governed attributes. `screening` remains a focused top-level leaf agent.
+
+### Case tab unread state
+The Documents and Agent Runs badges are analyst-specific and case-specific. `case_tab_reviews` persists the last time each analyst opened each tab. `/api/entity/:kycRef/tab-unread` counts newer artifacts and terminal leaf-agent runs; opening a tab calls `/api/entity/:kycRef/tab-reviewed/:tab`. The UI polls counts every 15 seconds and never clears a badge merely because its data was refreshed.
 
 If migration 009 hasn't run, the commit step fails with a column error. Verify with:
 ```sql
