@@ -121,9 +121,12 @@ Run migrations in `scripts/migrations` in numeric order:
 011_agent_run_outcomes.sql
 012_agent_registry_orchestration.sql
 013_case_tab_review_state.sql
+014_agent_registry_audit.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.
+
+Set `AGENT_REGISTRY_ADMIN_EMAILS` in Railway to the comma-separated emails allowed to edit the Agent Register. Users with Supabase `app_metadata.role = admin` are also allowed. Migration `014` creates the immutable configuration audit table.
 
 One-time environment setup:
 

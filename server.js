@@ -1116,6 +1116,63 @@ app.patch('/api/entity/:kycRef/screening/disposition', requireAuth, async (req, 
 // ─── Agent registry ───────────────────────────────────────────────────────────
 
 // GET /api/agents — persistent golden-source registry plus runtime readiness.
+function canEditAgentRegistry(user) {
+  const configuredEmails = (process.env.AGENT_REGISTRY_ADMIN_EMAILS ?? '')
+    .split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
+  if (user?.app_metadata?.role === 'admin') return true;
+  if (configuredEmails.length) return configuredEmails.includes((user?.email ?? '').toLowerCase());
+  return true;
+}
+
+const EDITABLE_AGENT_FIELDS = new Set([
+  'display_name', 'description', 'enabled', 'user_triggerable', 'top_level_trigger',
+  'execution_mode', 'pre_agents', 'post_agents', 'child_agents', 'child_execution',
+  'failure_policy', 'sort_order',
+]);
+
+function validateAgentRegistryConfig(agents) {
+  const bySlug = new Map(agents.map((agent) => [agent.slug, agent]));
+  for (const agent of agents) {
+    for (const field of ['pre_agents', 'post_agents', 'child_agents']) {
+      if (!Array.isArray(agent[field]) || agent[field].some((slug) => typeof slug !== 'string')) {
+        throw new Error(`${field} must be an array of agent slugs`);
+      }
+      if (new Set(agent[field]).size !== agent[field].length) throw new Error(`${agent.slug} has duplicate ${field}`);
+      for (const slug of agent[field]) {
+        const dependency = bySlug.get(slug);
+        if (!dependency) throw new Error(`${agent.slug} references unregistered agent "${slug}"`);
+        if (!dependency.enabled) throw new Error(`${agent.slug} references disabled agent "${slug}"`);
+      }
+    }
+    if (agent.execution_mode === 'orchestrator' && agent.child_agents.length === 0) {
+      throw new Error(`Orchestrator "${agent.slug}" must have at least one child agent`);
+    }
+    if (agent.execution_mode !== 'orchestrator' && agent.child_agents.length > 0) {
+      throw new Error(`Leaf agent "${agent.slug}" cannot have child agents`);
+    }
+    if (agent.top_level_trigger && (!agent.enabled || !agent.user_triggerable)) {
+      throw new Error(`Top-level trigger "${agent.slug}" must be enabled and user-triggerable`);
+    }
+  }
+
+  const visiting = new Set();
+  const complete = new Set();
+  const visit = (slug, path = []) => {
+    if (visiting.has(slug)) throw new Error(`Agent dependency cycle: ${[...path, slug].join(' -> ')}`);
+    if (complete.has(slug)) return;
+    visiting.add(slug);
+    const agent = bySlug.get(slug);
+    for (const next of [...agent.pre_agents, ...agent.child_agents, ...agent.post_agents]) visit(next, [...path, slug]);
+    visiting.delete(slug);
+    complete.add(slug);
+  };
+  for (const agent of agents) visit(agent.slug);
+}
+
+app.get('/api/agents/access', requireAuth, (req, res) => {
+  res.json({ canEdit: canEditAgentRegistry(req.user) });
+});
+
 app.get('/api/agents', requireAuth, async (_req, res) => {
   try {
     const agents = await getSb().getAgentRegistry();
@@ -1137,7 +1194,7 @@ app.get('/api/agents', requireAuth, async (_req, res) => {
     const bySlug = new Map(enriched.map((agent) => [agent.slug, agent]));
     const dependencyError = (agent, stack = []) => {
       if (stack.includes(agent.slug)) return `Dependency cycle: ${[...stack, agent.slug].join(' -> ')}`;
-      for (const slug of [...registrySlugList(agent.pre_agents), ...registrySlugList(agent.post_agents)]) {
+      for (const slug of [...registrySlugList(agent.pre_agents), ...registrySlugList(agent.child_agents), ...registrySlugList(agent.post_agents)]) {
         const dependency = bySlug.get(slug);
         if (!dependency) return `Dependency "${slug}" is not registered`;
         if (!dependency.enabled) return `Dependency "${slug}" is disabled`;
@@ -1163,6 +1220,57 @@ app.get('/api/agents', requireAuth, async (_req, res) => {
 
 // Temporary in-code reference retained during migration 010 rollout. It is not
 // served to the frontend and can be removed after every environment is migrated.
+app.patch('/api/agents/:slug', requireAuth, async (req, res) => {
+  if (!canEditAgentRegistry(req.user)) return res.status(403).json({ error: 'Agent Register administrator access required' });
+  try {
+    const { sb, getAgentRegistry } = getSb();
+    const agents = await getAgentRegistry();
+    const existing = agents.find((agent) => agent.slug === req.params.slug);
+    if (!existing) return res.status(404).json({ error: `Agent "${req.params.slug}" is not registered` });
+    const unknown = Object.keys(req.body ?? {}).filter((key) => !EDITABLE_AGENT_FIELDS.has(key));
+    if (unknown.length) return res.status(400).json({ error: `Fields are not editable: ${unknown.join(', ')}` });
+
+    const patch = Object.fromEntries(Object.entries(req.body ?? {}).filter(([key]) => EDITABLE_AGENT_FIELDS.has(key)));
+    for (const field of ['pre_agents', 'post_agents', 'child_agents']) {
+      if (field in patch) patch[field] = registrySlugList(patch[field]);
+    }
+    if ('sort_order' in patch && (!Number.isInteger(patch.sort_order) || patch.sort_order < 0)) {
+      return res.status(400).json({ error: 'sort_order must be a non-negative integer' });
+    }
+    const candidate = { ...existing, ...patch };
+    const candidateAgents = agents.map((agent) => agent.slug === existing.slug ? candidate : agent);
+    validateAgentRegistryConfig(candidateAgents);
+    const referenced = new Set(candidateAgents.flatMap((agent) => [
+      ...agent.pre_agents, ...agent.child_agents, ...agent.post_agents,
+    ]));
+    for (const dependency of candidateAgents.filter((agent) => referenced.has(agent.slug))) {
+      const missing = registrySlugList(dependency.required_env).filter((key) => !process.env[key]);
+      if (missing.length) throw new Error(`Referenced agent "${dependency.slug}" is unavailable: missing ${missing.join(', ')}`);
+      if (!['screening', 'orchestrator'].includes(dependency.execution_mode) && !(await loadRunnerClass(dependency.slug))) {
+        throw new Error(`Referenced agent "${dependency.slug}" has no backend runner`);
+      }
+    }
+
+    const { data: updated, error: updateError } = await sb.from('agent_registry')
+      .update(patch).eq('slug', existing.slug).select().single();
+    if (updateError) throw updateError;
+    const { error: auditError } = await sb.from('agent_registry_audit').insert({
+      agent_slug: existing.slug,
+      changed_by: req.user.id,
+      old_config: existing,
+      new_config: updated,
+    });
+    if (auditError) {
+      const rollback = Object.fromEntries([...EDITABLE_AGENT_FIELDS].map((key) => [key, existing[key]]));
+      await sb.from('agent_registry').update(rollback).eq('slug', existing.slug);
+      throw new Error(`Audit write failed; registry change was reverted: ${auditError.message}`);
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/api/agents-legacy', requireAuth, (_req, res) => {
   const CIP = 'Registered Investment Advisor or Commodity Trading Advisor';
   const agents = [
