@@ -12,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Zap, Database, ClipboardList, ShieldCheck } from "lucide-react";
+import { ChevronDown, Zap, Database, ClipboardList, ShieldCheck, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAgents } from "@/components/AgentSystem";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
@@ -20,30 +20,31 @@ import { apiFetch } from "@/lib/apiFetch";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
-function TriggerButton({ icon: Icon, label, children }: {
-  icon: typeof Zap; label: string; children: React.ReactNode;
+function TriggerButton({ icon: Icon, label, children, disabled = false }: {
+  icon: typeof Zap; label: string; children: React.ReactNode; disabled?: boolean;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border">
-          <Icon className="size-3" />
+        <button disabled={disabled} title={disabled ? "An agent is already running for this entity" : undefined} className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border disabled:cursor-not-allowed disabled:opacity-50">
+          {disabled ? <Loader2 className="size-3 animate-spin" /> : <Icon className="size-3" />}
           {label} <ChevronDown className="size-3 opacity-60" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
+      {!disabled && <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
         {children}
-      </DropdownMenuContent>
+      </DropdownMenuContent>}
     </DropdownMenu>
   );
 }
 
 function CategorySection({
-  icon, label, agents,
+  icon, label, agents, disabled,
 }: {
   icon: typeof Database;
   label: string;
   agents: RegistryAgent[];
+  disabled: boolean;
 }) {
   const { runAgents } = useAgents();
   const triggerAll = agents.find((a) => a.trigger_all);
@@ -52,7 +53,7 @@ function CategorySection({
   if (agents.length === 0) return null;
 
   return (
-    <TriggerButton icon={icon} label={label}>
+    <TriggerButton icon={icon} label={label} disabled={disabled}>
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {triggerAll && (
         <DropdownMenuItem
@@ -85,6 +86,8 @@ function CategorySection({
 
 export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: string; entityName: string }) {
   const { data: registry = [] } = useAgentRegistry();
+  const { activeKycRefs } = useAgents();
+  const entityBusy = activeKycRefs.has(caseKyc);
 
   // Fetch this entity's attributes to determine CIP classification.
   // TanStack Query caches the result — other components fetching the same key share it.
@@ -108,15 +111,16 @@ export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: s
     return agentCip === entityCip;
   }
 
-  const sourcing     = registry.filter((a) => a.category?.toLowerCase() === "sourcing").filter(cipFilter);
-  const dueDiligence = registry.filter((a) => a.category?.toLowerCase() === "due_diligence").filter(cipFilter);
-  const screening    = registry.filter((a) => a.category?.toLowerCase() === "screening").filter(cipFilter);
+  const visible = registry.filter((a) => a.enabled !== false && a.user_triggerable !== false && !a.top_level_trigger);
+  const sourcing     = visible.filter((a) => a.category?.toLowerCase() === "sourcing").filter(cipFilter);
+  const dueDiligence = visible.filter((a) => a.category?.toLowerCase() === "due_diligence").filter(cipFilter);
+  const screening    = visible.filter((a) => a.category?.toLowerCase() === "screening").filter(cipFilter);
 
   return (
     <div className="flex items-center gap-2">
-      <CategorySection icon={Database}      label="Sourcing"        agents={sourcing} />
-      <CategorySection icon={ClipboardList} label="Due Diligence"   agents={dueDiligence} />
-      <CategorySection icon={ShieldCheck}   label="Screening"       agents={screening} />
+      <CategorySection icon={Database}      label="Sourcing"        agents={sourcing} disabled={entityBusy} />
+      <CategorySection icon={ClipboardList} label="Due Diligence"   agents={dueDiligence} disabled={entityBusy} />
+      <CategorySection icon={ShieldCheck}   label="Screening"       agents={screening} disabled={entityBusy} />
     </div>
   );
 }

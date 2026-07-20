@@ -119,6 +119,7 @@ Run migrations in `scripts/migrations` in numeric order:
 009_person_overrides_and_runs_columns.sql
 010_agent_registry.sql
 011_agent_run_outcomes.sql
+012_agent_registry_orchestration.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase.

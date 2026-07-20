@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/apiFetch";
+import { registryEntryAvailable } from "@/lib/agentRegistry";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
@@ -14,7 +15,15 @@ export type RegistryAgent = {
   output_type?: string;
   enabled: boolean;
   trigger_all?: boolean;
-  execution_mode?: "generic" | "screening";
+  top_level_trigger?: boolean;
+  user_triggerable?: boolean;
+  pre_agents?: string[];
+  post_agents?: string[];
+  child_agents?: string[];
+  child_execution?: "parallel" | "sequential";
+  failure_policy?: "fail_fast" | "continue";
+  sort_order?: number;
+  execution_mode?: "generic" | "screening" | "orchestrator";
   required_env?: string[];
   runner_registered?: boolean;
   available?: boolean;
@@ -27,7 +36,7 @@ export type RegistryAgent = {
  * false` from the database-backed backend.
  */
 export function isAgentAvailable(agent: RegistryAgent): boolean {
-  return agent.available ?? (agent.enabled && agent.runner_registered !== false);
+  return registryEntryAvailable(agent);
 }
 
 export function useAgentRegistry() {

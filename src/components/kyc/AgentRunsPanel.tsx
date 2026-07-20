@@ -27,6 +27,7 @@ type AgentRun = {
   outcome?: "data_found" | "no_data" | null;
   outcome_reason?: string | null;
   error?: string | null;
+  run_phase?: "orchestrator" | "pre" | "main" | "post";
   completed_at?: string | null;
   started_at?: string | null;
   steps?: string[] | null;
@@ -105,6 +106,7 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
   const latest = useMemo(() => {
     const m = new Map<string, AgentRun>();
     for (const run of runs) {
+      if (run.run_phase === "orchestrator") continue;
       if (!["complete", "pending_review", "failed"].includes(run.status)) continue;
       const hasContent = (run.raw_output?.attributes?.length) || (run.steps?.length);
       if (!hasContent) continue;
@@ -130,9 +132,9 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
   }, [focusAgentSlug, latest]);
 
   const toolbar = (
-    <div className="mb-3 flex items-center justify-between rounded-xl border border-border/70 bg-secondary/25 px-3 py-2">
+    <div className="sticky top-0 z-10 mb-3 flex items-center justify-between rounded-xl border border-border/70 bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
       <div>
-        <p className="text-[11px] font-semibold">Latest agent results</p>
+        <p className="text-[11px] font-semibold">{latest.length} latest agent run{latest.length === 1 ? "" : "s"}</p>
         <p className="text-[9px] text-muted-foreground">
           {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Not refreshed yet"}
         </p>

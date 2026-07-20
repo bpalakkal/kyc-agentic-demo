@@ -387,14 +387,55 @@ async function loadRunnerClass(slug) {
   return map[slug] ?? null;
 }
 
-async function getAgentReadiness(slug) {
+async function getAgentReadiness(slug, { direct = true } = {}) {
   const registry = await getSb().getAgentRegistry();
   const agent = registry.find((entry) => entry.slug === slug);
   if (!agent) return { ok: false, status: 404, error: `Agent "${slug}" is not registered` };
   if (!agent.enabled) return { ok: false, status: 409, error: `Agent "${slug}" is disabled` };
+  if (direct && agent.user_triggerable === false) return { ok: false, status: 403, error: `Agent "${slug}" is dependency-only` };
   const missing = (agent.required_env ?? []).filter((key) => !process.env[key]);
   if (missing.length) return { ok: false, status: 503, error: `Agent "${slug}" is unavailable: missing ${missing.join(', ')}` };
   return { ok: true, agent };
+}
+
+function registrySlugList(value) {
+  return Array.isArray(value) ? value.filter((slug) => typeof slug === 'string' && slug.trim()) : [];
+}
+
+async function resolveAgentExecutionPlan(rootSlug) {
+  const registry = await getSb().getAgentRegistry();
+  const bySlug = new Map(registry.map((agent) => [agent.slug, agent]));
+  const sequence = [];
+  const completed = new Set();
+  const stack = [];
+
+  const visit = async (slug, phase) => {
+    if (stack.includes(slug)) throw new Error(`Agent dependency cycle: ${[...stack, slug].join(' -> ')}`);
+    if (completed.has(slug)) return;
+    const agent = bySlug.get(slug);
+    if (!agent) throw new Error(`Dependency agent "${slug}" is not registered`);
+    if (!agent.enabled) throw new Error(`Dependency agent "${slug}" is disabled`);
+    const RunnerClass = ['screening', 'orchestrator'].includes(agent.execution_mode) ? null : await loadRunnerClass(slug);
+    if (!['screening', 'orchestrator'].includes(agent.execution_mode) && !RunnerClass) throw new Error(`Dependency agent "${slug}" has no backend runner`);
+    const missing = registrySlugList(agent.required_env).filter((key) => !process.env[key]);
+    if (missing.length) throw new Error(`Dependency agent "${slug}" is unavailable: missing ${missing.join(', ')}`);
+
+    stack.push(slug);
+    for (const dependency of registrySlugList(agent.pre_agents)) await visit(dependency, 'pre');
+    if (agent.execution_mode === 'orchestrator') {
+      const children = registrySlugList(agent.child_agents);
+      if (children.length === 0) throw new Error(`Orchestrator "${slug}" has no child_agents`);
+      for (const child of children) await visit(child, 'main');
+    } else {
+      sequence.push({ agent, RunnerClass, phase });
+    }
+    completed.add(slug);
+    for (const dependency of registrySlugList(agent.post_agents)) await visit(dependency, 'post');
+    stack.pop();
+  };
+
+  await visit(rootSlug, 'main');
+  return sequence;
 }
 
 // POST /api/agent-run/api/:slug — start an API runner in the background.
@@ -405,23 +446,120 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
   if (!kycRef)     return res.status(400).json({ error: 'kycRef is required' });
   if (!entityName) return res.status(400).json({ error: 'entityName is required' });
 
+  let rootAgent;
   try {
     const readiness = await getAgentReadiness(slug);
     if (!readiness.ok) return res.status(readiness.status).json({ error: readiness.error });
-    if (readiness.agent.execution_mode !== 'generic') {
+    rootAgent = readiness.agent;
+    if (!['generic', 'orchestrator'].includes(readiness.agent.execution_mode)) {
       return res.status(400).json({ error: `Agent "${slug}" does not use the generic runner endpoint` });
     }
   } catch (err) {
     return res.status(503).json({ error: `Agent registry unavailable: ${err.message}` });
   }
 
-  let RunnerClass;
+  let RunnerClass = null;
   try {
-    RunnerClass = await loadRunnerClass(slug);
+    if (rootAgent.execution_mode === 'generic') RunnerClass = await loadRunnerClass(slug);
   } catch (e) {
     return res.status(503).json({ error: `Runner modules unavailable: ${e.message}` });
   }
-  if (!RunnerClass) return res.status(404).json({ error: `No API runner registered for slug "${slug}"` });
+  if (rootAgent.execution_mode === 'generic' && !RunnerClass) return res.status(404).json({ error: `No API runner registered for slug "${slug}"` });
+
+  let executionPlan;
+  try {
+    executionPlan = await resolveAgentExecutionPlan(slug);
+  } catch (err) {
+    return res.status(409).json({ error: err.message });
+  }
+
+  if (rootAgent.execution_mode === 'orchestrator' || executionPlan.length > 1) {
+    const initiatedBy = req.user.id;
+    const { data: parentRun, error: parentError } = await getSb().sb.from('agent_runs').insert({
+      kyc_ref: kycRef, agent_slug: slug, runner_type: 'api', initiated_by: initiatedBy,
+      status: 'running', run_phase: 'orchestrator',
+    }).select().single();
+    if (parentError) return res.status(500).json({ error: parentError.message });
+
+    const steps = [];
+    apiRunnerSteps.set(parentRun.id, steps);
+    res.json({ runId: parentRun.id, status: 'running' });
+
+    void (async () => {
+      try {
+        const outcomes = [];
+        const failures = [];
+        const executeItem = async (item) => {
+          const { data: state } = await getSb().sb.from('agent_runs').select('status').eq('id', parentRun.id).single();
+          if (state?.status === 'cancelled') throw new Error('Agent chain cancelled by analyst');
+          steps.push(`${item.phase.toUpperCase()} · Starting ${item.agent.display_name}`);
+          if (item.agent.execution_mode === 'screening') {
+            const { data: childRun, error: childError } = await getSb().sb.from('agent_runs').insert({
+              kyc_ref: kycRef, agent_slug: item.agent.slug, runner_type: 'api', initiated_by: initiatedBy,
+              status: 'running', parent_run_id: parentRun.id, run_phase: item.phase,
+            }).select().single();
+            if (childError) throw childError;
+            try {
+              const { runScreening } = getSb();
+              await runScreening(kycRef, { initiatedBy });
+              await getSb().sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString() }).eq('id', childRun.id);
+              steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
+              return 'data_found';
+            } catch (screeningError) {
+              await getSb().sb.from('agent_runs').update({ status: 'failed', error: screeningError.message, completed_at: new Date().toISOString() }).eq('id', childRun.id);
+              throw screeningError;
+            }
+          } else {
+            const child = new item.RunnerClass(getSb().sb);
+            child._onStep = (message) => steps.push(`${item.agent.display_name} · ${message}`);
+            const childResult = await child.run({ kycRef, entityName, initiatedBy, parentRunId: parentRun.id, runPhase: item.phase });
+            steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
+            return childResult.outcome;
+          }
+        };
+
+        const runSequential = async (items, tolerateFailures = false) => {
+          for (const item of items) {
+            try { outcomes.push(await executeItem(item)); }
+            catch (error) {
+              failures.push({ slug: item.agent.slug, error: error.message });
+              if (!tolerateFailures) throw error;
+            }
+          }
+        };
+        const pre = executionPlan.filter((item) => item.phase === 'pre');
+        const main = executionPlan.filter((item) => item.phase === 'main');
+        const post = executionPlan.filter((item) => item.phase === 'post');
+        await runSequential(pre);
+        if (rootAgent.child_execution === 'parallel') {
+          const settled = await Promise.allSettled(main.map(executeItem));
+          settled.forEach((result, index) => result.status === 'fulfilled'
+            ? outcomes.push(result.value)
+            : failures.push({ slug: main[index].agent.slug, error: result.reason?.message ?? String(result.reason) }));
+        } else {
+          await runSequential(main, rootAgent.failure_policy === 'continue');
+        }
+        if (failures.length && (rootAgent.failure_policy !== 'continue' || outcomes.length === 0)) {
+          throw new Error(`Orchestrator child failures: ${failures.map((failure) => `${failure.slug}: ${failure.error}`).join(' | ')}`);
+        }
+        await runSequential(post);
+        await getSb().sb.from('agent_runs').update({
+          status: 'complete', outcome: outcomes.every((outcome) => outcome === 'no_data') ? 'no_data' : 'data_found', completed_at: new Date().toISOString(), steps,
+          outcome_reason: failures.length ? `Completed with ${failures.length} child failure(s)` : null,
+          raw_output: { agentSlug: slug, metadata: { executionPlan: executionPlan.map((item) => ({ slug: item.agent.slug, phase: item.phase })), failures } },
+        }).eq('id', parentRun.id);
+      } catch (err) {
+        steps.push(`FAILED · ${err.message}`);
+        const { data: current } = await getSb().sb.from('agent_runs').select('status').eq('id', parentRun.id).single();
+        if (current?.status !== 'cancelled') {
+          await getSb().sb.from('agent_runs').update({ status: 'failed', error: err.message, completed_at: new Date().toISOString(), steps }).eq('id', parentRun.id);
+        }
+      } finally {
+        setTimeout(() => apiRunnerSteps.delete(parentRun.id), 60_000);
+      }
+    })();
+    return;
+  }
 
   // Capture user id before responding (req may not be safe to read after res.json)
   const initiatedBy = req.user.id;
@@ -871,7 +1009,37 @@ app.post('/api/entity/:kycRef/screening/run', requireAuth, async (req, res) => {
     if (!readiness.ok) return res.status(readiness.status).json({ error: readiness.error });
     const { runScreening } = getSb();
     const initiatedBy = req.user.email ?? req.user.id;
-    res.json(await runScreening(req.params.kycRef, { ...req.body, initiatedBy }));
+    const plan = await resolveAgentExecutionPlan('screening');
+    if (plan.length === 1) return res.json(await runScreening(req.params.kycRef, { ...req.body, initiatedBy }));
+
+    const { data: parent, error: parentError } = await getSb().sb.from('agent_runs').insert({
+      kyc_ref: req.params.kycRef, agent_slug: 'screening', runner_type: 'api', initiated_by: req.user.id,
+      status: 'running', run_phase: 'orchestrator',
+    }).select().single();
+    if (parentError) throw parentError;
+    const steps = [];
+    let screeningResult = null;
+    try {
+      for (const item of plan) {
+        steps.push(`${item.phase.toUpperCase()} · Starting ${item.agent.display_name}`);
+        if (item.agent.execution_mode === 'screening') {
+          screeningResult = await runScreening(req.params.kycRef, { ...req.body, initiatedBy });
+        } else {
+          const child = new item.RunnerClass(getSb().sb);
+          child._onStep = (message) => steps.push(`${item.agent.display_name} · ${message}`);
+          await child.run({
+            kycRef: req.params.kycRef, entityName: req.body?.entityName ?? req.params.kycRef,
+            initiatedBy: req.user.id, parentRunId: parent.id, runPhase: item.phase,
+          });
+        }
+        steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
+      }
+      await getSb().sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString(), steps }).eq('id', parent.id);
+      return res.json(screeningResult ?? { status: 'complete' });
+    } catch (chainError) {
+      await getSb().sb.from('agent_runs').update({ status: 'failed', error: chainError.message, completed_at: new Date().toISOString(), steps }).eq('id', parent.id);
+      throw chainError;
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -908,7 +1076,7 @@ app.get('/api/agents', requireAuth, async (_req, res) => {
     const enriched = await Promise.all(agents.map(async (agent) => {
       const requiredEnv = Array.isArray(agent.required_env) ? agent.required_env : [];
       const missingEnv = requiredEnv.filter((key) => !process.env[key]);
-      const runnerRegistered = agent.execution_mode === 'screening'
+      const runnerRegistered = ['screening', 'orchestrator'].includes(agent.execution_mode)
         ? true
         : !!(await loadRunnerClass(agent.slug));
       return {
@@ -920,7 +1088,25 @@ app.get('/api/agents', requireAuth, async (_req, res) => {
           : (missingEnv.length ? `Missing configuration: ${missingEnv.join(', ')}` : null),
       };
     }));
-    res.json(enriched);
+    const bySlug = new Map(enriched.map((agent) => [agent.slug, agent]));
+    const dependencyError = (agent, stack = []) => {
+      if (stack.includes(agent.slug)) return `Dependency cycle: ${[...stack, agent.slug].join(' -> ')}`;
+      for (const slug of [...registrySlugList(agent.pre_agents), ...registrySlugList(agent.post_agents)]) {
+        const dependency = bySlug.get(slug);
+        if (!dependency) return `Dependency "${slug}" is not registered`;
+        if (!dependency.enabled) return `Dependency "${slug}" is disabled`;
+        if (!dependency.available) return `Dependency "${slug}" is unavailable: ${dependency.readiness_error ?? 'not runnable'}`;
+        const nested = dependencyError(dependency, [...stack, agent.slug]);
+        if (nested) return nested;
+      }
+      return null;
+    };
+    res.json(enriched.map((agent) => {
+      const dependencyIssue = dependencyError(agent);
+      return dependencyIssue
+        ? { ...agent, available: false, readiness_error: dependencyIssue }
+        : agent;
+    }));
   } catch (err) {
     const migrationHint = err.code === 'PGRST205'
       ? ' Apply scripts/migrations/010_agent_registry.sql.'

@@ -100,7 +100,6 @@ const exceptions: Exc[] = [];
 type CompareRow = { field: string; a: string; b: string; conflict?: boolean };
 type Compare = { aLabel: string; bLabel: string; rows: CompareRow[] };
 
-const COMPARISONS: Record<string, Compare> = {};
 
 
 const getSla = (title: string, recommended?: boolean): string => {
@@ -910,7 +909,7 @@ const ExceptionReview = () => {
                 <p className="text-[13px]">{active.flagText}</p>
               </div>
               {(() => {
-                const cmp = COMPARISONS[active.id] ?? dynamicComparisons[active.id];
+                const cmp = dynamicComparisons[active.id];
                 if (!cmp) {
                   return (
                     <p className={cn("text-[13px] text-muted-foreground leading-relaxed", !showReasoning && "line-clamp-2")}>

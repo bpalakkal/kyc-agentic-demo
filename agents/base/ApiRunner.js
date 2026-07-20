@@ -60,12 +60,14 @@ export class ApiRunner {
   async startPreview(ctx, { onStep } = {}) {
     this._onStep = onStep ?? null;
 
-    const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy);
+    const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy, ctx.parentRunId, ctx.runPhase);
     const runId = agentRun.id;
 
     const executionPromise = (async () => {
       try {
         const output = await this.execute(ctx);
+        const { data: currentRun } = await this.sb.from('agent_runs').select('status').eq('id', runId).single();
+        if (currentRun?.status === 'cancelled') throw Object.assign(new Error('Run cancelled by analyst'), { code: 'RUN_CANCELLED' });
         const outcome = output.metadata?.outcome ?? this._inferOutcome(output);
         const { error: statusErr } = await this.sb
           .from('agent_runs')
@@ -74,7 +76,7 @@ export class ApiRunner {
         if (statusErr) throw new Error(`Failed to set pending_review status: ${statusErr.message}`);
         return { runId, output };
       } catch (err) {
-        await this._finalizeRun(runId, { status: 'failed', error: err.message });
+        if (err.code !== 'RUN_CANCELLED') await this._finalizeRun(runId, { status: 'failed', error: err.message });
         throw err;
       }
     })();
@@ -112,7 +114,7 @@ export class ApiRunner {
    * Used when callers don't need the review step.
    */
   async run(ctx) {
-    const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy);
+    const agentRun = await this._createRun(ctx.kycRef, ctx.initiatedBy, ctx.parentRunId, ctx.runPhase);
     try {
       const output = await this.execute(ctx);
       const stats  = await this._publish(ctx.kycRef, agentRun.id, output, ctx.initiatedBy);
@@ -132,7 +134,7 @@ export class ApiRunner {
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
-  async _createRun(kycRef, initiatedBy) {
+  async _createRun(kycRef, initiatedBy, parentRunId, runPhase = 'main') {
     const { data, error } = await this.sb
       .from('agent_runs')
       .insert({
@@ -141,6 +143,8 @@ export class ApiRunner {
         runner_type:  'api',
         initiated_by: initiatedBy ?? null,
         status:       'running',
+        parent_run_id: parentRunId ?? null,
+        run_phase:     runPhase,
       })
       .select()
       .single();

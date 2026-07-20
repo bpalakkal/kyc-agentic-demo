@@ -41,27 +41,14 @@ import {
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { AttributeDiffModal, type PendingDiff } from "@/components/kyc/AttributeDiffModal";
+import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
+import { filterRunnableAgentSlugs } from "@/lib/agentRegistry";
 
 // ─── Agent registry ──────────────────────────────────────────────────────────
 // Add a new AgentId value and a corresponding entry in AGENTS[] to introduce
 // any new agent.  If the agent has a live API, also add it to AGENT_API_CONFIGS.
 
-export type AgentId =
-  | "identity" | "document" | "regulatory" | "audit" | "outreach"
-  | "sanctions" | "pep" | "adverse-media" | "beneficial-owner" | "risk-scoring"
-  | "companies-house" | "jersey-fsc" | "fca" | "uk-sourcing-flow"
-  | "gleif" | "sec" | "iapd" | "nyse" | "us-sourcing-flow"
-  | "screening"
-  | "dd-all-in-one"
-  | "ria-authorized-signatory-idv" | "ria-beneficial-owner-idv"
-  | "ria-cip-classification-id" | "ria-commodities-indicator-id"
-  | "ria-corporate-officer-idv" | "ria-entity-name-idv"
-  | "ria-evidence-of-existence-idv" | "ria-government-identification-idv"
-  | "ria-legal-structure-idv" | "ria-parent-publicly-listed-id"
-  | "ria-principal-business-address-idv" | "ria-proxy-bo-idv"
-  | "ria-registered-address-idv" | "ria-regulator-idv"
-  | "ria-securities-exchange-act-id" | "ria-sole-proprietorship-id"
-  | "ria-source-of-wealth-idv" | "ria-transacting-funds-id";
+export type AgentId = string;
 
 export type Agent = {
   id: AgentId;
@@ -600,7 +587,7 @@ function buildThoughtsFromAgentSteps(steps: unknown[], apiData?: unknown): strin
 
 function buildThoughtsFromResult(data: unknown, agentId: AgentId): string[] {
   const agent = AGENTS_BY_ID[agentId];
-  if (!data || typeof data !== "object") return [...agent.defaultThoughts, "✓ Run completed"];
+  if (!data || typeof data !== "object") return [...(agent?.defaultThoughts ?? []), "✓ Run completed"];
   const d = data as Record<string, unknown>;
   const thoughts: string[] = [];
   if (d.executionTime != null) thoughts.push(`Completed in ${d.executionTime}ms`);
@@ -663,7 +650,9 @@ type AgentContextValue = {
   setDockMinimized: (v: boolean) => void;
   runAgents: (agentIds: AgentId[], label?: string) => void;
   clearRuns: () => void;
+  cancelRun: (id: string) => void;
   currentLabel: string | null;
+  activeKycRefs: Set<string>;
   entityContext: EntityCtx | null;
   setEntityContext: (ctx: EntityCtx | null) => void;
   qaReviewCallback: (() => void) | null;
@@ -685,6 +674,7 @@ export const useAgents = () => {
 // state.  Components consume it via useAgents().
 
 export const AgentProvider = ({ children }: { children: ReactNode }) => {
+  const { data: registry = [] } = useAgentRegistry();
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [dockOpen, setDockOpen] = useState(false);
   const [dockMinimized, setDockMinimized] = useState(false);
@@ -695,14 +685,26 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
   // Ref so runAgents (stable useCallback) always reads the latest entity context
   const entityContextRef = useRef<EntityCtx | null>(null);
   entityContextRef.current = entityContext;
+  const registryRef = useRef<RegistryAgent[]>([]);
+  registryRef.current = registry;
+  const cancelRefs = useRef(new Map<string, { current: boolean }>());
+  const backendRunIds = useRef(new Map<string, string>());
 
   const isRunning = runs.some((r) => r.state !== "done");
+  const activeKycRefs = useMemo(
+    () => new Set(runs.filter((run) => run.state === "running" && run.kycRef).map((run) => run.kycRef!)),
+    [runs],
+  );
 
   const runAgents = useCallback((agentIds: AgentId[], label?: string) => {
     const ctx = entityContextRef.current;
+    const registered = new Map(registryRef.current.map((agent) => [agent.slug, agent]));
+    const allowedIds = filterRunnableAgentSlugs(agentIds, registryRef.current);
+    if (allowedIds.length === 0) return;
     const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const newRuns: AgentRun[] = agentIds.map((id, i) => {
-      const hasReal = !!AGENT_API_CONFIGS[id];
+    const newRuns: AgentRun[] = allowedIds.map((id, i) => {
+      const agent = registered.get(id)!;
+      const hasReal = true;
       return {
         id: `${Date.now()}-${i}`,
         agentId: id,
@@ -715,7 +717,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
         batchId,
         kycRef: ctx?.kyc,
         entityName: ctx?.name,
-        displayName: AGENTS_BY_ID[id]?.name,
+        displayName: agent.display_name,
         isReal: hasReal,
       };
     });
@@ -732,8 +734,10 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 
     // Snapshot entity context at call time (ref is always current)
     newRuns.forEach(async (run) => {
-      const cfg = AGENT_API_CONFIGS[run.agentId];
-      if (!cfg) return;
+      const agent = registered.get(run.agentId)!;
+      const cfg: AgentApiConfig = agent.execution_mode === "screening"
+        ? { slug: agent.slug, endpoint: (current) => `/api/entity/${encodeURIComponent(current?.kyc ?? "")}/screening/run`, buildBody: () => ({}), fetchSteps: false, asyncMode: false, apiRunner: false, skipSnapshot: true }
+        : { slug: agent.slug, endpoint: `/api/agent-run/api/${encodeURIComponent(agent.slug)}`, buildBody: (current) => ({ kycRef: current?.kyc ?? "", entityName: current?.name ?? "" }), fetchSteps: true, asyncMode: true, apiRunner: true, skipSnapshot: true };
 
       const kycRef = ctx?.kyc;
 
@@ -862,6 +866,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 
       // H5: Track cancellation so polling stops if the component unmounts
       const cancelled = { current: false };
+      cancelRefs.current.set(run.id, cancelled);
 
       const endpoint = typeof cfg.endpoint === "function" ? cfg.endpoint(ctx) : (cfg.endpoint ?? `/api/agent/${cfg.slug}`);
       apiFetch(`${AGENT_API_BASE}${endpoint}`, {
@@ -882,6 +887,7 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           if (cancelled.current) return;
           const d = data as Record<string, unknown>;
           const runId = d.runId ?? d.run_id ?? d.id;
+          if (runId) backendRunIds.current.set(run.id, String(runId));
           const status = String(d.status ?? "");
 
           // Proxy returned an error (e.g. upstream timeout or network error)
@@ -905,6 +911,20 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
           if (!cancelled.current) markDone([`⚠ API error: ${err.message}`]);
         });
     });
+  }, []);
+
+  const cancelRun = useCallback((id: string) => {
+    const cancelRef = cancelRefs.current.get(id);
+    if (cancelRef) cancelRef.current = true;
+    const backendId = backendRunIds.current.get(id);
+    if (backendId) {
+      void apiFetch(`${AGENT_API_BASE}/api/agent-run-api/${encodeURIComponent(backendId)}`, { method: "DELETE" });
+    }
+    setRuns((previous) => previous.map((run) => run.id === id
+      ? { ...run, state: "done", completedAt: Date.now(), thoughts: [...run.thoughts, "Run cancelled by analyst"] }
+      : run));
+    cancelRefs.current.delete(id);
+    backendRunIds.current.delete(id);
   }, []);
 
   const clearRuns = useCallback(() => setRuns([]), []);
@@ -941,10 +961,10 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 
   const value = useMemo(() => ({
     runs, isRunning, dockOpen, dockMinimized, setDockOpen, setDockMinimized,
-    runAgents, clearRuns, currentLabel, entityContext, setEntityContext,
+    runAgents, clearRuns, cancelRun, currentLabel, activeKycRefs, entityContext, setEntityContext,
     qaReviewCallback, setQaReviewCallback,
     pendingDiff, setPendingDiff,
-  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, currentLabel, entityContext, setEntityContext, qaReviewCallback, pendingDiff]);
+  }), [runs, isRunning, dockOpen, dockMinimized, runAgents, clearRuns, cancelRun, currentLabel, activeKycRefs, entityContext, setEntityContext, qaReviewCallback, pendingDiff]);
 
   return (
     <AgentContext.Provider value={value}>
@@ -957,16 +977,29 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
 // =========== Top recommendation strip ===========
 
 export const AgentRecommendationStrip = ({ route }: { route: string }) => {
-  const { runAgents, entityContext, qaReviewCallback } = useAgents();
+  const { runAgents, entityContext, activeKycRefs, qaReviewCallback } = useAgents();
+  const { data: registry = [] } = useAgentRegistry();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<AgentId>>(new Set());
 
-  const bundle = RECOMMENDED_BUNDLES.find((b) => b.route === route) ?? RECOMMENDED_BUNDLES[2];
+  const topTriggers = registry
+    .filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const registryBySlug = new Map(registry.map((agent) => [agent.slug, agent]));
+  const firstTrigger = topTriggers[0];
+  const bundle = {
+    route,
+    label: firstTrigger?.display_name ?? "Trigger Agents",
+    reason: firstTrigger?.description ?? "Select a registered agent",
+    agents: firstTrigger ? [firstTrigger.slug] : [],
+  };
+  const categories: AgentCategoryDef[] = [{ id: "registered-top-level", label: "Registered triggers", agentIds: topTriggers.map((agent) => agent.slug) }];
+  const entityBusy = Boolean(entityContext?.kyc && activeKycRefs.has(entityContext.kyc));
 
   // Reset selection whenever the bundle changes (e.g. route navigation)
   useEffect(() => {
     setSelected(new Set());
-  }, [bundle]);
+  }, [route]);
 
   const toggle = (id: AgentId) => {
     setSelected((prev) => {
@@ -1003,13 +1036,15 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={runRecommended}
+            disabled={!firstTrigger || entityBusy || !isAgentAvailable(firstTrigger)}
             className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-95"
           >
-            <Zap className="size-3.5" /> Run Recommended
+            {entityBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />} Run Recommended
           </button>
           <div className="relative">
             <button
-              onClick={() => setOpen((o) => !o)}
+              onClick={() => !entityBusy && setOpen((o) => !o)}
+              disabled={entityBusy || topTriggers.length === 0}
               className="text-xs px-3 py-1.5 rounded-full border border-border bg-card flex items-center gap-1.5 hover:bg-secondary"
             >
               Trigger <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
@@ -1021,7 +1056,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                   <p className="text-[11px] text-muted-foreground">Select agents or trigger an entire section</p>
                 </div>
                 <div className="max-h-[480px] overflow-y-auto py-1">
-                  {AGENT_CATEGORIES.map((cat, catIdx) => (
+                  {categories.map((cat, catIdx) => (
                     <div key={cat.id}>
                       {catIdx > 0 && <div className="h-px bg-border mx-3 my-1" />}
                       {/* Section header */}
@@ -1045,10 +1080,11 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                       )}
                       {/* Individual agents */}
                       {cat.agentIds.map((id) => {
+                        const registeredAgent = registryBySlug.get(id)!;
                         const a = AGENTS_BY_ID[id];
-                        const Icon = a.icon;
+                        const Icon = a?.icon ?? Bot;
                         const isSel = selected.has(id);
-                        const isLive = !!AGENT_API_CONFIGS[id];
+                        const isLive = isAgentAvailable(registeredAgent);
                         const isRec = bundle.agents.includes(id);
                         return (
                           <button
@@ -1073,12 +1109,12 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-[12px] font-medium truncate">{a.short}</p>
+                                <p className="text-[12px] font-medium truncate">{registeredAgent.display_name}</p>
                                 {isRec && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Rec</span>}
                                 {isLive && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide flex items-center gap-0.5"><span className="size-1 rounded-full bg-success inline-block" />Live</span>}
                                 {!isLive && <span className="text-[9px] text-muted-foreground/50">Soon</span>}
                               </div>
-                              <p className="text-[11px] text-muted-foreground leading-snug">{a.description}</p>
+                              <p className="text-[11px] text-muted-foreground leading-snug">{registeredAgent.description}</p>
                               {isLive && !entityContext?.name && (
                                 <p className="text-[10px] text-amber-500/80 mt-0.5">Open an entity to run live</p>
                               )}
@@ -1100,7 +1136,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                   </button>
                 </div>
                 {/* ── Quality Assurance ─────────────────────────── */}
-                {qaReviewCallback && (
+                {false && (
                   <div className="border-t border-border bg-secondary/30">
                     <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                       <span className="size-1.5 rounded-full bg-primary inline-block" />
@@ -1151,7 +1187,7 @@ const runFailed = (r: AgentRun) =>
   r.state === "done" && /⚠|✗|failed|error|timed out/i.test(r.thoughts[r.thoughts.length - 1] ?? "");
 
 const AgentDock = () => {
-  const { runs, dockOpen, dockMinimized, setDockOpen, setDockMinimized, isRunning, currentLabel } = useAgents();
+  const { runs, dockOpen, dockMinimized, setDockOpen, setDockMinimized, isRunning, currentLabel, cancelRun } = useAgents();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!isRunning) return;
@@ -1235,6 +1271,11 @@ const AgentDock = () => {
                           </span>
                         )}
                         <span className={cn("text-[9px] uppercase font-semibold tracking-wide shrink-0", statusColor)}>{statusText}</span>
+                        {r.state === "running" && (
+                          <button type="button" onClick={() => cancelRun(r.id)} className="grid size-5 shrink-0 place-items-center rounded text-muted-foreground hover:bg-alert-soft hover:text-alert" title={`Cancel ${name}`}>
+                            <X className="size-3" />
+                          </button>
+                        )}
                         {r.state === "done" && r.kycRef && (
                           <button
                             type="button"

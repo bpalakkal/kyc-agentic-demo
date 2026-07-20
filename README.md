@@ -57,7 +57,7 @@ npm run start
 
 `npm run start` launches Vite on port 8080 and Express on port 3001.
 
-Before first use, run the SQL files in `scripts/migrations/` in numeric order through migration 011, then initialize storage and seed data if needed:
+Before first use, run the SQL files in `scripts/migrations/` in numeric order through migration 012, then initialize storage and seed data if needed:
 
 ```bash
 node scripts/setup-storage.js
@@ -115,6 +115,7 @@ Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. P
 - `entity_persons` stores party records and per-person JSON attributes.
 - `exceptions` stores review exceptions and their resolutions.
 - `agent_runs` stores runner status, business outcome (`data_found` or `no_data`), steps, output, errors, and sources. `failed` means execution failed; a valid zero-result search is `complete` with a `no_data` outcome.
+- `agent_registry` is the authority for every visible and executable agent. It defines pre/post dependencies and virtual orchestrator membership, parallel/sequential execution, and failure policy. UK/US sourcing and DD All-in-One are registry-defined orchestrators; DD All-in-One runs the 18 focused DD agents independently.
 - `case_files` points to private objects in the `kyc-files` Storage bucket.
 - Screening tables store party matches and analyst dispositions.
 

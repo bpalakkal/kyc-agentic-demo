@@ -74,7 +74,7 @@ kyc-agentic/
 │   └── data/kycMockData.ts               # Type definitions only — no mock data
 │
 ├── scripts/
-│   └── migrations/                        # Current SQL migrations through 010; run in order
+│   └── migrations/                        # Current SQL migrations through 012; run in order
 │
 ├── server.js                              # All Express backend logic
 ├── vite.config.ts                         # @schema alias + base: /kyc-agentic/
@@ -113,10 +113,18 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 009_person_overrides_and_runs_columns.sql  ← person_overrides table + agent_runs.steps/raw_output
 010_agent_registry.sql                     ← persistent golden-source agent registry
 011_agent_run_outcomes.sql                 ← separates data_found/no_data from operational failures
+012_agent_registry_orchestration.sql       ← registry-only visibility plus pre/main/post orchestration
 ```
 
 ### Agent run status vs outcome
 `agent_runs.status` records execution lifecycle. `failed` is reserved for operational or technical failures such as credentials, HTTP errors, timeouts, invalid responses, persistence errors, or server restarts. A successful provider search that returns no matching record finishes with `status = 'complete'`, `outcome = 'no_data'`, and a human-readable `outcome_reason`. Successful searches with results use `outcome = 'data_found'`. Never throw solely because a valid search returned zero records; return a normal output with `metadata.outcome = 'no_data'`. Conversely, never swallow HTTP or network errors and turn them into no-data results.
+
+### Registry-authoritative dispatch
+Only enabled, available rows in `agent_registry` with `user_triggerable = true` may be invoked directly. `top_level_trigger` controls the global Trigger Agents strip; other user-triggerable rows appear in the case category controls. The frontend validates every invocation against `/api/agents`, including legacy resolution and re-verification actions, and never simulates an unknown slug. The backend repeats registry validation so direct API calls cannot bypass it.
+
+`pre_agents` and `post_agents` are ordered arrays of registry slugs. Virtual parents use `execution_mode = 'orchestrator'` with registry-owned `child_agents`, `child_execution` (`parallel` or `sequential`), and `failure_policy` (`fail_fast` or `continue`). The backend resolves these relationships recursively, rejects missing/disabled/unimplemented dependencies and cycles, then executes pre → children → post. Dependency-only utilities use `user_triggerable = false`. Chains are audited through `agent_runs.parent_run_id` and `run_phase` (`orchestrator`, `pre`, `main`, or `post`).
+
+`uk-sourcing-flow`, `us-sourcing-flow`, and `dd-all-in-one` are virtual orchestrators; they do not use their legacy aggregate runner classes. `dd-all-in-one` runs all 18 focused DD agents independently in parallel so each model call is limited to its governed attributes. `screening` remains a focused top-level leaf agent.
 
 If migration 009 hasn't run, the commit step fails with a column error. Verify with:
 ```sql
@@ -206,7 +214,7 @@ Must be exactly `'Registered Investment Advisor or Commodity Trading Advisor'` �
 3. Call `this.step(msg)` at each phase for dock progress.
 4. Export from `agents/runners/api/index.js`.
 5. Add to `loadRunnerClass()` map in `server.js` — missing entry returns 404 and shows ⚠ in dock.
-6. Add `AgentApiConfig` entry in `AgentSystem.tsx` with `asyncMode: true, apiRunner: true`.
+6. Add the registry row through a migration. The frontend derives generic versus screening dispatch from `execution_mode`; do not add a frontend agent catalog entry.
 
 ### Agent registry entries (`agent_registry` → `/api/agents`)
 Migration 010 seeds 29 persisted agents across three groups. Supabase is the golden source for metadata, enablement, ordering, trigger behavior, execution mode, and required environment variables. The API enriches each row with runtime readiness:
@@ -214,7 +222,7 @@ Migration 010 seeds 29 persisted agents across three groups. Supabase is the gol
 - **Due Diligence (19):** `dd-all-in-one` + 18 per-attribute DD runners
 - **Screening (1):** `screening` — routed to `POST /api/entity/:kycRef/screening/run`
 
-An agent is runnable only when it is enabled, its runner/route exists, and every `required_env` entry is configured. Do not add agents only to `AgentSystem.tsx` or `server.js`; add or update the registry seed/migration and wire the implementation using the same slug.
+An agent is runnable only when it is enabled, directly triggerable (or reached as a dependency), its runner/route exists, every `required_env` entry is configured, and its pre/post dependency graph is valid. Do not add agents to `AgentSystem.tsx`; add or update the registry through a migration and wire the backend implementation using the same slug.
 
 Current groups:
 - **Sourcing (9):** `uk-sourcing-flow`, `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `sec`, `iapd`, `nyse`, `gleif`
