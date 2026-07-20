@@ -103,7 +103,20 @@ export default function Agents() {
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [editing, setEditing] = useState<RegistryAgent | null>(null);
   const [canEdit, setCanEdit] = useState(false);
-  useEffect(() => { apiFetch(`${AGENT_API_BASE}/api/agents/access`).then((r) => r.ok ? r.json() : { canEdit: false }).then((body) => setCanEdit(Boolean(body.canEdit))).catch(() => setCanEdit(false)); }, []);
+  const [accessMessage, setAccessMessage] = useState<string | null>(null);
+  const checkAccess = async () => {
+    try {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/agents/access`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? `Access check failed (HTTP ${response.status})`);
+      setCanEdit(Boolean(body.canEdit));
+      setAccessMessage(body.canEdit ? null : `Signed in as ${body.email ?? "an unknown account"}, but this account is not authorized by the Agent Register administrator allowlist.`);
+    } catch (cause) {
+      setCanEdit(false);
+      setAccessMessage(cause instanceof Error ? cause.message : "Unable to verify Agent Register access");
+    }
+  };
+  useEffect(() => { void checkAccess(); }, []);
 
   const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(agents.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
@@ -143,6 +156,12 @@ export default function Agents() {
       </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">Loading registry…</p>}
+      {accessMessage && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-foreground">
+          <span>{accessMessage}</span>
+          <Button variant="outline" size="sm" className="h-7 shrink-0" onClick={checkAccess}>Retry access</Button>
+        </div>
+      )}
       {isError && (
         <p className="text-sm text-destructive">
           Failed to load agents: {(error as Error)?.message}

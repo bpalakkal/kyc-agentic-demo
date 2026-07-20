@@ -1118,8 +1118,10 @@ app.patch('/api/entity/:kycRef/screening/disposition', requireAuth, async (req, 
 // GET /api/agents — persistent golden-source registry plus runtime readiness.
 function canEditAgentRegistry(user) {
   const configuredEmails = (process.env.AGENT_REGISTRY_ADMIN_EMAILS ?? '')
-    .split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
-  if (user?.app_metadata?.role === 'admin') return true;
+    .split(/[;,\s]+/)
+    .map((email) => email.trim().replace(/^[\["']+|[\]"']+$/g, '').toLowerCase())
+    .filter(Boolean);
+  if (user?.app_metadata?.role === 'admin' || user?.user_metadata?.role === 'admin') return true;
   if (configuredEmails.length) return configuredEmails.includes((user?.email ?? '').toLowerCase());
   return true;
 }
@@ -1170,7 +1172,11 @@ function validateAgentRegistryConfig(agents) {
 }
 
 app.get('/api/agents/access', requireAuth, (req, res) => {
-  res.json({ canEdit: canEditAgentRegistry(req.user) });
+  res.json({
+    canEdit: canEditAgentRegistry(req.user),
+    email: req.user.email ?? null,
+    allowlistConfigured: Boolean((process.env.AGENT_REGISTRY_ADMIN_EMAILS ?? '').trim()),
+  });
 });
 
 app.get('/api/agents', requireAuth, async (_req, res) => {
