@@ -106,6 +106,8 @@ For each item, check **Forge verified** when the behavior exists and works end t
 
 ## 8. Agent Register administration UI
 
+- [ ] **Forge verified — Agent Register search.** Analysts can filter the inventory by agent name, slug, description, category, jurisdiction, CIP classification, runner, or output type; search works with pagination and can be cleared in one click.
+
 - [ ] **Forge verified — Existing Agents page is editable for administrators.** Authorized users have an Edit action; unauthorized users retain read-only inventory access.
 
 - [ ] **Forge verified — Core configuration is editable.** Administrators can update display name, description, enabled state, user-triggerable state, top-level status, sort order, and execution mode.

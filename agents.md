@@ -132,7 +132,7 @@ Only enabled, available rows in `agent_registry` with `user_triggerable = true` 
 The Documents and Agent Runs badges are analyst-specific and case-specific. `case_tab_reviews` persists the last time each analyst opened each tab. `/api/entity/:kycRef/tab-unread` counts newer artifacts and terminal leaf-agent runs; opening a tab calls `/api/entity/:kycRef/tab-reviewed/:tab`. The UI polls counts every 15 seconds and never clears a badge merely because its data was refreshed.
 
 ### Agent Register administration
-The Agents page edits registry configuration through `PATCH /api/agents/:slug`; the browser never writes registry rows directly. The server validates references, enabled dependencies, runner/environment readiness, top-level trigger rules, and cycles, then records old/new configurations in `agent_registry_audit`. Set `AGENT_REGISTRY_ADMIN_EMAILS` to a comma-separated Railway allowlist. Supabase users with `app_metadata.role = admin` are always allowed; when no allowlist exists, authenticated users retain edit access for backward compatibility.
+The Agents page supports client-side registry search and edits registry configuration through `PATCH /api/agents/:slug`; the browser never writes registry rows directly. The server validates references, enabled dependencies, runner/environment readiness, top-level trigger rules, and cycles, then records old/new configurations in `agent_registry_audit`. Set `AGENT_REGISTRY_ADMIN_EMAILS` to a comma-separated Railway allowlist. Supabase users with admin role metadata are always allowed; when no allowlist exists, authenticated users retain edit access for backward compatibility.
 
 If migration 009 hasn't run, the commit step fails with a column error. Verify with:
 ```sql

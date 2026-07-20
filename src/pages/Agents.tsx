@@ -3,7 +3,7 @@
  * Reads from GET /api/agents.
  */
 import { useEffect, useState } from "react";
-import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck, Search, X } from "lucide-react";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
@@ -104,6 +104,7 @@ export default function Agents() {
   const [editing, setEditing] = useState<RegistryAgent | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const checkAccess = async () => {
     try {
       const response = await apiFetch(`${AGENT_API_BASE}/api/agents/access`);
@@ -118,19 +119,26 @@ export default function Agents() {
   };
   useEffect(() => { void checkAccess(); }, []);
 
-  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(agents.length / pageSize));
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredAgents = normalizedSearch
+    ? agents.filter((agent) => [
+        agent.display_name, agent.slug, agent.description, agent.category,
+        agent.jurisdiction, agent.cip_classification, agent.runner_type, agent.output_type,
+      ].some((value) => value?.toLowerCase().includes(normalizedSearch)))
+    : agents;
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filteredAgents.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
   const paginated = pageSize === "all"
-    ? agents
-    : agents.slice(safePage * pageSize, (safePage + 1) * pageSize);
+    ? filteredAgents
+    : filteredAgents.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   function changePageSize(val: PageSize) {
     setPageSize(val);
     setPage(0);
   }
 
-  const start = pageSize === "all" ? 1 : safePage * pageSize + 1;
-  const end   = pageSize === "all" ? agents.length : Math.min((safePage + 1) * pageSize, agents.length);
+  const start = filteredAgents.length === 0 ? 0 : pageSize === "all" ? 1 : safePage * pageSize + 1;
+  const end   = pageSize === "all" ? filteredAgents.length : Math.min((safePage + 1) * pageSize, filteredAgents.length);
   const readyCount = agents.filter(isAgentAvailable).length;
 
   return (
@@ -169,6 +177,20 @@ export default function Agents() {
       )}
       {!isLoading && !isError && (
         <>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-sm">
+            <div className="relative w-full max-w-xl">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => { setSearch(event.target.value); setPage(0); }}
+                placeholder="Search by agent, slug, category, jurisdiction, or classification…"
+                className="pl-9 pr-9"
+                aria-label="Search Agent Register"
+              />
+              {search && <button type="button" onClick={() => { setSearch(""); setPage(0); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search"><X className="size-4" /></button>}
+            </div>
+            <span className="shrink-0 text-xs text-muted-foreground">{filteredAgents.length} result{filteredAgents.length === 1 ? "" : "s"}</span>
+          </div>
           <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
             <Table>
               <TableHeader>
@@ -219,10 +241,10 @@ export default function Agents() {
                     </TableRow>
                   );
                 })}
-                {agents.length === 0 && (
+                {filteredAgents.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={canEdit ? 9 : 8} className="py-8 text-center text-sm text-muted-foreground">
-                      No agents registered yet.
+                      {search ? `No agents match “${search}”.` : "No agents registered yet."}
                     </TableCell>
                   </TableRow>
                 )}
@@ -251,9 +273,9 @@ export default function Agents() {
             </div>
 
             <div className="flex items-center gap-3">
-              {agents.length > 0 && (
+              {filteredAgents.length > 0 && (
                 <span>
-                  {start}–{end} of {agents.length}
+                  {start}–{end} of {filteredAgents.length}
                 </span>
               )}
               <div className="flex items-center gap-1">
