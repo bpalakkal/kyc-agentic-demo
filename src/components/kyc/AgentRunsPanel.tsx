@@ -7,7 +7,7 @@
  *                   (from agent_runs.raw_output, migration 008)
  */
 import { useEffect, useMemo, useState } from "react";
-import { Database, ChevronDown, Clock, Loader2, Inbox, Brain, ListTree } from "lucide-react";
+import { Database, ChevronDown, Clock, Loader2, Inbox, Brain, ListTree, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAgentRegistry } from "@/hooks/useAgentRegistry";
@@ -69,6 +69,9 @@ function groupBySource(attrs: RawAttr[]): { source: string; items: { name: strin
 export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; focusAgentSlug?: string | null }) {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [openRun, setOpenRun] = useState<Record<string, boolean>>({});
   const [section, setSection] = useState<Record<string, "thinking" | "attributes" | null>>({});
   const { data: registry = [] } = useAgentRegistry();
@@ -79,13 +82,24 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
     if (!kycRef) return;
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/runs`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: AgentRun[]) => { if (!cancelled) setRuns(Array.isArray(data) ? data : []); })
-      .catch(() => {})
+      .then((r) => {
+        if (!r.ok) throw new Error(`Unable to load agent runs (HTTP ${r.status})`);
+        return r.json();
+      })
+      .then((data: AgentRun[]) => {
+        if (!cancelled) {
+          setRuns(Array.isArray(data) ? data : []);
+          setLastUpdated(new Date());
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : "Unable to load agent runs");
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [kycRef]);
+  }, [kycRef, refreshKey]);
 
   // Latest run per agent that produced something (attributes or a thinking log).
   const latest = useMemo(() => {
@@ -115,25 +129,49 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
     });
   }, [focusAgentSlug, latest]);
 
-  if (loading) {
+  const toolbar = (
+    <div className="mb-3 flex items-center justify-between rounded-xl border border-border/70 bg-secondary/25 px-3 py-2">
+      <div>
+        <p className="text-[11px] font-semibold">Latest agent results</p>
+        <p className="text-[9px] text-muted-foreground">
+          {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Not refreshed yet"}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setRefreshKey((key) => key + 1)}
+        disabled={loading}
+        className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[10px] font-semibold text-primary shadow-sm hover:bg-primary/5 disabled:opacity-60"
+        title="Refresh agent runs"
+      >
+        <RefreshCw className={cn("size-3", loading && "animate-spin")} /> Refresh
+      </button>
+    </div>
+  );
+
+  if (loading && runs.length === 0) {
     return (
       <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
         <Loader2 className="size-4 animate-spin" /> <span className="text-sm">Loading agent runs…</span>
       </div>
     );
   }
+  if (loadError) {
+    return <div>{toolbar}<div className="rounded-xl border border-alert/25 bg-alert-soft px-4 py-5 text-center text-xs text-alert">{loadError}</div></div>;
+  }
   if (latest.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 text-muted-foreground py-10 text-center px-4">
+      <div>{toolbar}<div className="flex flex-col items-center gap-2 text-muted-foreground py-10 text-center px-4">
         <Inbox className="size-6 opacity-40" />
         <p className="text-[12px]">No agent runs yet.</p>
         <p className="text-[10px] text-muted-foreground/70">Trigger an agent — its thinking log and returned values will appear here.</p>
-      </div>
+      </div></div>
     );
   }
 
   return (
     <div className="space-y-2 overflow-y-auto">
+      {toolbar}
       {latest.map((run) => {
         const attrs = (run.raw_output?.attributes ?? []).filter((a) => attrName(a) && attrGroup(a) !== "wgq");
         const groups = groupBySource(attrs);
