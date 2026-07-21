@@ -4,7 +4,7 @@
 
 This is the **no-Forge replica** of the Forge KYC platform.
 - **UI behaviour**: identical to the Forge version — same layouts, same agent trigger panels, same attribute grid, same screening flow.
-- **What's different**: no Forge platform dependency. Agents run via direct REST API calls or Claude API. No `proposals` / `acceptProposals` / `rejectProposals` proposal system. No `RegisterAgentDialog`. No `forge_slug` column.
+- **What's different**: no Forge platform dependency. Agents run via direct REST APIs, Firecrawl Browser, or Claude API. No `proposals` / `acceptProposals` / `rejectProposals` proposal system. No Forge registration dialog or `forge_slug` column.
 - **Governing rule**: _"This should behave exactly the same as the Forge version with the exception that the agents are running directly using direct API calls where available or using Claude API directly plus additional MCPs and tools."_
 
 ---
@@ -35,6 +35,7 @@ AI-powered KYC (Know Your Customer) compliance platform for financial analysts. 
 
 ### AI
 - **Anthropic Claude** (`claude-sonnet-4-6`) — floating chat assistant + tool use, CompaniesHouseRunner PDF digitization, all DD agent runs
+- **Firecrawl Browser** — disposable browser sessions for Delaware Division of Corporations searches
 - No AWS ELB or Forge platform
 
 ---
@@ -67,13 +68,13 @@ kyc-agentic/
 │           ├── NYSERunner.js              # NYSE REST (no LLM)
 │           ├── SECEDGARRunner.js          # SEC EDGAR REST (no LLM)
 │           ├── UKSourcingFlowRunner.js    # FCA + CH in parallel
-│           ├── USSourcingFlowRunner.js    # SEC + IAPD + NYSE in parallel
+│           ├── USRegistryResearchRunners.js # NFA + Puerto Rico APIs; Delaware via Firecrawl
 │           ├── ScreeningRunner.js         # OpenSanctions + Claude discounting
 │           ├── DdRunner.js                # Base DD orchestrator (Claude API)
 │           ├── dd/                        # Per-attribute DD runner classes
-│           │   ├── DdAllInOneRunner.js    # Runs all applicable DD agents sequentially
+│           │   ├── DdAllInOneRunner.js    # Compatibility class; registry parent runs children
 │           │   ├── RiaEntityNameIdvRunner.js
-│           │   └── ... (17 total DD runners)
+│           │   └── ... (18 focused DD runners)
 │           └── index.js                   # Re-exports all runner classes
 │
 ├── schema/                                # Anti-drift contract (shared frontend + backend)
@@ -87,7 +88,7 @@ kyc-agentic/
 │   │   ├── Dashboard.tsx                 # Stats, priority cases, AI action recommendations
 │   │   ├── WorkQueue.tsx                 # Entity table grouped by DRG, filter by status/risk
 │   │   ├── ExceptionReview.tsx           # Deep-dive: attributes + exceptions + agents + files
-│   │   ├── Agents.tsx                    # Agent registry table (no RegisterAgentDialog)
+│   │   ├── Agents.tsx                    # Search/edit registry + create virtual orchestrators
 │   │   ├── Reports.tsx                   # Analytics (placeholder)
 │   │   └── Login.tsx                     # Supabase auth
 │   ├── components/
@@ -250,6 +251,9 @@ Sourcing agents write party data to `entity_persons` (one row per person), not a
 | `POST /api/entity/:kycRef/attributes/override` | Persist analyst attribute override |
 | `POST /api/entity/:kycRef/attributes/:name/confirm` | Set ID+V flags manually |
 | `GET /api/agents` | Persisted Supabase registry with runtime readiness |
+| `GET /api/agents/access` | Current user's Agent Register administration access |
+| `POST /api/agents` | Admin-only creation of registry-driven virtual orchestrators |
+| `PATCH /api/agents/:slug` | Admin-only audited registry configuration update |
 | `GET /api/health` | Supabase + Neo4j health check |
 
 ### In-memory Maps (server.js)
@@ -264,10 +268,12 @@ On Railway restart: Maps cleared. Status endpoint handles orphans: `running` + n
 ## Agent Ecosystem
 
 ### Agent registry (`agent_registry` → `/api/agents`)
-Supabase `agent_registry` is the golden source. Migration 010 seeds 29 agents (9 sourcing, 19 due diligence, and 1 screening); `/api/agents` enriches those rows with runner and credential readiness.
-- **Sourcing** (9): `uk-sourcing-flow` (trigger_all UK), `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `sec`, `iapd`, `nyse`, `gleif`
+Supabase `agent_registry` is the golden source. Migrations seed 32 agents (12 sourcing, 19 due diligence, and 1 screening); administrators may add more virtual orchestrators. `/api/agents` enriches rows with runner, credential, and dependency readiness.
+- **Sourcing** (12): `uk-sourcing-flow`, `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `sec`, `iapd`, `nyse`, `nfa`, `delaware`, `puerto-rico`, `gleif`
 - **Due Diligence** (19): `dd-all-in-one` (trigger_all DD) plus 18 attribute agents — all have `cip_classification: 'Registered Investment Advisor or Commodity Trading Advisor'`
 - **Screening** (1): `screening` (trigger_all Screening) — routed via `/api/entity/:kycRef/screening/run`
+
+`uk-sourcing-flow`, `us-sourcing-flow`, and `dd-all-in-one` are registry-defined virtual orchestrators. Administrators can create additional orchestrators through **New Orchestrator** using existing enabled agents as pre, child, and post dependencies. The restricted `POST /api/agents` endpoint cannot create leaf agents; leaf agents still require a backend runner and deployment.
 
 `cip_classification` must be the FULL string `'Registered Investment Advisor or Commodity Trading Advisor'` — this is what the DB stores and what the UI filters on. Never use short aliases like `'RIA'`.
 
@@ -309,6 +315,7 @@ Every `AttributeOutput` must set `attributeGroup` to `'core'` or `'wgq'`. A cust
 
 ### ID/V flags
 - `id_flag` and `verification_flag` in `entity_attributes` are set ONLY by DD agent runs
+- `AttributePublisher` strips ID/V decisions by default; only `BaseDdRunner.canSetIdvFlags` authorizes persistence
 - They are NEVER auto-set when an analyst manually overrides a value
 - `SimpleFieldRow.tsx` reads them directly from DB — the `isOverridden ? true :` pattern was intentionally removed
 
@@ -356,13 +363,14 @@ ANTHROPIC_API_KEY                           — Claude API (DD agents + CH PDF d
 COMPANIES_HOUSE_API_KEY                     — Companies House REST API
 FCA_AUTH_EMAIL, FCA_API_KEY                 — FCA Register API (set in Railway Variables)
 OPENSANCTIONS_API_KEY                       — OpenSanctions /match/default (screening)
+SEC_API_KEY                                 — sec-api.io access for IAPD
+FIRECRAWL_API_KEY                           — Firecrawl Browser API for Delaware
 VITE_AGENT_API_BASE                         — Express server URL (Railway URL in production)
 NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD      — Neo4j (optional — graph tab only)
 ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET
 ```
 
-**Railway-only** (not in .env file):
-- `FCA_AUTH_EMAIL`, `FCA_API_KEY`, `OPENSANCTIONS_API_KEY`
+Production credentials, including `FCA_AUTH_EMAIL`, `FCA_API_KEY`, `OPENSANCTIONS_API_KEY`, `SEC_API_KEY`, and `FIRECRAWL_API_KEY`, belong in Railway Variables and must never be committed.
 
 ---
 
@@ -376,7 +384,7 @@ npm run build    # Production build
 npm run generate # Regenerate schema-meta from master schema
 ```
 
-Migrations — paste each into Supabase SQL Editor and run once, in order (001 → 009):
+Migrations — paste each into Supabase SQL Editor and run once, in numeric order through 018:
 ```
 000_base_schema.sql
 001_agent_runs_and_case_files.sql
@@ -386,6 +394,15 @@ Migrations — paste each into Supabase SQL Editor and run once, in order (001 �
 007_kyc_ref_from_ids.sql    ← WIPES all case data (TRUNCATE entities CASCADE)
 008_persons_and_dd_columns.sql
 009_person_overrides_and_runs_columns.sql  ← person_overrides table + agent_runs.steps/raw_output
+010_agent_registry.sql                     ← persistent golden-source registry
+011_agent_run_outcomes.sql                 ← data_found/no_data outcomes
+012_agent_registry_orchestration.sql       ← registry-driven orchestration
+013_case_tab_review_state.sql              ← unread tab review cursors
+014_agent_registry_audit.sql               ← immutable registry audit
+015_us_sourcing_agents.sql                 ← seven-agent US sourcing group
+016_agent_run_manual_review_outcome.sql    ← manual-review outcome
+017_delaware_firecrawl.sql                 ← Delaware Firecrawl readiness
+018_source_agents_do_not_set_idv.sql       ← DD-only ID/V persistence cleanup
 ```
 
 ---
@@ -442,6 +459,8 @@ Returns `{ ok: true }` when Supabase is reachable. `ok: false` means DB is down 
 |-------------|-----------------|---------------|
 | Companies House, UK sourcing | `COMPANIES_HOUSE_API_KEY` | `COMPANIES_HOUSE_API_KEY environment variable is not set` |
 | FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
+| IAPD, US sourcing | `SEC_API_KEY` | `SEC_API_KEY environment variable is required for the IAPD runner` |
+| Delaware, US sourcing | `FIRECRAWL_API_KEY` | `FIRECRAWL_API_KEY environment variable is required for the Delaware runner` |
 | All DD agents, CH PDF phase | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is not set` |
 | Screening | `OPENSANCTIONS_API_KEY` | `OPENSANCTIONS_API_KEY is not set` |
 | Any agent | Supabase down | `agent_runs insert error` or `Supabase unavailable` |
