@@ -118,6 +118,7 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 014_agent_registry_audit.sql               ← immutable Agent Register configuration history
 015_us_sourcing_agents.sql                 ← seven-agent US sourcing group and missing registry agents
 016_agent_run_manual_review_outcome.sql    ← authoritative interactive-registry outcome
+017_delaware_firecrawl.sql                 ← Delaware Firecrawl credential/readiness
 ```
 
 ### Agent run status vs outcome
@@ -152,6 +153,7 @@ WHERE table_name = 'agent_runs' ORDER BY column_name;
 | `COMPANIES_HOUSE_API_KEY` | Companies House REST API |
 | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | FCA Register API (set in Railway Variables, not .env) |
 | `SEC_API_KEY` | sec-api.io access used by the IAPD runner |
+| `FIRECRAWL_API_KEY` | Firecrawl Browser API used by the Delaware runner |
 | `OPENSANCTIONS_API_KEY` | OpenSanctions /match/default (screening) — set in Railway |
 | `VITE_AGENT_API_BASE` | Express URL (Railway URL in production; set as GitHub Actions secret) |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Neo4j (optional — graph tab only) |
@@ -251,6 +253,7 @@ Current groups:
 | Companies House, UK sourcing | `COMPANIES_HOUSE_API_KEY` | `COMPANIES_HOUSE_API_KEY environment variable is not set` |
 | FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
 | IAPD, US sourcing | `SEC_API_KEY` | `SEC_API_KEY environment variable is required for the IAPD runner` |
+| Delaware, US sourcing | `FIRECRAWL_API_KEY` | `FIRECRAWL_API_KEY environment variable is required for the Delaware runner` |
 | All DD agents, CH PDF phase | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is not set` |
 | Screening | `OPENSANCTIONS_API_KEY` | `OPENSANCTIONS_API_KEY is not set` |
 | Any agent | Supabase down | `agent_runs insert error` |

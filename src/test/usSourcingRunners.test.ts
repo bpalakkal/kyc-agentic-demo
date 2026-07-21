@@ -13,6 +13,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.SEC_API_KEY;
+  delete process.env.FIRECRAWL_API_KEY;
 });
 
 describe('US sourcing provider contracts', () => {
@@ -73,9 +74,27 @@ describe('US sourcing provider contracts', () => {
     expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('123-456');
   });
 
-  it('keeps Delaware as manual review because its official site prohibits automation', async () => {
+  it('maps an exact Delaware result returned through a disposable Firecrawl browser', async () => {
+    process.env.FIRECRAWL_API_KEY = 'test-key';
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ success: true, id: 'session-1' }))
+      .mockResolvedValueOnce(jsonResponse({
+        success: true, exitCode: 0, killed: false, error: null,
+        stdout: '__DELAWARE_RESULTS__\nFILE NUMBER\nENTITY NAME\n- cell "5147304" [ref=e43]\n  - StaticText "5147304"\n- cell "EXAMPLE LP" [ref=e44]',
+      }))
+      .mockResolvedValueOnce(jsonResponse({ success: true })));
     const output = await new DelawareRunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example LP' });
-    expect(output.metadata.outcome).toBe('manual_review');
-    expect(output.metadata.outcome).not.toBe('no_data');
+    expect(output.metadata.outcome).toBe('data_found');
+    expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('5147304');
+  });
+
+  it('treats a valid empty Delaware result as no data', async () => {
+    process.env.FIRECRAWL_API_KEY = 'test-key';
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ success: true, id: 'session-1' }))
+      .mockResolvedValueOnce(jsonResponse({ success: true, exitCode: 0, killed: false, error: null, stdout: '__DELAWARE_RESULTS__\nFILE NUMBER\nENTITY NAME' }))
+      .mockResolvedValueOnce(jsonResponse({ success: true })));
+    const output = await new DelawareRunner({}).execute({ kycRef: 'CASE_1', entityName: 'Missing LP' });
+    expect(output.metadata.outcome).toBe('no_data');
   });
 });

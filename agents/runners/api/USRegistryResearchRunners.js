@@ -5,6 +5,7 @@ const NFA_SOURCE_URL = 'https://www.nfa.futures.org/basicnet/';
 const PR_API = 'https://rceapi.estado.pr.gov/api/corporation/search';
 const PR_SOURCE_URL = 'https://rcp.estado.pr.gov/en/search/';
 const DELAWARE_SOURCE_URL = 'https://icis.corp.delaware.gov/ecorp/entitysearch/namesearch.aspx';
+const FIRECRAWL_API = 'https://api.firecrawl.dev/v2';
 const CONFIDENCE = 100;
 
 function result(slug, kycRef, attributes, startedAt, outcome, outcomeReason, sourceUrl) {
@@ -29,6 +30,38 @@ function attribute(source, sourceUrl, attributeName, value, idFlag = false, veri
 
 function normalizeName(value) {
   return String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, ' ').replace(/\b(THE|INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LLC|LP|LTD)\b/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
+}
+
+async function firecrawlRequest(path, { method = 'POST', body, timeout = 45_000 } = {}) {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) throw new Error('FIRECRAWL_API_KEY environment variable is required for the Delaware runner');
+  const response = await fetch(`${FIRECRAWL_API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Firecrawl API HTTP ${response.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+  }
+  return response.json();
+}
+
+function parseDelawareRows(stdout) {
+  const marker = '__DELAWARE_RESULTS__';
+  const resultSnapshot = String(stdout ?? '').split(marker).at(-1);
+  if (!String(stdout ?? '').includes(marker) || !resultSnapshot.includes('FILE NUMBER') || !resultSnapshot.includes('ENTITY NAME')) {
+    throw new Error('Firecrawl did not return a valid Delaware search-results page');
+  }
+  const rows = [];
+  const rowPattern = /- cell "(\d{4,})"[^\n]*\n(?:[^\n]*\n){0,2}?\s*- cell "([^"]+)"[^\n]*/g;
+  for (const match of resultSnapshot.matchAll(rowPattern)) rows.push({ fileNumber: match[1], entityName: match[2] });
+  return rows;
 }
 
 export class NFARunner extends ApiRunner {
@@ -122,9 +155,54 @@ export class DelawareRunner extends ApiRunner {
 
   async execute({ kycRef, entityName }) {
     const startedAt = Date.now();
-    const reason = 'The Delaware Division of Corporations prohibits automated search tools; an analyst must perform the official entity search.';
-    this.step(`Delaware requires manual authoritative verification for "${entityName}"`);
-    this.step(`Manual search: ${DELAWARE_SOURCE_URL}`);
-    return result(this.slug, kycRef, [], startedAt, 'manual_review', reason, DELAWARE_SOURCE_URL);
+    if (!String(entityName ?? '').trim()) throw new Error('Delaware search requires an entity name');
+    this.step('Starting a disposable Firecrawl browser for Delaware…');
+    let sessionId;
+    try {
+      const session = await firecrawlRequest('/browser', { body: { ttl: 150, activityTtl: 150, streamWebView: false } });
+      if (!session.success || !session.id) throw new Error('Firecrawl did not create a browser session');
+      sessionId = session.id;
+
+      this.step(`Searching Delaware Division of Corporations for "${entityName}"…`);
+      const code = [
+        `agent-browser open ${shellQuote(DELAWARE_SOURCE_URL)}`,
+        'agent-browser wait 2500',
+        'agent-browser snapshot -i',
+        `agent-browser fill @e38 ${shellQuote(entityName)}`,
+        'agent-browser click @e40',
+        'agent-browser wait 4000',
+        'echo __DELAWARE_RESULTS__',
+        'agent-browser get url',
+        'agent-browser snapshot',
+      ].join('\n');
+      const execution = await firecrawlRequest(`/browser/${encodeURIComponent(sessionId)}/execute`, {
+        body: { code, language: 'bash', timeout: 110 }, timeout: 125_000,
+      });
+      if (!execution.success || execution.exitCode !== 0 || execution.killed || execution.error) {
+        throw new Error(`Firecrawl Delaware browser execution failed: ${execution.error || execution.stderr || `exit ${execution.exitCode}`}`);
+      }
+
+      const rows = parseDelawareRows(execution.stdout);
+      const normalized = normalizeName(entityName);
+      const best = rows.find((row) => normalizeName(row.entityName) === normalized);
+      if (!best) {
+        this.step(`No exact Delaware entity match found for "${entityName}"`);
+        return result(this.slug, kycRef, [], startedAt, 'no_data', 'No exact Delaware Division of Corporations entity record', DELAWARE_SOURCE_URL);
+      }
+      const attributes = [
+        attribute('Delaware Division of Corporations', DELAWARE_SOURCE_URL, 'entity_name', best.entityName, true, true),
+        attribute('Delaware Division of Corporations', DELAWARE_SOURCE_URL, 'registration_number', best.fileNumber, true, true),
+        attribute('Delaware Division of Corporations', DELAWARE_SOURCE_URL, 'country_of_incorporation', 'United States', true, true),
+        attribute('Delaware Division of Corporations', DELAWARE_SOURCE_URL, 'registration_country', 'United States', true, true),
+        attribute('Delaware Division of Corporations', DELAWARE_SOURCE_URL, 'verification_of_existence', 'Yes', true, true),
+      ].filter(Boolean);
+      this.step(`Found Delaware file number ${best.fileNumber}; extracted ${attributes.length} attribute(s)`);
+      return result(this.slug, kycRef, attributes, startedAt, 'data_found', null, DELAWARE_SOURCE_URL);
+    } finally {
+      if (sessionId) {
+        await firecrawlRequest(`/browser/${encodeURIComponent(sessionId)}`, { method: 'DELETE', timeout: 30_000 })
+          .catch((error) => console.warn(`[delaware] Failed to close Firecrawl session: ${error.message}`));
+      }
+    }
   }
 }

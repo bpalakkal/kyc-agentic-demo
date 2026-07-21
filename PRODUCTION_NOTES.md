@@ -124,6 +124,7 @@ Run migrations in `scripts/migrations` in numeric order:
 014_agent_registry_audit.sql
 015_us_sourcing_agents.sql
 016_agent_run_manual_review_outcome.sql
+017_delaware_firecrawl.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.
@@ -150,6 +151,7 @@ node scripts/seed-supabase.js
 | `COMPANIES_HOUSE_API_KEY` | Railway/local | Companies House API |
 | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | Railway/local | FCA Register API |
 | `SEC_API_KEY` | Railway/local | sec-api.io access for IAPD |
+| `FIRECRAWL_API_KEY` | Railway/local | Firecrawl Browser API for Delaware registry searches |
 | `OPENSANCTIONS_API_KEY` | Railway/local | Screening API |
 | `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` | Railway/local | Optional graph database |
 | `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET` | Railway/local | Zoom server-to-server OAuth |
@@ -178,6 +180,7 @@ Check failures in this order:
 | Companies House and UK aggregate sourcing | `COMPANIES_HOUSE_API_KEY` |
 | FCA and UK aggregate sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` |
 | IAPD and US aggregate sourcing | `SEC_API_KEY` |
+| Delaware and US aggregate sourcing | `FIRECRAWL_API_KEY` |
 | DD agents and Companies House PDF processing | `ANTHROPIC_API_KEY` |
 | Screening | `OPENSANCTIONS_API_KEY` |
 | All persisted runs | Supabase backend variables |
