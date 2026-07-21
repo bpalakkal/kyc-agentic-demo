@@ -275,7 +275,11 @@ Supabase `agent_registry` is the golden source. Migrations seed 32 agents (12 so
 
 `uk-sourcing-flow`, `us-sourcing-flow`, and `dd-all-in-one` are registry-defined virtual orchestrators. Administrators can create additional orchestrators through **New Orchestrator** using existing enabled agents as pre, child, and post dependencies. The restricted `POST /api/agents` endpoint cannot create leaf agents; leaf agents still require a backend runner and deployment.
 
+The registry editor persists explicit pre/child/post array order through numbered move-up/move-down controls. Pre and post phases are ordered; child order is enforced only for `child_execution = 'sequential'` because parallel children start concurrently.
+
 `cip_classification` must be the FULL string `'Registered Investment Advisor or Commodity Trading Advisor'` — this is what the DB stores and what the UI filters on. Never use short aliases like `'RIA'`.
+
+Agent Register create/edit controls load their CIP choices from `enumValues('CIPClassification')`; `server.js` validates against the same generated canonical enum. Do not add a free-form classification directly to a registry row.
 
 ### Runner class map (server.js `loadRunnerClass()`)
 Slug → runner class lookup. If a slug isn't in this map, the server returns 404 and the run shows ⚠ in the dock.

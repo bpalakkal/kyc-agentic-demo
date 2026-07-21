@@ -34,6 +34,7 @@ import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import Anthropic from "@anthropic-ai/sdk";
+import { enumValues } from "./schema/index.js";
 
 // Lazy Anthropic client — created on first use so the server starts even when
 // ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
@@ -1132,14 +1133,18 @@ function canEditAgentRegistry(user) {
 }
 
 const EDITABLE_AGENT_FIELDS = new Set([
-  'display_name', 'description', 'enabled', 'user_triggerable', 'top_level_trigger',
+  'display_name', 'description', 'cip_classification', 'enabled', 'user_triggerable', 'top_level_trigger',
   'execution_mode', 'pre_agents', 'post_agents', 'child_agents', 'child_execution',
   'failure_policy', 'sort_order',
 ]);
+const CIP_CLASSIFICATIONS = new Set(enumValues('CIPClassification'));
 
 function validateAgentRegistryConfig(agents) {
   const bySlug = new Map(agents.map((agent) => [agent.slug, agent]));
   for (const agent of agents) {
+    if (agent.cip_classification && agent.cip_classification !== 'all' && !CIP_CLASSIFICATIONS.has(agent.cip_classification)) {
+      throw new Error(`${agent.slug} has invalid CIP classification "${agent.cip_classification}"`);
+    }
     for (const field of ['pre_agents', 'post_agents', 'child_agents']) {
       if (!Array.isArray(agent[field]) || agent[field].some((slug) => typeof slug !== 'string')) {
         throw new Error(`${field} must be an array of agent slugs`);
@@ -1302,6 +1307,12 @@ app.patch('/api/agents/:slug', requireAuth, async (req, res) => {
     if (unknown.length) return res.status(400).json({ error: `Fields are not editable: ${unknown.join(', ')}` });
 
     const patch = Object.fromEntries(Object.entries(req.body ?? {}).filter(([key]) => EDITABLE_AGENT_FIELDS.has(key)));
+    if ('cip_classification' in patch) {
+      patch.cip_classification = patch.cip_classification || null;
+      if (patch.cip_classification !== null && patch.cip_classification !== 'all' && !CIP_CLASSIFICATIONS.has(patch.cip_classification)) {
+        return res.status(400).json({ error: 'cip_classification must be a value from the canonical CIPClassification enum' });
+      }
+    }
     for (const field of ['pre_agents', 'post_agents', 'child_agents']) {
       if (field in patch) patch[field] = registrySlugList(patch[field]);
     }

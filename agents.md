@@ -138,7 +138,11 @@ The Documents and Agent Runs badges are analyst-specific and case-specific. `cas
 ### Agent Register administration
 The Agents page supports client-side registry search and edits registry configuration through `PATCH /api/agents/:slug`; the browser never writes registry rows directly. The server validates references, enabled dependencies, runner/environment readiness, top-level trigger rules, and cycles, then records old/new configurations in `agent_registry_audit`. Set `AGENT_REGISTRY_ADMIN_EMAILS` to a comma-separated Railway allowlist. Supabase users with admin role metadata are always allowed; when no allowlist exists, authenticated users retain edit access for backward compatibility.
 
+Agent Register CIP classification controls are populated from the canonical `CIPClassification` enum in `schema/kyc_master_attribute_schema.json`. The API validates the same enum on create and edit; free-form CIP values are not accepted.
+
 Administrators can create virtual orchestrators through **New Orchestrator**. `POST /api/agents` is intentionally restricted to `execution_mode = orchestrator`; it cannot create leaf agents. New orchestrators must reference existing enabled registry agents and pass dependency, readiness, and cycle validation before the row and its creation audit are persisted.
+
+Create and Edit dialogs show numbered execution-order lists with move-up/move-down controls for pre-, child-, and post-agents. Pre and post arrays always execute in stored order. Child arrays execute in stored order when `child_execution = sequential`; parallel children start together, though their configured order remains available for display and audit.
 
 If migration 009 hasn't run, the commit step fails with a column error. Verify with:
 ```sql

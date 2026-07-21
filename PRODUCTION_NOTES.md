@@ -135,6 +135,10 @@ Set `AGENT_REGISTRY_ADMIN_EMAILS` in Railway to the comma-separated emails allow
 
 Authorized administrators can create registry-only virtual orchestrators from the Agents page. The server permits creation only through the restricted `POST /api/agents` orchestrator contract; new leaf agents still require a backend runner and deployment.
 
+Orchestrator relationship arrays can be reordered explicitly in the Create and Edit dialogs. Sequential children, pre-agents, and post-agents respect the saved order; parallel children do not wait on the preceding child.
+
+Agent Register CIP classifications are selected and server-validated against the canonical schema's `CIPClassification` enum. Update the master schema and regenerate metadata before introducing a new classification.
+
 One-time environment setup:
 
 ```bash

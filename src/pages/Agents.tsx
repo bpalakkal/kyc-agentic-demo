@@ -3,7 +3,7 @@
  * Reads from GET /api/agents.
  */
 import { useEffect, useState } from "react";
-import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck, Search, X, Plus } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck, Search, X, Plus, ArrowUp, ArrowDown } from "lucide-react";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
@@ -19,13 +19,40 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { enumValues } from "@schema";
 
 type PageSize = 10 | 20 | 50 | "all";
 const PAGE_SIZE_OPTIONS: PageSize[] = [10, 20, 50, "all"];
+const CIP_CLASSIFICATIONS = enumValues("CIPClassification");
 
 const relationshipFields = [
   ["pre_agents", "Pre-agents"], ["child_agents", "Child agents"], ["post_agents", "Post-agents"],
 ] as const;
+
+function RelationshipEditor({ label, required, agents, values, onToggle, onMove }: {
+  label: string; required?: boolean; agents: RegistryAgent[]; values: string[];
+  onToggle: (slug: string) => void; onMove: (from: number, to: number) => void;
+}) {
+  const bySlug = new Map(agents.map((agent) => [agent.slug, agent]));
+  return (
+    <fieldset className="rounded-xl border p-3 sm:col-span-2">
+      <legend className="px-1 text-xs font-semibold">{label}{required ? " (required)" : ""}</legend>
+      {values.length > 0 && <div className="mb-3 space-y-1.5 pt-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Execution order</p>
+        {values.map((slug, index) => <div key={slug} className="flex items-center gap-2 rounded-md border bg-secondary/30 px-2 py-1.5 text-xs">
+          <span className="grid size-5 shrink-0 place-items-center rounded bg-primary/10 font-bold text-primary">{index + 1}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{bySlug.get(slug)?.display_name ?? slug}<span className="ml-1 font-mono text-[10px] font-normal text-muted-foreground">{slug}</span></span>
+          <Button type="button" variant="ghost" size="sm" className="size-7 p-0" disabled={index === 0} onClick={() => onMove(index, index - 1)} aria-label={`Move ${slug} up`}><ArrowUp className="size-3.5" /></Button>
+          <Button type="button" variant="ghost" size="sm" className="size-7 p-0" disabled={index === values.length - 1} onClick={() => onMove(index, index + 1)} aria-label={`Move ${slug} down`}><ArrowDown className="size-3.5" /></Button>
+        </div>)}
+      </div>}
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Available agents</p>
+      <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto pt-2 sm:grid-cols-3">
+        {agents.map((option) => <label key={option.slug} className="flex items-start gap-2 text-xs"><input className="mt-0.5" type="checkbox" checked={values.includes(option.slug)} onChange={() => onToggle(option.slug)} /><span>{option.display_name}<span className="block text-[10px] text-muted-foreground">{option.slug}{!option.enabled ? " · disabled" : ""}</span></span></label>)}
+      </div>
+    </fieldset>
+  );
+}
 
 function EditAgentDialog({ agent, agents, onClose, onSaved }: {
   agent: RegistryAgent; agents: RegistryAgent[]; onClose: () => void; onSaved: () => Promise<unknown>;
@@ -38,13 +65,17 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
     const values = draft[field] ?? [];
     set(field, values.includes(slug) ? values.filter((value) => value !== slug) : [...values, slug]);
   };
+  const moveRelation = (field: "pre_agents" | "child_agents" | "post_agents", from: number, to: number) => {
+    const values = [...(draft[field] ?? [])];
+    const [moved] = values.splice(from, 1); values.splice(to, 0, moved); set(field, values);
+  };
   const save = async () => {
     setSaving(true); setError(null);
     try {
       const response = await apiFetch(`${AGENT_API_BASE}/api/agents/${encodeURIComponent(agent.slug)}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          display_name: draft.display_name, description: draft.description ?? "", enabled: draft.enabled,
+          display_name: draft.display_name, description: draft.description ?? "", cip_classification: draft.cip_classification ?? null, enabled: draft.enabled,
           user_triggerable: draft.user_triggerable ?? false, top_level_trigger: draft.top_level_trigger ?? false,
           execution_mode: draft.execution_mode ?? "generic", pre_agents: draft.pre_agents ?? [],
           child_agents: draft.execution_mode === "orchestrator" ? (draft.child_agents ?? []) : [],
@@ -67,6 +98,11 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
           <label className="space-y-1 text-xs font-semibold">Display name<Input value={draft.display_name} onChange={(e) => set("display_name", e.target.value)} /></label>
           <label className="space-y-1 text-xs font-semibold">Sort order<Input type="number" min={0} value={draft.sort_order ?? 0} onChange={(e) => set("sort_order", Number(e.target.value))} /></label>
           <label className="space-y-1 text-xs font-semibold sm:col-span-2">Description<Textarea value={draft.description ?? ""} onChange={(e) => set("description", e.target.value)} /></label>
+          <label className="space-y-1 text-xs font-semibold">CIP classification
+            <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.cip_classification ?? "all"} onChange={(e) => set("cip_classification", e.target.value === "all" ? undefined : e.target.value)}>
+              <option value="all">All classifications</option>{CIP_CLASSIFICATIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </label>
           <label className="space-y-1 text-xs font-semibold">Execution mode
             <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.execution_mode ?? "generic"} onChange={(e) => set("execution_mode", e.target.value as RegistryAgent["execution_mode"])}>
               <option value="generic">Generic leaf</option><option value="screening">Screening leaf</option><option value="orchestrator">Orchestrator</option>
@@ -82,11 +118,7 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
             <label className="space-y-1 text-xs font-semibold">Failure policy<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.failure_policy ?? "fail_fast"} onChange={(e) => set("failure_policy", e.target.value as RegistryAgent["failure_policy"])}><option value="continue">Continue</option><option value="fail_fast">Fail fast</option></select></label>
           </>}
           {relationshipFields.map(([field, label]) => (field !== "child_agents" || draft.execution_mode === "orchestrator") && (
-            <fieldset key={field} className="rounded-xl border p-3 sm:col-span-2"><legend className="px-1 text-xs font-semibold">{label}</legend>
-              <div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto pt-2 sm:grid-cols-3">
-                {agents.filter((option) => option.slug !== agent.slug).map((option) => <label key={option.slug} className="flex items-start gap-2 text-xs"><input className="mt-0.5" type="checkbox" checked={(draft[field] ?? []).includes(option.slug)} onChange={() => toggleRelation(field, option.slug)} /><span>{option.display_name}<span className="block text-[10px] text-muted-foreground">{option.slug}</span></span></label>)}
-              </div>
-            </fieldset>
+            <RelationshipEditor key={field} label={label} required={field === "child_agents"} agents={agents.filter((option) => option.slug !== agent.slug)} values={draft[field] ?? []} onToggle={(slug) => toggleRelation(field, slug)} onMove={(from, to) => moveRelation(field, from, to)} />
           ))}
         </div>
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error}</p>}
@@ -112,6 +144,10 @@ function CreateOrchestratorDialog({ agents, onClose, onSaved }: {
     const values = draft[field];
     set(field, values.includes(slug) ? values.filter((value) => value !== slug) : [...values, slug]);
   };
+  const moveRelation = (field: "pre_agents" | "child_agents" | "post_agents", from: number, to: number) => {
+    const values = [...draft[field]];
+    const [moved] = values.splice(from, 1); values.splice(to, 0, moved); set(field, values);
+  };
   const save = async () => {
     setSaving(true); setError(null);
     try {
@@ -135,14 +171,14 @@ function CreateOrchestratorDialog({ agents, onClose, onSaved }: {
           <label className="space-y-1 text-xs font-semibold">Category<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.category} onChange={(e) => set("category", e.target.value)}><option value="sourcing">Sourcing</option><option value="due_diligence">Due diligence</option><option value="screening">Screening</option></select></label>
           <label className="space-y-1 text-xs font-semibold">Output<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.output_type} onChange={(e) => set("output_type", e.target.value)}><option value="both">Attributes and exceptions</option><option value="attributes">Attributes</option><option value="exceptions">Exceptions</option><option value="screening">Screening</option></select></label>
           <label className="space-y-1 text-xs font-semibold">Jurisdiction<Input value={draft.jurisdiction} placeholder="US, UK, or Global" onChange={(e) => set("jurisdiction", e.target.value)} /></label>
-          <label className="space-y-1 text-xs font-semibold">CIP classification<Input value={draft.cip_classification} placeholder="Blank means all" onChange={(e) => set("cip_classification", e.target.value)} /></label>
+          <label className="space-y-1 text-xs font-semibold">CIP classification<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.cip_classification || "all"} onChange={(e) => set("cip_classification", e.target.value === "all" ? "" : e.target.value)}><option value="all">All classifications</option>{CIP_CLASSIFICATIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
           <label className="space-y-1 text-xs font-semibold">Child execution<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.child_execution} onChange={(e) => set("child_execution", e.target.value)}><option value="parallel">Parallel</option><option value="sequential">Sequential</option></select></label>
           <label className="space-y-1 text-xs font-semibold">Failure policy<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.failure_policy} onChange={(e) => set("failure_policy", e.target.value)}><option value="continue">Continue</option><option value="fail_fast">Fail fast</option></select></label>
           <label className="space-y-1 text-xs font-semibold">Sort order<Input type="number" min={0} value={draft.sort_order} onChange={(e) => set("sort_order", Number(e.target.value))} /></label>
           <div className="flex items-center gap-4 rounded-xl border p-3 text-xs">
             {(["enabled", "user_triggerable", "top_level_trigger"] as const).map((field) => <label key={field} className="flex items-center gap-2"><input type="checkbox" checked={draft[field]} onChange={(e) => set(field, e.target.checked)} />{field === "enabled" ? "Enabled" : field === "user_triggerable" ? "User triggerable" : "Top trigger"}</label>)}
           </div>
-          {relationshipFields.map(([field, label]) => <fieldset key={field} className="rounded-xl border p-3 sm:col-span-2"><legend className="px-1 text-xs font-semibold">{label}{field === "child_agents" ? " (required)" : ""}</legend><div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto pt-2 sm:grid-cols-3">{agents.map((option) => <label key={option.slug} className="flex items-start gap-2 text-xs"><input className="mt-0.5" type="checkbox" checked={draft[field].includes(option.slug)} onChange={() => toggleRelation(field, option.slug)} /><span>{option.display_name}<span className="block text-[10px] text-muted-foreground">{option.slug}{!option.enabled ? " · disabled" : ""}</span></span></label>)}</div></fieldset>)}
+          {relationshipFields.map(([field, label]) => <RelationshipEditor key={field} label={label} required={field === "child_agents"} agents={agents} values={draft[field]} onToggle={(slug) => toggleRelation(field, slug)} onMove={(from, to) => moveRelation(field, from, to)} />)}
         </div>
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error}</p>}
         <DialogFooter><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button onClick={save} disabled={saving || !draft.slug || !draft.display_name || draft.child_agents.length === 0}>{saving && <RefreshCw className="mr-1.5 size-4 animate-spin" />}Create orchestrator</Button></DialogFooter>
