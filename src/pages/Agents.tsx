@@ -3,7 +3,7 @@
  * Reads from GET /api/agents.
  */
 import { useEffect, useState } from "react";
-import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck, Search, X } from "lucide-react";
+import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck, Search, X, Plus } from "lucide-react";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
@@ -96,12 +96,68 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
   );
 }
 
+function CreateOrchestratorDialog({ agents, onClose, onSaved }: {
+  agents: RegistryAgent[]; onClose: () => void; onSaved: () => Promise<unknown>;
+}) {
+  const [draft, setDraft] = useState({
+    slug: "", display_name: "", description: "", category: "sourcing", cip_classification: "",
+    jurisdiction: "", output_type: "both", enabled: true, user_triggerable: true,
+    top_level_trigger: false, pre_agents: [] as string[], child_agents: [] as string[],
+    post_agents: [] as string[], child_execution: "parallel", failure_policy: "continue", sort_order: 0,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = (key: keyof typeof draft, value: unknown) => setDraft((current) => ({ ...current, [key]: value }));
+  const toggleRelation = (field: "pre_agents" | "child_agents" | "post_agents", slug: string) => {
+    const values = draft[field];
+    set(field, values.includes(slug) ? values.filter((value) => value !== slug) : [...values, slug]);
+  };
+  const save = async () => {
+    setSaving(true); setError(null);
+    try {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/agents`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draft),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? `Create failed (HTTP ${response.status})`);
+      await onSaved(); toast.success(`${draft.display_name} created`); onClose();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to create orchestrator"); }
+    finally { setSaving(false); }
+  };
+  return (
+    <Dialog open onOpenChange={(value) => { if (!value && !saving) onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>New Orchestrator</DialogTitle><DialogDescription>Create a registry-driven virtual agent from existing registered agents. No leaf runner is created.</DialogDescription></DialogHeader>
+        <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <label className="space-y-1 text-xs font-semibold">Slug<Input value={draft.slug} placeholder="us-regulatory-review" onChange={(e) => set("slug", e.target.value.toLowerCase().replace(/\s+/g, "-"))} /></label>
+          <label className="space-y-1 text-xs font-semibold">Display name<Input value={draft.display_name} onChange={(e) => set("display_name", e.target.value)} /></label>
+          <label className="space-y-1 text-xs font-semibold sm:col-span-2">Description<Textarea value={draft.description} onChange={(e) => set("description", e.target.value)} /></label>
+          <label className="space-y-1 text-xs font-semibold">Category<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.category} onChange={(e) => set("category", e.target.value)}><option value="sourcing">Sourcing</option><option value="due_diligence">Due diligence</option><option value="screening">Screening</option></select></label>
+          <label className="space-y-1 text-xs font-semibold">Output<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.output_type} onChange={(e) => set("output_type", e.target.value)}><option value="both">Attributes and exceptions</option><option value="attributes">Attributes</option><option value="exceptions">Exceptions</option><option value="screening">Screening</option></select></label>
+          <label className="space-y-1 text-xs font-semibold">Jurisdiction<Input value={draft.jurisdiction} placeholder="US, UK, or Global" onChange={(e) => set("jurisdiction", e.target.value)} /></label>
+          <label className="space-y-1 text-xs font-semibold">CIP classification<Input value={draft.cip_classification} placeholder="Blank means all" onChange={(e) => set("cip_classification", e.target.value)} /></label>
+          <label className="space-y-1 text-xs font-semibold">Child execution<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.child_execution} onChange={(e) => set("child_execution", e.target.value)}><option value="parallel">Parallel</option><option value="sequential">Sequential</option></select></label>
+          <label className="space-y-1 text-xs font-semibold">Failure policy<select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.failure_policy} onChange={(e) => set("failure_policy", e.target.value)}><option value="continue">Continue</option><option value="fail_fast">Fail fast</option></select></label>
+          <label className="space-y-1 text-xs font-semibold">Sort order<Input type="number" min={0} value={draft.sort_order} onChange={(e) => set("sort_order", Number(e.target.value))} /></label>
+          <div className="flex items-center gap-4 rounded-xl border p-3 text-xs">
+            {(["enabled", "user_triggerable", "top_level_trigger"] as const).map((field) => <label key={field} className="flex items-center gap-2"><input type="checkbox" checked={draft[field]} onChange={(e) => set(field, e.target.checked)} />{field === "enabled" ? "Enabled" : field === "user_triggerable" ? "User triggerable" : "Top trigger"}</label>)}
+          </div>
+          {relationshipFields.map(([field, label]) => <fieldset key={field} className="rounded-xl border p-3 sm:col-span-2"><legend className="px-1 text-xs font-semibold">{label}{field === "child_agents" ? " (required)" : ""}</legend><div className="grid max-h-40 grid-cols-2 gap-2 overflow-y-auto pt-2 sm:grid-cols-3">{agents.map((option) => <label key={option.slug} className="flex items-start gap-2 text-xs"><input className="mt-0.5" type="checkbox" checked={draft[field].includes(option.slug)} onChange={() => toggleRelation(field, option.slug)} /><span>{option.display_name}<span className="block text-[10px] text-muted-foreground">{option.slug}{!option.enabled ? " · disabled" : ""}</span></span></label>)}</div></fieldset>)}
+        </div>
+        {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">{error}</p>}
+        <DialogFooter><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button onClick={save} disabled={saving || !draft.slug || !draft.display_name || draft.child_agents.length === 0}>{saving && <RefreshCw className="mr-1.5 size-4 animate-spin" />}Create orchestrator</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Agents() {
   const { data: agents = [], isLoading, isError, error, refetch, isFetching } = useAgentRegistry();
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<PageSize>(10);
   const [editing, setEditing] = useState<RegistryAgent | null>(null);
+  const [creating, setCreating] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -151,10 +207,10 @@ export default function Agents() {
             Live registry · {agents.length} agent{agents.length === 1 ? "" : "s"}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`size-4 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {canEdit && <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1.5 size-4" />New Orchestrator</Button>}
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}><RefreshCw className={`size-4 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -304,6 +360,7 @@ export default function Agents() {
       )}
       {canEdit && <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-primary" />Registry edits are server-validated and written to the audit log.</div>}
       {editing && <EditAgentDialog agent={editing} agents={agents} onClose={() => setEditing(null)} onSaved={refetch} />}
+      {creating && <CreateOrchestratorDialog agents={agents} onClose={() => setCreating(false)} onSaved={refetch} />}
     </div>
   );
 }

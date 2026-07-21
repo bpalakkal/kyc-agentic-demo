@@ -1229,6 +1229,66 @@ app.get('/api/agents', requireAuth, async (_req, res) => {
   }
 });
 
+// POST /api/agents — administrators may create virtual orchestrators only.
+// New leaf agents still require a backend runner and must be added in code.
+app.post('/api/agents', requireAuth, async (req, res) => {
+  if (!canEditAgentRegistry(req.user)) return res.status(403).json({ error: 'Agent Register administrator access required' });
+  try {
+    const { sb, getAgentRegistry } = getSb();
+    const agents = await getAgentRegistry();
+    const body = req.body ?? {};
+    const allowed = new Set([
+      'slug', 'display_name', 'description', 'category', 'cip_classification', 'jurisdiction',
+      'output_type', 'enabled', 'user_triggerable', 'top_level_trigger', 'pre_agents',
+      'post_agents', 'child_agents', 'child_execution', 'failure_policy', 'sort_order',
+    ]);
+    const unknown = Object.keys(body).filter((key) => !allowed.has(key));
+    if (unknown.length) return res.status(400).json({ error: `Fields are not accepted: ${unknown.join(', ')}` });
+    const slug = String(body.slug ?? '').trim().toLowerCase();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return res.status(400).json({ error: 'slug must use lowercase letters, numbers, and single hyphens' });
+    if (agents.some((agent) => agent.slug === slug)) return res.status(409).json({ error: `Agent "${slug}" is already registered` });
+    const displayName = String(body.display_name ?? '').trim();
+    if (!displayName) return res.status(400).json({ error: 'display_name is required' });
+    if (!['sourcing', 'due_diligence', 'screening'].includes(body.category)) return res.status(400).json({ error: 'category is invalid' });
+    if (!['attributes', 'exceptions', 'both', 'screening'].includes(body.output_type)) return res.status(400).json({ error: 'output_type is invalid' });
+    if (!Number.isInteger(body.sort_order ?? 0) || (body.sort_order ?? 0) < 0) return res.status(400).json({ error: 'sort_order must be a non-negative integer' });
+
+    const candidate = {
+      slug, display_name: displayName, description: String(body.description ?? '').trim(),
+      category: body.category, cip_classification: body.cip_classification || null,
+      jurisdiction: body.jurisdiction || null, runner_type: 'api', output_type: body.output_type,
+      execution_mode: 'orchestrator', required_env: [], enabled: body.enabled !== false,
+      trigger_all: false, top_level_trigger: Boolean(body.top_level_trigger),
+      user_triggerable: body.user_triggerable !== false,
+      pre_agents: registrySlugList(body.pre_agents), post_agents: registrySlugList(body.post_agents),
+      child_agents: registrySlugList(body.child_agents), child_execution: body.child_execution ?? 'parallel',
+      failure_policy: body.failure_policy ?? 'fail_fast', sort_order: body.sort_order ?? 0,
+    };
+    const candidateAgents = [...agents, candidate];
+    validateAgentRegistryConfig(candidateAgents);
+    for (const dependencySlug of new Set([...candidate.pre_agents, ...candidate.child_agents, ...candidate.post_agents])) {
+      const dependency = agents.find((agent) => agent.slug === dependencySlug);
+      const missing = registrySlugList(dependency.required_env).filter((key) => !process.env[key]);
+      if (missing.length) throw new Error(`Referenced agent "${dependency.slug}" is unavailable: missing ${missing.join(', ')}`);
+      if (!['screening', 'orchestrator'].includes(dependency.execution_mode) && !(await loadRunnerClass(dependency.slug))) {
+        throw new Error(`Referenced agent "${dependency.slug}" has no backend runner`);
+      }
+    }
+    const { data: created, error: insertError } = await sb.from('agent_registry').insert(candidate).select().single();
+    if (insertError) throw insertError;
+    const { error: auditError } = await sb.from('agent_registry_audit').insert({
+      agent_slug: slug, changed_by: req.user.id, old_config: {}, new_config: created,
+    });
+    if (auditError) {
+      await sb.from('agent_registry').delete().eq('slug', slug);
+      throw new Error(`Audit write failed; new orchestrator was removed: ${auditError.message}`);
+    }
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Temporary in-code reference retained during migration 010 rollout. It is not
 // served to the frontend and can be removed after every environment is migrated.
 app.patch('/api/agents/:slug', requireAuth, async (req, res) => {

@@ -138,6 +138,8 @@ The Documents and Agent Runs badges are analyst-specific and case-specific. `cas
 ### Agent Register administration
 The Agents page supports client-side registry search and edits registry configuration through `PATCH /api/agents/:slug`; the browser never writes registry rows directly. The server validates references, enabled dependencies, runner/environment readiness, top-level trigger rules, and cycles, then records old/new configurations in `agent_registry_audit`. Set `AGENT_REGISTRY_ADMIN_EMAILS` to a comma-separated Railway allowlist. Supabase users with admin role metadata are always allowed; when no allowlist exists, authenticated users retain edit access for backward compatibility.
 
+Administrators can create virtual orchestrators through **New Orchestrator**. `POST /api/agents` is intentionally restricted to `execution_mode = orchestrator`; it cannot create leaf agents. New orchestrators must reference existing enabled registry agents and pass dependency, readiness, and cycle validation before the row and its creation audit are persisted.
+
 If migration 009 hasn't run, the commit step fails with a column error. Verify with:
 ```sql
 SELECT column_name FROM information_schema.columns

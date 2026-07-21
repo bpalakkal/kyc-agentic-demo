@@ -133,6 +133,8 @@ Migration `007` truncates entity case data and must be scheduled deliberately. M
 
 Set `AGENT_REGISTRY_ADMIN_EMAILS` in Railway to the comma-separated emails allowed to edit the Agent Register. Users with Supabase `app_metadata.role = admin` are also allowed. Migration `014` creates the immutable configuration audit table.
 
+Authorized administrators can create registry-only virtual orchestrators from the Agents page. The server permits creation only through the restricted `POST /api/agents` orchestrator contract; new leaf agents still require a backend runner and deployment.
+
 One-time environment setup:
 
 ```bash

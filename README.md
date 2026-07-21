@@ -118,6 +118,7 @@ Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. P
 - The Delaware runner uses a disposable Firecrawl browser session and requires `FIRECRAWL_API_KEY`; valid empty registry results are `no_data`, while browser/API failures are `failed`.
 - `agent_registry` is the authority for every visible and executable agent. It defines pre/post dependencies and virtual orchestrator membership, parallel/sequential execution, and failure policy. UK/US sourcing and DD All-in-One are registry-defined orchestrators; DD All-in-One runs the 18 focused DD agents independently.
 - The Agents page provides audited registry administration. Configure `AGENT_REGISTRY_ADMIN_EMAILS` in Railway as a comma-separated allowlist; Supabase users with `app_metadata.role = admin` are also authorized.
+- Administrators can add virtual orchestrators from the Agent Register using existing registered agents as pre, child, and post dependencies. Leaf-agent creation remains code-backed.
 - `case_files` points to private objects in the `kyc-files` Storage bucket.
 - `case_tab_reviews` stores each analyst's per-case Documents and Agent Runs review cursors. Unread badges persist across sessions and clear when the corresponding tab is opened.
 - Screening tables store party matches and analyst dispositions.
