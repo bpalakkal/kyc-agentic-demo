@@ -593,7 +593,9 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
         }
         await runSequential(post);
         await getSb().sb.from('agent_runs').update({
-          status: 'complete', outcome: outcomes.every((outcome) => outcome === 'no_data') ? 'no_data' : 'data_found', completed_at: new Date().toISOString(), steps,
+          status: 'complete',
+          outcome: outcomes.includes('data_found') ? 'data_found' : outcomes.includes('manual_review') ? 'manual_review' : 'no_data',
+          completed_at: new Date().toISOString(), steps,
           outcome_reason: failures.length ? `Completed with ${failures.length} child failure(s)` : null,
           raw_output: { agentSlug: slug, metadata: { executionPlan: executionPlan.map((item) => ({ slug: item.agent.slug, phase: item.phase })), failures } },
         }).eq('id', parentRun.id);

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IAPDRunner } from '../../agents/runners/api/IAPDRunner.js';
 import { SECEDGARRunner } from '../../agents/runners/api/SECEDGARRunner.js';
 import { NYSERunner } from '../../agents/runners/api/NYSERunner.js';
+import { DelawareRunner, NFARunner, PuertoRicoRunner } from '../../agents/runners/api/USRegistryResearchRunners.js';
 
 const jsonResponse = (body: unknown) => ({ ok: true, json: async () => body }) as Response;
 
@@ -52,5 +53,29 @@ describe('US sourcing provider contracts', () => {
     const output = await new NYSERunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example Holdings Inc.' });
     expect(output.attributes?.find((attr) => attr.attributeName === 'listing_status')?.displayValue).toBe('Listed');
     expect(output.attributes?.find((attr) => attr.attributeName === 'listed_exchange')?.displayValue).toBe('NYSE');
+  });
+
+  it('queries NFA BASIC directly and distinguishes a confirmed no-match', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      result: { success: true, result: { result: { rows: [] } } }, error: null,
+    })));
+    const output = await new NFARunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example LP' });
+    expect(output.metadata.outcome).toBe('no_data');
+  });
+
+  it('maps an official Puerto Rico registry result', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
+      success: true, code: 1,
+      response: { records: [{ corpName: 'EXAMPLE LP', registrationIndex: '123-456', statusEn: 'ACTIVE', classEn: 'Limited Partnership' }] },
+    })));
+    const output = await new PuertoRicoRunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example LP' });
+    expect(output.metadata.outcome).toBe('data_found');
+    expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('123-456');
+  });
+
+  it('keeps Delaware as manual review because its official site prohibits automation', async () => {
+    const output = await new DelawareRunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example LP' });
+    expect(output.metadata.outcome).toBe('manual_review');
+    expect(output.metadata.outcome).not.toBe('no_data');
   });
 });

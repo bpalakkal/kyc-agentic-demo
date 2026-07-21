@@ -7,9 +7,9 @@ INSERT INTO agent_registry
    top_level_trigger, user_triggerable, pre_agents, post_agents, child_agents,
    child_execution, failure_policy)
 VALUES
-  ('nfa', 'NFA BASIC', 'National Futures Association BASIC registration and membership research.', 'sourcing', NULL, 'US', 'attributes', 'generic', ARRAY['ANTHROPIC_API_KEY'], true, false, 90, false, true, '[]', '[]', '[]', 'parallel', 'fail_fast'),
-  ('delaware', 'State of Delaware', 'Delaware Division of Corporations entity registration research.', 'sourcing', NULL, 'US-DE', 'attributes', 'generic', ARRAY['ANTHROPIC_API_KEY'], true, false, 100, false, true, '[]', '[]', '[]', 'parallel', 'fail_fast'),
-  ('puerto-rico', 'State of Puerto Rico', 'Puerto Rico Department of State corporation and entity registration research.', 'sourcing', NULL, 'US-PR', 'attributes', 'generic', ARRAY['ANTHROPIC_API_KEY'], true, false, 110, false, true, '[]', '[]', '[]', 'parallel', 'fail_fast')
+  ('nfa', 'NFA BASIC', 'National Futures Association BASIC registration and membership research.', 'sourcing', NULL, 'US', 'attributes', 'generic', ARRAY[]::text[], true, false, 90, false, true, '[]', '[]', '[]', 'parallel', 'fail_fast'),
+  ('delaware', 'State of Delaware', 'Delaware Division of Corporations entity registration research.', 'sourcing', NULL, 'US-DE', 'attributes', 'generic', ARRAY[]::text[], true, false, 100, false, true, '[]', '[]', '[]', 'parallel', 'fail_fast'),
+  ('puerto-rico', 'State of Puerto Rico', 'Puerto Rico Department of State corporation and entity registration research.', 'sourcing', NULL, 'US-PR', 'attributes', 'generic', ARRAY[]::text[], true, false, 110, false, true, '[]', '[]', '[]', 'parallel', 'fail_fast')
 ON CONFLICT (slug) DO UPDATE SET
   display_name = EXCLUDED.display_name, description = EXCLUDED.description,
   category = EXCLUDED.category, jurisdiction = EXCLUDED.jurisdiction,

@@ -114,7 +114,7 @@ Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. P
 - `entity_attributes` stores scalar values, confidence, flags, and lineage.
 - `entity_persons` stores party records and per-person JSON attributes.
 - `exceptions` stores review exceptions and their resolutions.
-- `agent_runs` stores runner status, business outcome (`data_found` or `no_data`), steps, output, errors, and sources. `failed` means execution failed; a valid zero-result search is `complete` with a `no_data` outcome.
+- `agent_runs` stores runner status, business outcome (`data_found`, `no_data`, or `manual_review`), steps, output, errors, and sources. `failed` means execution failed; a valid zero-result search is `complete` with `no_data`; an authoritative interactive-only registry is `complete` with `manual_review` and its official link.
 - `agent_registry` is the authority for every visible and executable agent. It defines pre/post dependencies and virtual orchestrator membership, parallel/sequential execution, and failure policy. UK/US sourcing and DD All-in-One are registry-defined orchestrators; DD All-in-One runs the 18 focused DD agents independently.
 - The Agents page provides audited registry administration. Configure `AGENT_REGISTRY_ADMIN_EMAILS` in Railway as a comma-separated allowlist; Supabase users with `app_metadata.role = admin` are also authorized.
 - `case_files` points to private objects in the `kyc-files` Storage bucket.

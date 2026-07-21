@@ -860,7 +860,9 @@ export const AgentProvider = ({ children }: { children: ReactNode }) => {
                 if (Number(stats?.fileStored) > 0) parts.push(`${stats!.fileStored} files`);
                 const finalMessage = outcome === "no_data"
                   ? `ℹ No data found${outcomeReason ? `: ${outcomeReason}` : ""}`
-                  : `✓ Saved: ${parts.join(" · ") || "complete"}`;
+                  : outcome === "manual_review"
+                    ? `↗ Manual registry review required${outcomeReason ? `: ${outcomeReason}` : ""}`
+                    : `✓ Saved: ${parts.join(" · ") || "complete"}`;
                 markDone([...latestSteps, finalMessage], cd);
               } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);

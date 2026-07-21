@@ -117,10 +117,11 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 013_case_tab_review_state.sql              ← per-analyst Documents and Agent Runs unread cursors
 014_agent_registry_audit.sql               ← immutable Agent Register configuration history
 015_us_sourcing_agents.sql                 ← seven-agent US sourcing group and missing registry agents
+016_agent_run_manual_review_outcome.sql    ← authoritative interactive-registry outcome
 ```
 
 ### Agent run status vs outcome
-`agent_runs.status` records execution lifecycle. `failed` is reserved for operational or technical failures such as credentials, HTTP errors, timeouts, invalid responses, persistence errors, or server restarts. A successful provider search that returns no matching record finishes with `status = 'complete'`, `outcome = 'no_data'`, and a human-readable `outcome_reason`. Successful searches with results use `outcome = 'data_found'`. Never throw solely because a valid search returned zero records; return a normal output with `metadata.outcome = 'no_data'`. Conversely, never swallow HTTP or network errors and turn them into no-data results.
+`agent_runs.status` records execution lifecycle. `failed` is reserved for operational or technical failures such as credentials, HTTP errors, timeouts, invalid responses, persistence errors, or server restarts. A successful provider search that returns no matching record finishes with `status = 'complete'`, `outcome = 'no_data'`, and a human-readable `outcome_reason`. Successful searches with results use `outcome = 'data_found'`. Authoritative sources that require an interactive analyst search use `status = 'complete'`, `outcome = 'manual_review'`, and the official URL; this must never be reported as a confirmed no-match. Never throw solely because a valid search returned zero records, and never swallow HTTP or network errors into `no_data`.
 
 ### Registry-authoritative dispatch
 Only enabled, available rows in `agent_registry` with `user_triggerable = true` may be invoked directly. `top_level_trigger` controls the global Trigger Agents strip; other user-triggerable rows appear in the case category controls. The frontend validates every invocation against `/api/agents`, including legacy resolution and re-verification actions, and never simulates an unknown slug. The backend repeats registry validation so direct API calls cannot bypass it.
@@ -250,7 +251,6 @@ Current groups:
 | Companies House, UK sourcing | `COMPANIES_HOUSE_API_KEY` | `COMPANIES_HOUSE_API_KEY environment variable is not set` |
 | FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
 | IAPD, US sourcing | `SEC_API_KEY` | `SEC_API_KEY environment variable is required for the IAPD runner` |
-| NFA, Delaware, Puerto Rico | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is required for US registry research agents` |
 | All DD agents, CH PDF phase | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is not set` |
 | Screening | `OPENSANCTIONS_API_KEY` | `OPENSANCTIONS_API_KEY is not set` |
 | Any agent | Supabase down | `agent_runs insert error` |

@@ -24,7 +24,7 @@ type AgentRun = {
   id: string;
   agent_slug: string;
   status: string;
-  outcome?: "data_found" | "no_data" | null;
+  outcome?: "data_found" | "no_data" | "manual_review" | null;
   outcome_reason?: string | null;
   error?: string | null;
   run_phase?: "orchestrator" | "pre" | "main" | "post";
@@ -203,10 +203,12 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
               <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border",
                 run.status === "failed" ? "bg-alert-soft text-alert border-alert/30"
                 : run.outcome === "no_data" ? "bg-warning-soft text-warning-foreground border-warning/30"
+                : run.outcome === "manual_review" ? "bg-info-soft text-info-foreground border-info/30"
                 : run.status === "pending_review" ? "bg-primary/10 text-primary border-primary/20"
                 : "bg-success-soft text-success border-success/20")}>
                 {run.status === "failed" ? "failed"
                   : run.outcome === "no_data" ? "no data"
+                  : run.outcome === "manual_review" ? "manual review"
                   : run.status === "pending_review" ? "awaiting review"
                   : run.status}
               </span>
