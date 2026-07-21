@@ -119,6 +119,7 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 015_us_sourcing_agents.sql                 ← seven-agent US sourcing group and missing registry agents
 016_agent_run_manual_review_outcome.sql    ← authoritative interactive-registry outcome
 017_delaware_firecrawl.sql                 ← Delaware Firecrawl credential/readiness
+018_source_agents_do_not_set_idv.sql       ← reserve ID/V decisions for DD agents
 ```
 
 ### Agent run status vs outcome
@@ -195,6 +196,7 @@ Must be exactly `'Registered Investment Advisor or Commodity Trading Advisor'` �
 
 ### ID/V flags
 - `id_flag` and `verification_flag` in `entity_attributes` are set **only** by DD agent runs.
+- `AttributePublisher` strips ID/V decisions by default; only `BaseDdRunner.canSetIdvFlags` opts into persisting them.
 - They are **never** auto-set when an analyst manually overrides a value.
 - `SimpleFieldRow.tsx` reads them directly from DB — the `isOverridden ? true :` pattern was intentionally removed.
 

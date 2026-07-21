@@ -29,6 +29,9 @@ export class ApiRunner {
 
   get slug()       { throw new Error(`${this.constructor.name} must implement get slug()`); }
   get outputType() { return 'attributes'; }
+  // Sourcing runners provide candidate values and lineage only. DD runners
+  // override this to persist identification and verification decisions.
+  get canSetIdvFlags() { return false; }
 
   /**
    * Override in subclass. Call this.step(msg) at each phase.
@@ -188,7 +191,7 @@ export class ApiRunner {
 
     if (output.attributes?.length) {
       stats.attrCount = await new AttributePublisher(this.sb)
-        .publish(kycRef, agentRunId, output.attributes);
+        .publish(kycRef, agentRunId, output.attributes, { allowIdv: this.canSetIdvFlags });
     }
 
     if (output.exceptions?.length) {

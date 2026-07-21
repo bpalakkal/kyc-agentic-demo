@@ -37,7 +37,7 @@ export class AttributePublisher {
    * @param {import('../types.js').AttributeOutput[]} attributes
    * @returns {Promise<number>} count of rows inserted
    */
-  async publish(kycRef, agentRunId, attributes) {
+  async publish(kycRef, agentRunId, attributes, { allowIdv = false } = {}) {
     if (!attributes?.length) return 0;
 
     const rows = attributes.map(attr => {
@@ -55,14 +55,15 @@ export class AttributePublisher {
         attribute_group:        attr.attributeGroup,
         display_value:          norm.value ?? null,
         confidence:             attr.confidence  ?? null,
-        id_flag:                attr.idFlag ?? false,
-        id_source:              attr.source ?? null,
-        id_reasoning:           attr.idReasoning ?? null,
-        verification_flag:      attr.verificationFlag ?? false,
+        id_flag:                allowIdv ? (attr.idFlag ?? false) : false,
+        id_source:              allowIdv && attr.idFlag ? (attr.source ?? null) : null,
+        id_reasoning:           allowIdv ? (attr.idReasoning ?? null) : null,
+        verification_flag:      allowIdv ? (attr.verificationFlag ?? false) : false,
         // DD runners supply verificationSources (Forge array); sourcing runners use [source].
-        verification_source:    attr.verificationSources
-                                  ?? (attr.verificationFlag ? [attr.source] : null),
-        verification_reasoning: attr.verificationReasoning ?? null,
+        verification_source:    allowIdv
+                                  ? (attr.verificationSources ?? (attr.verificationFlag ? [attr.source] : null))
+                                  : null,
+        verification_reasoning: allowIdv ? (attr.verificationReasoning ?? null) : null,
         // Flag an unmapped enum value for analyst review (unless already flagged).
         exception_flag:         attr.exceptionFlag || norm.unmapped || false,
         exception_type:         attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null),

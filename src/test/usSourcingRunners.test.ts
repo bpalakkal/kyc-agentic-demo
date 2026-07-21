@@ -3,6 +3,7 @@ import { IAPDRunner } from '../../agents/runners/api/IAPDRunner.js';
 import { SECEDGARRunner } from '../../agents/runners/api/SECEDGARRunner.js';
 import { NYSERunner } from '../../agents/runners/api/NYSERunner.js';
 import { DelawareRunner, NFARunner, PuertoRicoRunner } from '../../agents/runners/api/USRegistryResearchRunners.js';
+import { AttributePublisher } from '../../agents/publishers/AttributePublisher.js';
 
 const jsonResponse = (body: unknown) => ({ ok: true, json: async () => body }) as Response;
 
@@ -17,6 +18,22 @@ afterEach(() => {
 });
 
 describe('US sourcing provider contracts', () => {
+  it('prevents sourcing publishers from persisting ID/V decisions', async () => {
+    let inserted: any[] = [];
+    const sb = { from: () => ({ insert: async (rows: any[]) => { inserted = rows; return { error: null }; } }) };
+    const attributes = [{ attributeName: 'entity_name', attributeGroup: 'core', displayValue: 'EXAMPLE LP', source: 'Official registry', confidence: 100, idFlag: true, verificationFlag: true }];
+    await new AttributePublisher(sb as any).publish('CASE_1', 'run-1', attributes as any);
+    expect(inserted[0]).toMatchObject({ id_flag: false, id_source: null, id_reasoning: null, verification_flag: false, verification_source: null, verification_reasoning: null });
+  });
+
+  it('allows an explicitly authorized DD publisher to persist ID/V decisions', async () => {
+    let inserted: any[] = [];
+    const sb = { from: () => ({ insert: async (rows: any[]) => { inserted = rows; return { error: null }; } }) };
+    const attributes = [{ attributeName: 'entity_name', attributeGroup: 'core', displayValue: 'EXAMPLE LP', source: 'DD policy', confidence: 95, idFlag: true, verificationFlag: true }];
+    await new AttributePublisher(sb as any).publish('CASE_1', 'run-2', attributes as any, { allowIdv: true });
+    expect(inserted[0]).toMatchObject({ id_flag: true, id_source: 'DD policy', verification_flag: true, verification_source: ['DD policy'] });
+  });
+
   it('uses the current Form ADV query and filings response shape', async () => {
     process.env.SEC_API_KEY = 'test-key';
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ filings: [{

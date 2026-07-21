@@ -282,6 +282,7 @@ const slugToKey = (slug) => slug.replace(/-/g, '_');
 class BaseDdRunner extends ApiRunner {
   get slug()       { return this._slug; }
   get outputType() { return 'both'; }
+  get canSetIdvFlags() { return true; }
 
   async execute(ctx) {
     const { kycRef } = ctx;

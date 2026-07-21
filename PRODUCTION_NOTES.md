@@ -67,6 +67,7 @@ Run steps and uncommitted output are held in process memory. A Railway restart d
 - `entity_persons` stores beneficial owners, officers, directors, and signatories.
 - Sourcing runners write persons as rows rather than numbered flat attributes.
 - DD results are the only source of `id_flag` and `verification_flag`.
+- Sourcing values and lineage are persisted with ID/V flags cleared at the publisher boundary; migration `018` repairs historical sourcing rows.
 - Analyst overrides do not automatically set identification or verification flags.
 - `kyc_ref` is database-derived as `entity_id + '_' + case_id`.
 
@@ -125,6 +126,7 @@ Run migrations in `scripts/migrations` in numeric order:
 015_us_sourcing_agents.sql
 016_agent_run_manual_review_outcome.sql
 017_delaware_firecrawl.sql
+018_source_agents_do_not_set_idv.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.

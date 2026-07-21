@@ -57,7 +57,7 @@ npm run start
 
 `npm run start` launches Vite on port 8080 and Express on port 3001.
 
-Before first use, run the SQL files in `scripts/migrations/` in numeric order through migration 017, then initialize storage and seed data if needed:
+Before first use, run the SQL files in `scripts/migrations/` in numeric order through migration 018, then initialize storage and seed data if needed:
 
 ```bash
 node scripts/setup-storage.js
@@ -135,6 +135,7 @@ Registered Investment Advisor or Commodity Trading Advisor
 ```
 
 `id_flag` and `verification_flag` are set only by DD agent output, not by manual analyst overrides.
+The publisher enforces this boundary: sourcing agents persist candidate values and lineage with both flags false until an authorized DD runner makes the decision.
 
 ## Authentication and API calls
 
