@@ -14,48 +14,12 @@ export const DEFAULT_ENTITY_TYPE: string =
 /** Structural/metadata keys that live in the schema but aren't display attributes. */
 const METADATA_ATTRS = new Set(['case_id', 'entity_id']);
 
-// Approved RIA Attribute View contract from PORT_ATTRIBUTE_VIEW.md and its
-// supporting master schema. Keeping the view allowlisted prevents legacy and
-// WGQ paths in the broader repository schema from leaking into the core grid.
-const RIA_CORE_ATTRS = [
-  'entity_name', 'entity_status', 'country_of_incorporation', 'registration_country',
-  'date_of_incorporation', 'registration_number', 'verification_of_existence',
-  'entity_giin', 'lei_code', 'previous_names', 'trading_names',
-  'transacting_with_own_or_third_party_funds_indicator', 'cip_classification',
-  'legal_structure', 'entity_risk_rating', 'wbq_flag', 'legal_registered_address',
-  'principal_place_of_business', 'entity_nature_of_business', 'other_business_activity',
-  'sole_proprietorship_indicator', 'parent_publicly_listed_on_united_states_exchange_indicator',
-  'source_of_wealth', 'website_address', 'regulator', 'activity_type', 'listed_exchange',
-  'listing_status', 'commodities_future_trading_commission_registered_indicator',
-  'securities_exchange_act_of_1934_section_13_or_15d_indicator',
-  'tax_identification_number', 'fca_firm_reference_number',
-] as const;
-
-const RIA_OPTIONAL = new Set(['activity_type', 'entity_giin', 'lei_code', 'other_business_activity', 'website_address']);
-const RIA_ID_AND_V = new Set([
-  'entity_name', 'entity_status', 'country_of_incorporation', 'registration_country',
-  'date_of_incorporation', 'registration_number', 'verification_of_existence',
-  'entity_giin', 'lei_code', 'legal_structure', 'entity_risk_rating',
-  'legal_registered_address', 'principal_place_of_business', 'other_business_activity',
-  'source_of_wealth', 'website_address', 'regulator', 'activity_type',
-  'tax_identification_number', 'wbq_flag', 'fca_firm_reference_number',
-]);
-const RIA_ID_ONLY = new Set([
-  'cip_classification', 'commodities_future_trading_commission_registered_indicator',
-  'entity_nature_of_business', 'listed_exchange', 'listing_status',
-  'parent_publicly_listed_on_united_states_exchange_indicator', 'previous_names',
-  'securities_exchange_act_of_1934_section_13_or_15d_indicator',
-  'sole_proprietorship_indicator', 'trading_names',
-  'transacting_with_own_or_third_party_funds_indicator',
-]);
-
 /**
  * Visible entity-level (non-party) scalar attribute names for an entity type,
  * excluding not_applicable. Party objects (beneficial_owner, …) render as tables,
  * so their dotted child paths are filtered out here.
  */
 export function entityLevelCoreAttrs(entityType: string = DEFAULT_ENTITY_TYPE): string[] {
-  if (!entityType || entityType === DEFAULT_ENTITY_TYPE) return [...RIA_CORE_ATTRS];
   const { required, optional } = getVisibleAttributes(entityType);
   return [...required, ...optional].filter((p) => {
     const m = schemaMeta.attributes[p];
@@ -65,16 +29,13 @@ export function entityLevelCoreAttrs(entityType: string = DEFAULT_ENTITY_TYPE): 
 
 /** Entity-level attribute names that are 'optional' (collect if provided, no IDV). */
 export function optionalCoreAttrs(entityType: string = DEFAULT_ENTITY_TYPE): Set<string> {
-  if (!entityType || entityType === DEFAULT_ENTITY_TYPE) return new Set(RIA_OPTIONAL);
   return new Set(getVisibleAttributes(entityType).optional.filter((p) => !p.includes('.')));
 }
 
 export function attributeChecks(attrName: string, entityType: string = DEFAULT_ENTITY_TYPE): { id: boolean; verification: boolean } {
-  if (!entityType || entityType === DEFAULT_ENTITY_TYPE) {
-    return { id: RIA_ID_AND_V.has(attrName) || RIA_ID_ONLY.has(attrName), verification: RIA_ID_AND_V.has(attrName) };
-  }
-  const verifiable = schemaMeta.attributes[attrName]?.verifiable;
-  return { id: verifiable !== null && verifiable !== undefined, verification: verifiable === true };
+  if (applicability(entityType, attrName) === 'not_applicable') return { id: false, verification: false };
+  const meta = schemaMeta.attributes[attrName];
+  return { id: meta?.identifiable === true, verification: meta?.verifiable === true };
 }
 
 /**
@@ -113,12 +74,6 @@ const PARTY_LABELS: Record<string, string> = {
   acting_person: 'Acting Persons',
   sub_advisor: 'Sub-Advisors',
 };
-const RIA_PARTY_COLUMNS: Record<string, string[]> = {
-  authorized_signatory: ['address', 'country', 'legal_structure', 'signatory_date', 'signature', 'title'],
-  beneficial_owner: ['address', 'cip_classification', 'country_of_incorporation', 'country_of_residence', 'date_of_birth', 'evidence_of_existence', 'legal_structure', 'nationality', 'nature_of_business', 'past_nationality', 'percentage_of_ownership'],
-  Proxy_BO: ['address', 'cip_classification', 'country_of_incorporation', 'country_of_residence', 'date_of_birth', 'evidence_of_existence', 'legal_structure', 'nationality', 'nature_of_business', 'past_nationality', 'percentage_of_ownership'],
-  corporate_officer: ['correspondence_address', 'country', 'country_of_incorporation', 'country_of_residence', 'date_of_birth', 'cip_classification', 'legal_structure', 'nationality', 'regulator', 'role'],
-};
 function titleCase(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -130,9 +85,6 @@ function titleCase(s: string): string {
  * records exist, empty-state otherwise), mirroring the entity attribute grid.
  */
 export function visibleParties(entityType: string = DEFAULT_ENTITY_TYPE): Array<{ role: string; label: string; columns: string[] }> {
-  if (!entityType || entityType === DEFAULT_ENTITY_TYPE) {
-    return Object.entries(RIA_PARTY_COLUMNS).map(([role, columns]) => ({ role, label: PARTY_LABELS[role] ?? titleCase(role), columns }));
-  }
   return arrayAttributes()
     .filter((a) => !NON_PERSON_ARRAYS.has(a.name) && applicability(entityType, a.name) !== 'not_applicable')
     .map((a) => ({ role: a.name, label: PARTY_LABELS[a.name] ?? titleCase(a.name), columns: partyColumns(a.name, entityType) }));
@@ -156,7 +108,6 @@ function schemaPartyKey(role: string): string | null {
  * (e.g. board_director, key_controller) — those fall back to data-derived columns.
  */
 export function partyColumns(role: string, entityType: string = DEFAULT_ENTITY_TYPE): string[] {
-  if ((!entityType || entityType === DEFAULT_ENTITY_TYPE) && RIA_PARTY_COLUMNS[role]) return [...RIA_PARTY_COLUMNS[role]];
   const party = schemaPartyKey(role);
   if (!party) return [];
   const prefix = party + '.';

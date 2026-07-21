@@ -13,8 +13,10 @@ export interface AttributeMeta {
   child?: string | null;
   /** value-enum name (e.g. "Country") if the value is enum-constrained */
   valueEnum?: string | null;
-  /** DD agent verifies (ID+V) this attribute */
-  verifiable?: boolean | null;
+  /** Master schema requires identification for this attribute */
+  identifiable?: boolean;
+  /** Master schema requires verification for this attribute */
+  verifiable?: boolean;
   /** DD agent key that produces this attribute */
   ddAgent?: string | null;
   /** child attribute paths for kind === 'array' | 'object' */

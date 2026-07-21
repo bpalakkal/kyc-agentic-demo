@@ -28,7 +28,6 @@ const valueNode = (b) => b?.lineage?.items?.properties?.value ?? null;
 const valueRef = (v) => v?.$ref ?? v?.items?.$ref ?? null;
 const enumName = (ref) => (ref ? ref.split('/').pop() : null);
 const riaName = (party, child) => (party ? `${party}_${child}` : child);
-const verifiableOf = (key) => (ria[key] ? Boolean(ria[key].verifiable) : null);
 const agentOf = (key) => ria[key]?.agent ?? null;
 
 const meta = { generatedAt: new Date().toISOString(), entityTypes: {}, attributes: {}, enums: {} };
@@ -50,7 +49,8 @@ function emitScalar(path, block, party = null, child = null) {
     child,
     valueEnum: ref ? enumName(ref) : null,
     multi: vn?.type === 'array' || undefined,   // array-valued (e.g. past_nationality, previous_names)
-    verifiable: verifiableOf(riaKey),
+    identifiable: Object.hasOwn(block, 'id_flag'),
+    verifiable: Object.hasOwn(block, 'verification_flag'),
     ddAgent: agentOf(riaKey),
     description: block?.description ?? null,
   };
@@ -71,7 +71,9 @@ for (const [name, block] of Object.entries(props)) {
   } else {
     meta.attributes[name] = {
       kind: 'scalar', party: null, valueEnum: null,
-      verifiable: verifiableOf(name), description: block?.description ?? null,
+      identifiable: Object.hasOwn(block ?? {}, 'id_flag'),
+      verifiable: Object.hasOwn(block ?? {}, 'verification_flag'),
+      description: block?.description ?? null,
     };
   }
 }
