@@ -5,6 +5,7 @@ export { IAPDRunner }              from './IAPDRunner.js';
 export { JerseyFSCRunner }         from './JerseyFSCRunner.js';
 export { NYSERunner }              from './NYSERunner.js';
 export { SECEDGARRunner }          from './SECEDGARRunner.js';
+export { NFARunner, DelawareRunner, PuertoRicoRunner } from './USRegistryResearchRunners.js';
 export { UKSourcingFlowRunner }    from './UKSourcingFlowRunner.js';
 export { USSourcingFlowRunner }    from './USSourcingFlowRunner.js';
 

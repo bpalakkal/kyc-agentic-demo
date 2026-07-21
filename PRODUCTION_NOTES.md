@@ -15,7 +15,7 @@ Express API (Railway)
   |-- Supabase PostgreSQL and private Storage
   |-- Neo4j ownership graph (optional)
   |-- Anthropic Claude (chat, DD, document digitization)
-  |-- Companies House, FCA, GLEIF, SEC, IAPD, NYSE, JFSC
+  |-- Companies House, FCA, JFSC, IAPD, SEC, NYSE, NFA, Delaware, Puerto Rico, GLEIF
   |-- OpenSanctions screening
   `-- Zoom meeting creation
 ```
@@ -122,6 +122,7 @@ Run migrations in `scripts/migrations` in numeric order:
 012_agent_registry_orchestration.sql
 013_case_tab_review_state.sql
 014_agent_registry_audit.sql
+015_us_sourcing_agents.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.

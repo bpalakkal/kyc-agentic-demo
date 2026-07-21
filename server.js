@@ -407,6 +407,9 @@ async function loadRunnerClass(slug) {
     'jersey-fsc':       runners.JerseyFSCRunner,
     'nyse':             runners.NYSERunner,
     'sec':              runners.SECEDGARRunner,
+    'nfa':              runners.NFARunner,
+    'delaware':         runners.DelawareRunner,
+    'puerto-rico':      runners.PuertoRicoRunner,
     'uk-sourcing-flow': runners.UKSourcingFlowRunner,
     'us-sourcing-flow': runners.USSourcingFlowRunner,
     // DD runners (Claude-based, no Forge)

@@ -1,6 +1,6 @@
 import { ApiRunner } from '../../base/ApiRunner.js';
 
-const SEARCH_BASE      = 'https://efts.sec.gov/LATEST/search-index';
+const TICKERS_URL      = 'https://www.sec.gov/files/company_tickers.json';
 const SUBMISSIONS_BASE = 'https://data.sec.gov/submissions';
 const SOURCE           = 'SEC EDGAR';
 const CONFIDENCE       = 100;
@@ -17,8 +17,9 @@ export class SECEDGARRunner extends ApiRunner {
 
     this.step(`Searching SEC EDGAR for "${entityName}"…`);
 
-    // Step 1: Find CIK via full-text search
-    const searchUrl = `${SEARCH_BASE}?q=%22${encodeURIComponent(entityName)}%22&forms=10-K`;
+    // Resolve the CIK from the SEC's published company-name/CIK dataset rather
+    // than relying on the EDGAR website's undocumented search endpoint.
+    const searchUrl = TICKERS_URL;
     const searchRes = await fetch(searchUrl, {
       headers: { 'User-Agent': USER_AGENT },
       signal:  AbortSignal.timeout(15_000),
@@ -26,15 +27,17 @@ export class SECEDGARRunner extends ApiRunner {
     if (!searchRes.ok) throw new Error(`EDGAR search HTTP ${searchRes.status}`);
 
     const searchData = await searchRes.json();
-    const hit = searchData.hits?.hits?.[0]?._source;
+    const normalized = normalizeName(entityName);
+    const companies = Object.values(searchData ?? {});
+    const hit = companies.find((company) => normalizeName(company.title) === normalized)
+      ?? companies.find((company) => normalizeName(company.title).includes(normalized) || normalized.includes(normalizeName(company.title)));
 
-    if (!hit?.ciks?.length) {
-      this.step(`No EDGAR 10-K filer found for "${entityName}"`);
+    if (!hit?.cik_str) {
+      this.step(`No EDGAR filer found for "${entityName}"`);
       return this._notFoundResult(kycRef, startedAt);
     }
 
-    const rawCik    = hit.ciks[0];
-    const paddedCik = rawCik.replace(/^0+/, '').padStart(10, '0');
+    const paddedCik = String(hit.cik_str).replace(/^0+/, '').padStart(10, '0');
     this.step(`Found CIK ${paddedCik} — fetching company details…`);
 
     // Step 2: Fetch full company profile from submissions API
@@ -81,20 +84,19 @@ export class SECEDGARRunner extends ApiRunner {
 
     return [
       attr('entity_name',               c.name),
-      attr('us_registration_number',    cikDisplay,              { idFlag: true, verificationFlag: true }),
+      attr('registration_number',       cikDisplay,              { idFlag: true, verificationFlag: true }),
       attr('entity_status',             c.entityType === 'operating' ? 'Active' : c.entityType),
       attr('entity_nature_of_business', c.sicDescription),
       attr('other_business_activity',   c.sic ? `SIC ${c.sic}` : null),
-      attr('us_entity_tax_id_number',   c.ein,                   { idFlag: true }),
+      attr('tax_identification_number', c.ein,                   { idFlag: true }),
       attr('lei_code',                  c.lei),
       attr('country_of_incorporation',  c.stateOfIncorporationDescription),
       attr('legal_registered_address',  fmtAddr(bizAddr)),
-      attr('ticker_symbol',             tickers,                 { idFlag: !!tickers }),
+      attr('other_business_activity',   tickers ? `Ticker: ${tickers}` : null),
       attr('listed_exchange',           exchanges),
       attr('previous_names',            prevNames),
       attr('website_address',           c.website),
       attr('verification_of_existence', 'Yes',                   { verificationFlag: true }),
-      attr('entity_source_url',         sourceUrl),
     ].filter(Boolean);
   }
 
@@ -109,7 +111,11 @@ export class SECEDGARRunner extends ApiRunner {
         lineage: [{ source: SOURCE, value: 'No', source_url: 'https://efts.sec.gov', timestamp: fetchedAt, confidence_score: CONFIDENCE / 100 }],
       }],
       files: [],
-      metadata: { outcome: 'no_data', outcomeReason: 'No matching SEC EDGAR 10-K filer', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: ['https://efts.sec.gov'] },
+      metadata: { outcome: 'no_data', outcomeReason: 'No matching SEC EDGAR filer', completedAt: new Date().toISOString(), durationMs: Date.now() - startedAt, sourcesConsulted: [TICKERS_URL] },
     };
   }
+}
+
+function normalizeName(value) {
+  return String(value ?? '').toUpperCase().replace(/[^A-Z0-9]/g, ' ').replace(/\b(THE|INCORPORATED|INC|CORPORATION|CORP|COMPANY|CO|LLC|LP|LTD)\b/g, ' ').replace(/\s+/g, ' ').trim();
 }

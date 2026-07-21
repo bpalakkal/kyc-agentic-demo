@@ -31,7 +31,7 @@ For each item, check **Forge verified** when the behavior exists and works end t
 
 - [ ] **Forge verified — UK Sourcing membership.** The parent independently invokes FCA and Companies House in parallel.
 
-- [ ] **Forge verified — US Sourcing membership.** The parent independently invokes GLEIF, SEC, IAPD, and NYSE in parallel.
+- [ ] **Forge verified — US Sourcing membership.** The parent independently invokes IAPD, SEC EDGAR, NYSE, NFA BASIC, Delaware, Puerto Rico, and GLEIF in parallel.
 
 - [ ] **Forge verified — DD All-in-One membership.** The parent independently invokes all 18 focused DD agents, keeping each agent/model context limited to its governed one or two attributes.
   - Acceptance: each DD child has its own run record, status, output, and error.

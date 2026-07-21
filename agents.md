@@ -116,6 +116,7 @@ node scripts/setup-storage.js   # Create kyc-files Supabase Storage bucket
 012_agent_registry_orchestration.sql       ← registry-only visibility plus pre/main/post orchestration
 013_case_tab_review_state.sql              ← per-analyst Documents and Agent Runs unread cursors
 014_agent_registry_audit.sql               ← immutable Agent Register configuration history
+015_us_sourcing_agents.sql                 ← seven-agent US sourcing group and missing registry agents
 ```
 
 ### Agent run status vs outcome
@@ -225,15 +226,15 @@ Must be exactly `'Registered Investment Advisor or Commodity Trading Advisor'` �
 6. Add the registry row through a migration. The frontend derives generic versus screening dispatch from `execution_mode`; do not add a frontend agent catalog entry.
 
 ### Agent registry entries (`agent_registry` → `/api/agents`)
-Migration 010 seeds 29 persisted agents across three groups. Supabase is the golden source for metadata, enablement, ordering, trigger behavior, execution mode, and required environment variables. The API enriches each row with runtime readiness:
-- **Sourcing (9)**
+Migrations 010 and 015 seed 32 persisted agents across three groups. Supabase is the golden source for metadata, enablement, ordering, trigger behavior, execution mode, and required environment variables. The API enriches each row with runtime readiness:
+- **Sourcing (12)**
 - **Due Diligence (19):** `dd-all-in-one` + 18 per-attribute DD runners
 - **Screening (1):** `screening` — routed to `POST /api/entity/:kycRef/screening/run`
 
 An agent is runnable only when it is enabled, directly triggerable (or reached as a dependency), its runner/route exists, every `required_env` entry is configured, and its pre/post dependency graph is valid. Do not add agents to `AgentSystem.tsx`; add or update the registry through a migration and wire the backend implementation using the same slug.
 
 Current groups:
-- **Sourcing (9):** `uk-sourcing-flow`, `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `sec`, `iapd`, `nyse`, `gleif`
+- **Sourcing (12):** `uk-sourcing-flow`, `companies-house`, `fca`, `jersey-fsc`, `us-sourcing-flow`, `iapd`, `sec`, `nyse`, `nfa`, `delaware`, `puerto-rico`, `gleif`
 - **Due Diligence (19):** `dd-all-in-one` + 18 per-attribute DD runners
 - **Screening (1):** `screening`
 
@@ -249,6 +250,7 @@ Current groups:
 | Companies House, UK sourcing | `COMPANIES_HOUSE_API_KEY` | `COMPANIES_HOUSE_API_KEY environment variable is not set` |
 | FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
 | IAPD, US sourcing | `SEC_API_KEY` | `SEC_API_KEY environment variable is required for the IAPD runner` |
+| NFA, Delaware, Puerto Rico | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is required for US registry research agents` |
 | All DD agents, CH PDF phase | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is not set` |
 | Screening | `OPENSANCTIONS_API_KEY` | `OPENSANCTIONS_API_KEY is not set` |
 | Any agent | Supabase down | `agent_runs insert error` |

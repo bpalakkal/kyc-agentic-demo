@@ -17,10 +17,11 @@ export class IAPDRunner extends ApiRunner {
 
     this.step(`Searching IAPD for "${entityName}"…`);
 
+    const escapedName = entityName.replace(/[\\"+\-!(){}[\]^~*?:/]/g, '\\$&');
     const res = await fetch(API_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: apiKey },
-      body:    JSON.stringify({ query: `Info.FirmName:"${entityName}"`, from: '0', size: '5' }),
+      body:    JSON.stringify({ query: `Info.BusNm:"${escapedName}" OR Info.LegalNm:"${escapedName}"`, from: 0, size: 5 }),
       signal:  AbortSignal.timeout(20_000),
     });
 
@@ -30,7 +31,7 @@ export class IAPDRunner extends ApiRunner {
     }
 
     const data  = await res.json();
-    const firms = data.data ?? [];
+    const firms = data.filings ?? [];
 
     if (!firms.length) {
       this.step(`"${entityName}" not found in IAPD — not a registered investment adviser`);
@@ -41,7 +42,7 @@ export class IAPDRunner extends ApiRunner {
     const info = firm.Info ?? {};
     const crd  = info.FirmCrdNb;
 
-    this.step(`Found CRD ${crd} — ${info.FirmName}`);
+    this.step(`Found CRD ${crd} — ${info.BusNm ?? info.LegalNm}`);
     const attributes = this._toAttributes(firm);
     this.step(`Extracted ${attributes.length} attribute(s) — ready for review`);
 
@@ -57,8 +58,8 @@ export class IAPDRunner extends ApiRunner {
 
   _toAttributes(firm) {
     const info      = firm.Info        ?? {};
-    const formInfo  = firm.FormInfo    ?? {};
-    const office    = firm.OfcOfOrgnzt ?? {};
+    const formInfo  = firm.FormInfo?.Part1A ?? firm.FormInfo ?? {};
+    const office    = firm.MainAddr ?? firm.OfcOfOrgnzt ?? {};
     const crd       = info.FirmCrdNb;
     const sourceUrl = crd
       ? `https://adviserinfo.sec.gov/firm/summary/${crd}`
@@ -77,21 +78,21 @@ export class IAPDRunner extends ApiRunner {
     };
 
     const addrParts = [office.Strt1, office.Strt2, office.City, office.State, office.Cntry, office.PstlCd].filter(Boolean);
-    const aum       = formInfo.Item5F?.RegAsstUndrMgmt?.Amt;
+    const aum       = formInfo.Item5F?.Q5F2C ?? formInfo.Item5F?.RegAsstUndrMgmt?.Amt;
     const aumStr    = aum ? `$${Number(aum).toLocaleString()}` : null;
-    const regStatus = formInfo.Item1?.RegistrationStatus ?? 'Registered';
+    const registration = Array.isArray(firm.Rgstn) ? firm.Rgstn[0] : firm.Rgstn;
+    const regStatus = registration?.St ?? registration?.FirmType ?? 'Registered';
 
     return [
-      attr('entity_name',                      info.FirmName),
-      attr('us_registration_number',           crd ? String(crd) : null, { idFlag: true, verificationFlag: true }),
+      attr('entity_name',                      info.BusNm ?? info.LegalNm),
+      attr('registration_number',              info.SECNb ?? (crd ? String(crd) : null), { idFlag: true, verificationFlag: true }),
       attr('entity_status',                    regStatus),
-      attr('legal_structure',                  formInfo.Item1?.OrgFm),
+      attr('legal_structure',                  formInfo.Item3?.Q3A ?? formInfo.Item1?.OrgFm),
       attr('regulator',                        'SEC (Securities and Exchange Commission)'),
       attr('principal_place_of_business',      addrParts.join(', ') || null),
-      attr('website_address',                  info.Website),
-      attr('assets_under_management_aum',      aumStr),
+      attr('website_address',                  formInfo.Item1?.WebAddrs?.WebAddr ?? info.Website),
+      attr('other_business_activity',          aumStr ? `Regulatory assets under management: ${aumStr}` : null),
       attr('verification_of_existence',        'Yes', { verificationFlag: true }),
-      attr('entity_source_url',                sourceUrl),
     ].filter(Boolean);
   }
 
