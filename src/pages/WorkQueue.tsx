@@ -14,13 +14,14 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
 import { EMPTY_WORK_QUEUE_FILTERS, filterWorkQueueRows, type WorkQueueFilters } from "@/lib/workQueueFilters";
+import { isAgentAvailable, useAgentRegistry } from "@/hooks/useAgentRegistry";
 
 // ─── API types ────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,10 @@ type Group = {
   priorityTone: "high" | "medium" | "low";
   rows: Row[];
 };
+
+type PreflightCase = { kycRef: string; entityName: string; eligible: boolean; reason: string | null };
+type BatchItem = { id: string; kyc_ref: string; entity_name: string; status: "queued" | "running" | "complete" | "failed" | "skipped" | "cancelled"; eligibility_reason?: string | null; error?: string | null };
+type AgentBatch = { id: string; agent_slug: string; status: string; total_count: number; queued_count: number; running_count: number; completed_count: number; failed_count: number; skipped_count: number; items: BatchItem[] };
 
 // ─── Mapping helpers ──────────────────────────────────────────────────────────
 
@@ -193,11 +198,13 @@ const EntityRow = ({
   selected,
   onToggle,
   indent = false,
+  batchStatus,
 }: {
   r: Row;
   selected: boolean;
   onToggle: (id: string, checked: boolean) => void;
   indent?: boolean;
+  batchStatus?: BatchItem;
 }) => (
   <div
     className={cn(
@@ -241,7 +248,13 @@ const EntityRow = ({
     )}>{r.risk}</span>
     <span className="text-[13px]">{r.exc}</span>
     <span className={cn("text-[13px] font-medium", statusColor(r.status))}>{r.status}</span>
-    <span className="text-[13px] text-muted-foreground">{r.action}</span>
+    <span className="text-[13px] text-muted-foreground">
+      {batchStatus ? (
+        <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize", batchStatus.status === "complete" ? "border-success/30 bg-success-soft text-success" : batchStatus.status === "failed" ? "border-alert/30 bg-alert-soft text-alert" : batchStatus.status === "running" ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground")} title={batchStatus.error ?? batchStatus.eligibility_reason ?? undefined}>
+          {batchStatus.status === "running" && <Loader2 className="size-2.5 animate-spin" />}{batchStatus.status}
+        </span>
+      ) : r.action}
+    </span>
   </div>
 );
 
@@ -262,6 +275,14 @@ const WorkQueue = () => {
   const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { data: registry = [] } = useAgentRegistry();
+  const topAgents = registry.filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger && isAgentAvailable(agent));
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
+  const [agentSlug, setAgentSlug] = useState("");
+  const [preflight, setPreflight] = useState<{ agent: { slug: string; displayName: string; category: string }; cases: PreflightCase[] } | null>(null);
+  const [batch, setBatch] = useState<AgentBatch | null>(null);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch(`${AGENT_API_BASE}/api/entities`)
@@ -306,6 +327,61 @@ const WorkQueue = () => {
     .filter((r) => selected[r.id])
     .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id, drg: drgByKyc[r.id] ?? undefined }));
   const selectedCount = selectedEntities.length;
+  const batchItemsByKyc = useMemo(() => new Map((batch?.items ?? []).map((item) => [item.kyc_ref, item])), [batch]);
+
+  useEffect(() => {
+    if (!agentDialogOpen || agentSlug || !topAgents.length) return;
+    setAgentSlug(topAgents[0].slug);
+  }, [agentDialogOpen, agentSlug, topAgents]);
+
+  useEffect(() => {
+    if (!batch?.id || ["complete", "partial", "failed", "cancelled"].includes(batch.status)) return;
+    const timer = window.setInterval(async () => {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches/${batch.id}`);
+      if (response.ok) setBatch(await response.json());
+    }, 2_000);
+    return () => window.clearInterval(timer);
+  }, [batch?.id, batch?.status]);
+
+  const checkEligibility = async () => {
+    if (!agentSlug || !selectedEntities.length) return;
+    setBatchBusy(true); setBatchError(null); setPreflight(null);
+    try {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-runs/preflight`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentSlug, kycRefs: selectedEntities.map((entity) => entity.kyc) }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? `Preflight HTTP ${response.status}`);
+      setPreflight(data);
+    } catch (error) { setBatchError(error instanceof Error ? error.message : "Preflight failed"); }
+    finally { setBatchBusy(false); }
+  };
+
+  const startBatch = async () => {
+    if (!preflight?.cases.some((item) => item.eligible)) return;
+    setBatchBusy(true); setBatchError(null);
+    try {
+      const idempotencyKey = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+      const response = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentSlug, kycRefs: selectedEntities.map((entity) => entity.kyc), idempotencyKey }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? `Batch HTTP ${response.status}`);
+      const statusResponse = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches/${data.batchId}`);
+      if (!statusResponse.ok) throw new Error(`Batch status HTTP ${statusResponse.status}`);
+      setBatch(await statusResponse.json()); setAgentDialogOpen(false); setPreflight(null);
+    } catch (error) { setBatchError(error instanceof Error ? error.message : "Could not start batch"); }
+    finally { setBatchBusy(false); }
+  };
+
+  const batchAction = async (action: "cancel" | "retry") => {
+    if (!batch) return;
+    setBatchBusy(true); setBatchError(null);
+    try {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches/${batch.id}/${action}`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? `${action} HTTP ${response.status}`);
+      const statusResponse = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches/${batch.id}`);
+      if (statusResponse.ok) setBatch(await statusResponse.json());
+    } catch (error) { setBatchError(error instanceof Error ? error.message : `${action} failed`); }
+    finally { setBatchBusy(false); }
+  };
 
   const handleToggle = (id: string, checked: boolean) =>
     setSelected((s) => ({ ...s, [id]: checked }));
@@ -389,6 +465,10 @@ const WorkQueue = () => {
           </div>
         </div>
 
+        <div className="flex items-center gap-2">
+        <button type="button" onClick={() => { setAgentDialogOpen(true); setPreflight(null); setBatchError(null); }} disabled={selectedCount === 0 || selectedCount > 25 || topAgents.length === 0} className="h-10 px-4 rounded-lg border border-primary text-primary bg-card text-sm font-medium flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/5" title={selectedCount > 25 ? "Select no more than 25 cases" : undefined}>
+          <Bot className="size-4" /> Run Agent <span className="size-5 rounded-full bg-primary/10 grid place-items-center text-[11px]">{selectedCount}</span>
+        </button>
         <Link
           to={`/work-queue/review/${selectedEntities[0]?.kyc ?? ''}`}
           state={{ entities: selectedEntities }}
@@ -404,7 +484,22 @@ const WorkQueue = () => {
           Review Selected
           <span className="size-5 rounded-full bg-white/20 grid place-items-center text-[11px]">{selectedCount}</span>
         </Link>
+        </div>
       </div>
+
+      {batch && (
+        <div className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div><p className="text-sm font-semibold">Batch: {registry.find((agent) => agent.slug === batch.agent_slug)?.display_name ?? batch.agent_slug}</p><p className="text-xs text-muted-foreground mt-0.5 capitalize">{batch.status} · {batch.completed_count} complete · {batch.running_count} running · {batch.queued_count} queued · {batch.failed_count} failed · {batch.skipped_count} skipped</p></div>
+            <div className="flex gap-2">
+              {batch.failed_count > 0 && <button type="button" disabled={batchBusy} onClick={() => void batchAction("retry")} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium flex items-center gap-1"><RotateCcw className="size-3" /> Retry failed</button>}
+              {["queued", "running"].includes(batch.status) && <button type="button" disabled={batchBusy} onClick={() => void batchAction("cancel")} className="rounded-md border border-alert/30 px-3 py-1.5 text-xs font-medium text-alert">Cancel queued</button>}
+              <button type="button" onClick={() => setBatch(null)} className="text-muted-foreground hover:text-foreground" aria-label="Close batch panel"><X className="size-4" /></button>
+            </div>
+          </div>
+          {batchError && <p className="mt-2 text-xs text-alert">{batchError}</p>}
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
         {/* Header row */}
@@ -474,6 +569,7 @@ const WorkQueue = () => {
                   selected={!!selected[r.id]}
                   onToggle={handleToggle}
                   indent
+                  batchStatus={batchItemsByKyc.get(r.kyc ?? r.id)}
                 />
               ))}
             </div>
@@ -496,6 +592,7 @@ const WorkQueue = () => {
                 r={r}
                 selected={!!selected[r.id]}
                 onToggle={handleToggle}
+                batchStatus={batchItemsByKyc.get(r.kyc ?? r.id)}
               />
             ))}
           </>
@@ -508,6 +605,21 @@ const WorkQueue = () => {
           </div>
         )}
       </div>
+
+      {agentDialogOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-label="Run top-level agent">
+          <div className="w-full max-w-3xl rounded-xl border border-border bg-card shadow-2xl">
+            <div className="flex items-start justify-between border-b border-border p-5"><div><h2 className="text-lg font-semibold">Run top-level agent</h2><p className="text-sm text-muted-foreground">Preflight {selectedCount} selected case{selectedCount === 1 ? "" : "s"} before creating the batch.</p></div><button type="button" onClick={() => setAgentDialogOpen(false)}><X className="size-5 text-muted-foreground" /></button></div>
+            <div className="p-5 space-y-4">
+              <label className="grid gap-1.5 text-sm font-medium">Agent<select value={agentSlug} onChange={(event) => { setAgentSlug(event.target.value); setPreflight(null); }} className="h-10 rounded-md border border-input bg-background px-3 text-sm">{topAgents.map((agent) => <option key={agent.slug} value={agent.slug}>{agent.display_name}</option>)}</select></label>
+              {!preflight && <button type="button" disabled={batchBusy || !agentSlug} onClick={() => void checkEligibility()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40 flex items-center gap-2">{batchBusy && <Loader2 className="size-4 animate-spin" />} Check eligibility</button>}
+              {batchError && <div className="rounded-md border border-alert/30 bg-alert-soft p-3 text-sm text-alert flex gap-2"><AlertCircle className="size-4 mt-0.5" />{batchError}</div>}
+              {preflight && <div className="rounded-lg border border-border overflow-hidden"><div className="grid grid-cols-[1fr_120px_1.4fr] gap-3 bg-muted/60 px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground"><span>Case</span><span>Eligibility</span><span>Reason</span></div><div className="max-h-72 overflow-y-auto">{preflight.cases.map((item) => <div key={item.kycRef} className="grid grid-cols-[1fr_120px_1.4fr] gap-3 border-t border-border px-3 py-2.5 text-xs"><span><span className="font-medium block">{item.entityName}</span><span className="text-muted-foreground">{item.kycRef}</span></span><span className={cn("flex items-center gap-1 font-medium", item.eligible ? "text-success" : "text-alert")}>{item.eligible ? <CheckCircle2 className="size-3.5" /> : <AlertCircle className="size-3.5" />}{item.eligible ? "Ready" : "Blocked"}</span><span className="text-muted-foreground">{item.reason ?? "—"}</span></div>)}</div></div>}
+            </div>
+            <div className="flex items-center justify-between border-t border-border p-4"><span className="text-xs text-muted-foreground">{preflight ? `${preflight.cases.filter((item) => item.eligible).length} eligible · ${preflight.cases.filter((item) => !item.eligible).length} blocked` : "Maximum 25 cases · 3 run concurrently"}</span><div className="flex gap-2"><button type="button" onClick={() => setAgentDialogOpen(false)} className="rounded-md border border-border px-4 py-2 text-sm">Cancel</button>{preflight && <button type="button" disabled={batchBusy || !preflight.cases.some((item) => item.eligible)} onClick={() => void startBatch()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40 flex items-center gap-2">{batchBusy ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Run {preflight.cases.filter((item) => item.eligible).length} eligible</button>}</div></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

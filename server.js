@@ -681,6 +681,203 @@ app.get('/api/entity/:kycRef/agent-sequence-state', requireAuth, async (req, res
 
 // POST /api/agent-run/api/:slug — start an API runner in the background.
 // Returns { runId, status: 'running' } immediately; frontend polls for progress.
+const activeBatchWorkers = new Set();
+const MAX_BATCH_CASES = 25;
+const BATCH_CONCURRENCY = 3;
+
+function jurisdictionMatches(agentJurisdiction, entityJurisdiction) {
+  if (!agentJurisdiction || /^global|all$/i.test(agentJurisdiction)) return true;
+  const agent = String(agentJurisdiction).toLowerCase();
+  const entity = String(entityJurisdiction ?? '').toLowerCase();
+  if (agent === 'us') return /united states|usa|u\.s\.|puerto rico/.test(entity);
+  if (agent === 'uk') return /united kingdom|england|scotland|wales|jersey|guernsey/.test(entity);
+  return entity.includes(agent);
+}
+
+async function preflightBatchCases(agentSlug, kycRefs) {
+  const readiness = await getAgentReadiness(agentSlug);
+  if (!readiness.ok) throw Object.assign(new Error(readiness.error), { status: readiness.status });
+  const agent = readiness.agent;
+  if (!agent.top_level_trigger) throw Object.assign(new Error('Work Queue batches may run top-level agents only'), { status: 403 });
+  await resolveAgentExecutionPlan(agentSlug);
+  const cases = await Promise.all(kycRefs.map(async (kycRef) => {
+    try {
+      const entity = await getSb().getEntity(kycRef);
+      if (!entity) return { kycRef, entityName: kycRef, eligible: false, reason: 'Entity not found' };
+      if (entity.jurisdiction && !jurisdictionMatches(agent.jurisdiction, entity.jurisdiction)) return { kycRef, entityName: entity.entity_name, eligible: false, reason: `Agent jurisdiction ${agent.jurisdiction} does not match ${entity.jurisdiction}` };
+      if (agent.cip_classification && agent.cip_classification !== 'all' && entity.cip_classification && agent.cip_classification !== entity.cip_classification) return { kycRef, entityName: entity.entity_name, eligible: false, reason: 'Agent does not support this CIP classification' };
+      const conflict = await sequenceConflict(kycRef, agent.category);
+      return { kycRef, entityName: entity.entity_name, eligible: !conflict, reason: conflict };
+    } catch (error) { return { kycRef, entityName: kycRef, eligible: false, reason: error.message }; }
+  }));
+  return { agent: { slug: agent.slug, displayName: agent.display_name, category: agent.category }, cases };
+}
+
+async function executeBatchAgent({ agent, kycRef, entityName, initiatedBy }) {
+  const { sb, runScreening } = getSb();
+  const plan = await resolveAgentExecutionPlan(agent.slug);
+  const { data: parent, error: parentError } = await sb.from('agent_runs').insert({ kyc_ref: kycRef, agent_slug: agent.slug, runner_type: 'api', initiated_by: initiatedBy, status: 'running', run_phase: 'orchestrator' }).select().single();
+  if (parentError) throw parentError;
+  const outcomes = []; const failures = [];
+  const executeItem = async (item) => {
+    if (item.agent.execution_mode === 'screening') {
+      const { data: child, error } = await sb.from('agent_runs').insert({ kyc_ref: kycRef, agent_slug: item.agent.slug, runner_type: 'api', initiated_by: initiatedBy, status: 'running', parent_run_id: parent.id, run_phase: item.phase }).select().single();
+      if (error) throw error;
+      try {
+        await runScreening(kycRef, { initiatedBy });
+        await sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString() }).eq('id', child.id);
+        return 'data_found';
+      } catch (error) {
+        await sb.from('agent_runs').update({ status: 'failed', error: error.message, completed_at: new Date().toISOString() }).eq('id', child.id);
+        throw error;
+      }
+    }
+    const runner = new item.RunnerClass(sb);
+    return (await runner.run({ kycRef, entityName, initiatedBy, parentRunId: parent.id, runPhase: item.phase })).outcome;
+  };
+  try {
+    const pre = plan.filter((item) => item.phase === 'pre'); const main = plan.filter((item) => item.phase === 'main'); const post = plan.filter((item) => item.phase === 'post');
+    for (const item of pre) outcomes.push(await executeItem(item));
+    if (agent.child_execution === 'parallel') {
+      const settled = await Promise.allSettled(main.map(executeItem));
+      settled.forEach((result, index) => result.status === 'fulfilled' ? outcomes.push(result.value) : failures.push({ slug: main[index].agent.slug, error: result.reason?.message ?? String(result.reason) }));
+    } else {
+      for (const item of main) try { outcomes.push(await executeItem(item)); } catch (error) { failures.push({ slug: item.agent.slug, error: error.message }); if (agent.failure_policy !== 'continue') throw error; }
+    }
+    if (failures.length && (agent.failure_policy !== 'continue' || outcomes.length === 0)) throw new Error(failures.map((failure) => `${failure.slug}: ${failure.error}`).join(' | '));
+    for (const item of post) outcomes.push(await executeItem(item));
+    const outcome = outcomes.includes('data_found') ? 'data_found' : outcomes.includes('manual_review') ? 'manual_review' : 'no_data';
+    await sb.from('agent_runs').update({ status: 'complete', outcome, outcome_reason: failures.length ? `Completed with ${failures.length} child failure(s)` : null, completed_at: new Date().toISOString() }).eq('id', parent.id);
+    return parent.id;
+  } catch (error) {
+    await sb.from('agent_runs').update({ status: 'failed', error: error.message, completed_at: new Date().toISOString() }).eq('id', parent.id);
+    throw Object.assign(error, { agentRunId: parent.id });
+  }
+}
+
+async function refreshBatchCounts(batchId) {
+  const { sb } = getSb();
+  const { data: currentBatch } = await sb.from('agent_run_batches').select('status').eq('id', batchId).single();
+  const { data: items, error } = await sb.from('agent_run_batch_items').select('status').eq('batch_id', batchId);
+  if (error) throw error;
+  const count = (status) => (items ?? []).filter((item) => item.status === status).length;
+  const queued = count('queued'); const running = count('running'); const completed = count('complete'); const failed = count('failed'); const skipped = count('skipped'); const cancelled = count('cancelled');
+  const finished = completed + failed + skipped + cancelled === (items ?? []).length;
+  const status = currentBatch?.status === 'cancelled' ? 'cancelled' : finished ? (failed ? (completed ? 'partial' : 'failed') : 'complete') : running ? 'running' : 'queued';
+  await sb.from('agent_run_batches').update({ status, queued_count: queued, running_count: running, completed_count: completed, failed_count: failed, skipped_count: skipped + cancelled, ...(status === 'running' ? { started_at: new Date().toISOString() } : {}), ...(finished ? { completed_at: new Date().toISOString() } : {}) }).eq('id', batchId);
+}
+
+async function processAgentBatch(batchId) {
+  if (activeBatchWorkers.has(batchId)) return;
+  activeBatchWorkers.add(batchId);
+  const { sb } = getSb();
+  try {
+    const { data: batch, error } = await sb.from('agent_run_batches').select('*').eq('id', batchId).single();
+    if (error || !batch || batch.status === 'cancelled') return;
+    const readiness = await getAgentReadiness(batch.agent_slug);
+    if (!readiness.ok) throw new Error(readiness.error);
+    const { data: queued, error: queueError } = await sb.from('agent_run_batch_items').select('*').eq('batch_id', batchId).eq('status', 'queued').order('entity_name');
+    if (queueError) throw queueError;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < (queued ?? []).length) {
+        const item = queued[cursor++];
+        const { data: currentBatch } = await sb.from('agent_run_batches').select('status').eq('id', batchId).single();
+        if (currentBatch?.status === 'cancelled') { await sb.from('agent_run_batch_items').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', item.id).eq('status', 'queued'); continue; }
+        const current = await preflightBatchCases(batch.agent_slug, [item.kyc_ref]);
+        if (!current.cases[0].eligible) { await sb.from('agent_run_batch_items').update({ status: 'skipped', eligibility_reason: current.cases[0].reason, completed_at: new Date().toISOString() }).eq('id', item.id); await refreshBatchCounts(batchId); continue; }
+        await sb.from('agent_run_batch_items').update({ status: 'running', attempts: item.attempts + 1, started_at: new Date().toISOString(), error: null }).eq('id', item.id);
+        await refreshBatchCounts(batchId);
+        try {
+          const agentRunId = await executeBatchAgent({ agent: readiness.agent, kycRef: item.kyc_ref, entityName: item.entity_name, initiatedBy: batch.initiated_by });
+          await sb.from('agent_run_batch_items').update({ status: 'complete', agent_run_id: agentRunId, completed_at: new Date().toISOString() }).eq('id', item.id);
+        } catch (error) { await sb.from('agent_run_batch_items').update({ status: 'failed', agent_run_id: error.agentRunId ?? null, error: error.message, completed_at: new Date().toISOString() }).eq('id', item.id); }
+        await refreshBatchCounts(batchId);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, queued?.length ?? 0) }, worker));
+    await refreshBatchCounts(batchId);
+  } catch (error) {
+    console.error(`[agent-batch] ${batchId}: ${error.message}`);
+    await sb.from('agent_run_batches').update({ status: 'failed', completed_at: new Date().toISOString() }).eq('id', batchId);
+  } finally { activeBatchWorkers.delete(batchId); }
+}
+
+async function resumeInterruptedAgentBatches() {
+  const { sb } = getSb();
+  const { data: batches, error } = await sb.from('agent_run_batches').select('id').in('status', ['queued', 'running']);
+  if (error) {
+    if (error.code !== '42P01') console.warn(`[agent-batch] recovery skipped: ${error.message}`);
+    return;
+  }
+  for (const batch of batches ?? []) {
+    await sb.from('agent_run_batch_items').update({ status: 'failed', error: 'Server restarted while this case was running; retry after verifying external results.', completed_at: new Date().toISOString() }).eq('batch_id', batch.id).eq('status', 'running');
+    await sb.from('agent_run_batches').update({ status: 'queued', completed_at: null }).eq('id', batch.id);
+    await refreshBatchCounts(batch.id);
+    void processAgentBatch(batch.id);
+  }
+}
+
+app.post('/api/work-queue/agent-runs/preflight', requireAuth, async (req, res) => {
+  try {
+    const agentSlug = String(req.body?.agentSlug ?? ''); const kycRefs = [...new Set(Array.isArray(req.body?.kycRefs) ? req.body.kycRefs.map(String) : [])];
+    if (!agentSlug || !kycRefs.length) return res.status(400).json({ error: 'agentSlug and kycRefs are required' });
+    if (kycRefs.length > MAX_BATCH_CASES) return res.status(400).json({ error: `A batch may contain at most ${MAX_BATCH_CASES} cases` });
+    res.json(await preflightBatchCases(agentSlug, kycRefs));
+  } catch (error) { res.status(error.status ?? 500).json({ error: error.message }); }
+});
+
+app.post('/api/work-queue/agent-run-batches', requireAuth, async (req, res) => {
+  try {
+    const agentSlug = String(req.body?.agentSlug ?? ''); const idempotencyKey = String(req.body?.idempotencyKey ?? ''); const kycRefs = [...new Set(Array.isArray(req.body?.kycRefs) ? req.body.kycRefs.map(String) : [])];
+    if (!agentSlug || !idempotencyKey || !kycRefs.length) return res.status(400).json({ error: 'agentSlug, idempotencyKey, and kycRefs are required' });
+    if (kycRefs.length > MAX_BATCH_CASES) return res.status(400).json({ error: `A batch may contain at most ${MAX_BATCH_CASES} cases` });
+    const preflight = await preflightBatchCases(agentSlug, kycRefs); const { sb } = getSb();
+    if (!preflight.cases.some((item) => item.eligible)) return res.status(409).json({ error: 'No selected cases are currently eligible for this agent', preflight });
+    const { data: existing } = await sb.from('agent_run_batches').select('id').eq('initiated_by', req.user.id).eq('idempotency_key', idempotencyKey).maybeSingle();
+    if (existing) return res.status(202).json({ batchId: existing.id, duplicate: true });
+    const eligible = preflight.cases.filter((item) => item.eligible).length; const skipped = preflight.cases.length - eligible;
+    const { data: batch, error: batchError } = await sb.from('agent_run_batches').insert({ agent_slug: agentSlug, category: preflight.agent.category, initiated_by: req.user.id, idempotency_key: idempotencyKey, total_count: preflight.cases.length, queued_count: eligible, skipped_count: skipped }).select().single();
+    if (batchError?.code === '23505') {
+      const { data: duplicate } = await sb.from('agent_run_batches').select('id').eq('initiated_by', req.user.id).eq('idempotency_key', idempotencyKey).single();
+      return res.status(202).json({ batchId: duplicate.id, duplicate: true });
+    }
+    if (batchError) throw batchError;
+    const { error: itemError } = await sb.from('agent_run_batch_items').insert(preflight.cases.map((item) => ({ batch_id: batch.id, kyc_ref: item.kycRef, entity_name: item.entityName, status: item.eligible ? 'queued' : 'skipped', eligibility_reason: item.reason, ...(item.eligible ? {} : { completed_at: new Date().toISOString() }) })));
+    if (itemError) throw itemError;
+    void processAgentBatch(batch.id);
+    res.status(202).json({ batchId: batch.id, eligible, skipped });
+  } catch (error) { res.status(error.status ?? 500).json({ error: error.message }); }
+});
+
+app.get('/api/work-queue/agent-run-batches/:batchId', requireAuth, async (req, res) => {
+  try {
+    const { sb } = getSb(); const { data: batch, error } = await sb.from('agent_run_batches').select('*').eq('id', req.params.batchId).eq('initiated_by', req.user.id).single();
+    if (error || !batch) return res.status(404).json({ error: 'Batch not found' });
+    const { data: items, error: itemError } = await sb.from('agent_run_batch_items').select('*').eq('batch_id', batch.id).order('entity_name');
+    if (itemError) throw itemError;
+    res.json({ ...batch, items: items ?? [] });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/work-queue/agent-run-batches/:batchId/cancel', requireAuth, async (req, res) => {
+  try {
+    const { sb } = getSb(); const { data: owned } = await sb.from('agent_run_batches').select('id').eq('id', req.params.batchId).eq('initiated_by', req.user.id).maybeSingle();
+    if (!owned) return res.status(404).json({ error: 'Batch not found' });
+    await sb.from('agent_run_batches').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('id', req.params.batchId);
+    await sb.from('agent_run_batch_items').update({ status: 'cancelled', completed_at: new Date().toISOString() }).eq('batch_id', req.params.batchId).eq('status', 'queued'); res.json({ ok: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+app.post('/api/work-queue/agent-run-batches/:batchId/retry', requireAuth, async (req, res) => {
+  try {
+    const { sb } = getSb(); const { data: owned } = await sb.from('agent_run_batches').select('id').eq('id', req.params.batchId).eq('initiated_by', req.user.id).maybeSingle();
+    if (!owned) return res.status(404).json({ error: 'Batch not found' });
+    await sb.from('agent_run_batch_items').update({ status: 'queued', error: null, completed_at: null }).eq('batch_id', req.params.batchId).eq('status', 'failed');
+    await sb.from('agent_run_batches').update({ status: 'queued', completed_at: null }).eq('id', req.params.batchId); await refreshBatchCounts(req.params.batchId); void processAgentBatch(req.params.batchId); res.status(202).json({ ok: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
   const { slug } = req.params;
   const { kycRef, entityName } = req.body ?? {};
@@ -1859,6 +2056,7 @@ const PORT = process.env.PORT ?? 3001;
         const missing = (agent.required_env ?? []).filter((key) => !process.env[key]);
         console.warn(`[${ts()}]   ${agent.slug}: ${!agent.enabled ? 'disabled' : `missing ${missing.join(', ')}`}`);
       }
+      await resumeInterruptedAgentBatches();
     } catch (err) {
       console.error(`[${ts()}] ✗ Agent registry unavailable: ${err.message}`);
       console.error(`[${ts()}]   Apply scripts/migrations/010_agent_registry.sql before using agent routes`);

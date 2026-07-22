@@ -196,7 +196,34 @@ Acceptance criteria:
 - [ ] Add an error boundary or panel-level fallback so one malformed record
   cannot blank the entire review screen.
 
-## 7. Verification and release
+## 7. Work Queue top-level agent batches
+
+- [ ] Add a `Run Agent` bulk action beside `Review Selected` for selected Work
+  Queue cases.
+- [ ] List only enabled, available, user-triggerable top-level agents supplied
+  by the Forge registry/read model.
+- [ ] Allow one top-level agent per submitted batch; do not allow mixed
+  Sourcing and Due Diligence selections.
+- [ ] Show Forge's per-case preflight result before submission, including
+  sequence conflicts, pending attribute review, jurisdiction/CIP mismatch, and
+  unavailable-agent reasons.
+- [ ] Submit eligible cases to the Forge engine's durable batch endpoint. Do not
+  loop over single-case agent endpoints from the browser.
+- [ ] Show queued, running, complete, failed, skipped, and cancelled states on
+  the corresponding Work Queue rows.
+- [ ] Add batch summary counts and controls to retry failed cases or cancel
+  cases that have not started.
+- [ ] Preserve row selection across search/filter changes and cap a single
+  submission at the Forge-supported batch size.
+
+Forge integration note:
+
+- Forge remains responsible for durable execution, concurrency, idempotency,
+  revalidation immediately before execution, sequencing locks, cancellation,
+  retries, and audit records. Only the Work Queue interaction and status
+  presentation should be ported from the No-Forge implementation.
+
+## 8. Verification and release
 
 - [ ] Add unit tests for case-insensitive search and combined filters.
 - [ ] Add component tests for opening, applying, clearing, and closing the
@@ -213,6 +240,8 @@ Acceptance criteria:
   capture time, outcome, and captured fields/no-match reason supplied by Forge.
 - [ ] Verify blank or invalid screenshots render a deliberate evidence error
   instead of appearing as successful source evidence.
+- [ ] Test batch preflight, zero-eligible handling, partial eligibility,
+  idempotent submission, progress polling, cancellation, and failed-case retry.
 - [ ] Validate keyboard navigation and accessible labels.
 - [ ] Validate responsive behavior at the Forge application's supported
   breakpoints.
