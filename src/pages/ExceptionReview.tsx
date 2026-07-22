@@ -101,8 +101,8 @@ type Compare = { aLabel: string; bLabel: string; rows: CompareRow[] };
 
 
 
-const getSla = (title: string, recommended?: boolean): string => {
-  const t = title.toLowerCase();
+const getSla = (title?: string | null, recommended?: boolean): string => {
+  const t = String(title ?? "").toLowerCase();
   if (t.includes("escalate")) return "24 hours";
   if (t.includes("request") || t.includes("outreach")) return "7 business days";
   if (t.includes("defer")) return "Until evidence received";
@@ -132,43 +132,51 @@ type DbExcRow = {
   kyc_ref: string;
   exception_number: number;
   field_name: string | null;
-  title: string;
+  title: string | null;
   sources: {
     source_a: string;
     source_b: string;
     rows: { field: string; source_a: string; source_b: string }[];
   } | null;
-  reasoning: string[];
-  recommended_actions: { option: number; description: string }[];
+  reasoning: string[] | null;
+  recommended_actions: ({ option?: number; description?: string; title?: string; action?: string } | string)[] | null;
   status: string;
 };
 
 function dbRowToExc(row: DbExcRow, entityName: string): Exc {
+  const title = row.title?.trim() || `Exception #${row.exception_number}`;
+  const reasoning = Array.isArray(row.reasoning) ? row.reasoning.filter((item): item is string => typeof item === "string") : [];
+  const actions = Array.isArray(row.recommended_actions) ? row.recommended_actions : [];
   return {
     id: `db-${row.kyc_ref}-${row.exception_number}`,
-    title: row.title,
+    title,
     confidence: 82,
     status: row.status === "open" ? "Pending" : "Addressed",
     entity: entityName,
     kyc: row.kyc_ref,
     category: row.field_name ?? "General",
     attrLabel: row.field_name ?? undefined,
-    flagText: row.reasoning[0] ?? row.title,
-    narrative: row.reasoning.slice(1).join(" "),
-    reasoningSteps: row.reasoning,
+    flagText: reasoning[0] ?? title,
+    narrative: reasoning.slice(1).join(" "),
+    reasoningSteps: reasoning,
     evidenceRationale: "Based on source data comparison. Refer to the comparison table for field-level evidence.",
     evidence: [],
     acceptability: "Review the comparison sources and apply the recommended resolution option.",
-    resolutions: row.recommended_actions.map((ra) => ({
-      id: `r${ra.option}`,
-      title: ra.description,
-      desc: ra.description,
-      recommended: ra.option === 1,
+    resolutions: actions.map((ra, index) => {
+      const option = typeof ra === "object" && ra ? (ra.option ?? index + 1) : index + 1;
+      const description = typeof ra === "string"
+        ? ra
+        : (ra.description ?? ra.title ?? ra.action ?? `Review exception option ${option}`);
+      return ({
+      id: `r${option}`,
+      title: description,
+      desc: description,
+      recommended: option === 1,
       agents: [] as AgentId[],
-      agentLabel: ra.description,
-      postRunSummary: `Resolution option ${ra.option} applied.`,
+      agentLabel: description,
+      postRunSummary: `Resolution option ${option} applied.`,
       updates: [],
-    })),
+    }); }),
   };
 }
 

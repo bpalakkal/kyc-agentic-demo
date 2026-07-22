@@ -156,7 +156,47 @@ Reference implementation:
 - `src/components/kyc/FileCard.tsx`
 - `src/pages/ExceptionReview.tsx`
 
-## 5. Verification and release
+## 5. Sourcing and due-diligence sequencing controls
+
+- [ ] Consume the Forge engine's per-entity execution state in the agent trigger
+  controls; do not derive authoritative state solely from browser memory.
+- [ ] Disable Due Diligence while sourcing is running or awaiting analyst
+  review for the same entity.
+- [ ] Disable Sourcing while due diligence is running or awaiting analyst
+  review for the same entity.
+- [ ] Keep the controls available for unrelated entities.
+- [ ] Explain the disabled state in a tooltip and display Forge's conflict
+  response if another session starts a conflicting run first.
+- [ ] Treat HTTP 409 sequencing responses as expected workflow feedback rather
+  than a generic system failure.
+- [ ] Keep screening behavior unchanged unless Forge's engine defines an
+  additional dependency.
+
+Forge integration note:
+
+- Forge's separate execution engine must remain the authority that enforces the
+  sequence. The UI may poll or subscribe to its state, but must not implement
+  locks, reorder agents, or reproduce the No-Forge database trigger.
+
+Acceptance criteria:
+
+- Sourcing and DD never appear independently runnable at the same time for one
+  entity, including across two browser sessions.
+- A pending-review sourcing run continues to block DD until it is accepted,
+  rejected, cancelled, or failed.
+- The UI recovers automatically when the blocking run reaches a terminal state.
+
+## 6. Defensive rendering for live API data
+
+- [ ] Normalize nullable exception titles, reasoning, and recommended actions
+  before rendering the Exception Review screen.
+- [ ] Support both text actions and structured action objects returned by Forge.
+- [ ] Use deliberate fallback labels instead of calling string methods on
+  missing API fields.
+- [ ] Add an error boundary or panel-level fallback so one malformed record
+  cannot blank the entire review screen.
+
+## 7. Verification and release
 
 - [ ] Add unit tests for case-insensitive search and combined filters.
 - [ ] Add component tests for opening, applying, clearing, and closing the
@@ -165,6 +205,10 @@ Reference implementation:
 - [ ] Test each Dashboard empty state and populated state.
 - [ ] Test customer-document selection, upload results, processing statuses,
   duplicates, and errors.
+- [ ] Test sourcing/DD button states for running, pending-review, terminal, and
+  cross-session conflict responses.
+- [ ] Test nullable and legacy exception payloads, including missing titles and
+  mixed recommended-action shapes.
 - [ ] Validate keyboard navigation and accessible labels.
 - [ ] Validate responsive behavior at the Forge application's supported
   breakpoints.
