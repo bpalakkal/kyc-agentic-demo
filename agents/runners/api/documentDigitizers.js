@@ -1,0 +1,33 @@
+export const DOCUMENT_DIGITIZERS = [
+  ['10K/Annual Report', 'digitize-10k-annual-report'],
+  ['Annual Return', 'digitize-annual-return'],
+  ['Articles of Association', 'digitize-articles-of-association'],
+  ['Articles of Incorporation', 'digitize-articles-of-incorporation'],
+  ['Articles of Organization', 'digitize-articles-of-organization'],
+  ['Audited Financial Report', 'digitize-audited-financial-report'],
+  ['Authorized signers list', 'digitize-authorized-signers-list'],
+  ['Board Resolution', 'digitize-board-resolution'],
+  ['Certificate of Formation', 'digitize-certificate-of-formation'],
+  ['Certificate of Incorporation', 'digitize-certificate-of-incorporation'],
+  ['Certificate of Incumbency', 'digitize-certificate-of-incumbency'],
+  ['Certificate of Name Change', 'digitize-certificate-of-name-change'],
+  ['Declaration of Trust', 'digitize-declaration-of-trust'],
+  ['Drivers License', 'digitize-drivers-license'],
+  ['Government Photo ID', 'digitize-government-photo-id'],
+  ['Investment Management Agreement', 'digitize-investment-management-agreement'],
+  ['LLC/LP Operating Agreement', 'digitize-llc-lp-operating-agreement'],
+  ['Memorandum of Association', 'digitize-memorandum-of-association'],
+  ['Offering Memorandum', 'digitize-offering-memorandum'],
+  ['Organizational Structure Document', 'digitize-organizational-structure'],
+  ['Passport', 'digitize-passport'],
+  ['Prospectus', 'digitize-prospectus'],
+  ['SEC Form ADV', 'digitize-sec-form-adv'],
+  ['Trust Agreement', 'digitize-trust-agreement'],
+  ['W9', 'digitize-w9'],
+  ['Wolfsberg Questionnaire', 'digitize-wolfsberg-questionnaire'],
+  ['WorldCheck Report', 'digitize-worldcheck-report'],
+  ['Other', 'digitize-generic-document'],
+];
+
+export const digitizerSlugForType = documentType =>
+  DOCUMENT_DIGITIZERS.find(([type]) => type === documentType)?.[1] ?? 'digitize-generic-document';

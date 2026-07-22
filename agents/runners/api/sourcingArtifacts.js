@@ -25,6 +25,9 @@ function documentContentBlock(file) {
   if (/^(text\/|application\/(xhtml\+xml|html|json))/.test(file.mimeType)) {
     return { type: 'text', text: `DOCUMENT CONTENT:\n${file.content.toString('utf8').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 180_000)}` };
   }
+  if (['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.mimeType)) {
+    return { type: 'image', source: { type: 'base64', media_type: file.mimeType, data: file.content.toString('base64') } };
+  }
   return null;
 }
 

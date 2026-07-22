@@ -11,6 +11,9 @@ export interface CaseFile {
   source_url?: string;
   created_at: string;
   agent_runs?: { agent_slug: string; completed_at?: string } | null;
+  processing_status?: "pending" | "processing" | "complete" | "failed" | "duplicate" | "not_applicable";
+  document_type?: string | null;
+  processing_error?: string | null;
 }
 
 interface FileCardProps {
@@ -60,6 +63,11 @@ export const FileCard = ({ file, onView, className }: FileCardProps) => {
       {file.caption && (
         <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2 pl-0.5">
           {file.caption}
+        </p>
+      )}
+      {file.file_category === "document" && file.processing_status && (
+        <p className={cn("text-[10px]", file.processing_status === "failed" ? "text-alert" : file.processing_status === "complete" ? "text-success" : "text-muted-foreground")} title={file.processing_error ?? undefined}>
+          {file.processing_status === "complete" ? `Digitized${file.document_type ? ` · ${file.document_type}` : ""}` : file.processing_status === "processing" ? "Classifying / digitizing…" : file.processing_status === "pending" ? "Queued for processing" : file.processing_status === "duplicate" ? "Duplicate document" : file.processing_status === "failed" ? "Processing failed" : ""}
         </p>
       )}
 

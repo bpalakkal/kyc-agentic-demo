@@ -71,6 +71,35 @@ finish and persist their files.
    `complete`, `failed`, `duplicate`, or `not_applicable`. Failed documents are
    eligible for retry on the next sourcing run.
 
+### Customer-provided documents
+
+- Analysts can upload up to ten customer-provided documents at a time from the
+  entity Document Locker. Each file is limited to 15 MB.
+- Supported inputs are PDF, PNG, JPEG, WebP, GIF, plain text, HTML, and JSON.
+- Uploads retain the authenticated uploader ID and are stored as customer KYC
+  evidence before processing begins.
+- Customer uploads use the identical SHA-256 deduplication, classification,
+  digitization, retry, and lineage path as sourced documents.
+- Processing runs asynchronously after upload. The Document Locker shows queued,
+  processing, digitized, duplicate, and failed states.
+
+### Document digitization agent register
+
+- Every supported Forge digitization persona is represented by an
+  `agent_registry` row with `agent_kind = 'document_digitizer'` and its canonical
+  `document_type`.
+- Document digitizers are dependency-only: `user_triggerable = false` and
+  `top_level_trigger = false`. They must never appear as independent Run Agent
+  choices in the analyst UI.
+- The classifier selects the registered digitizer by document type. A separate
+  child `agent_runs` record is created for the selected digitizer so extraction
+  lineage and operational history identify the actual digitization agent.
+- `Other`, `Unknown`, and types without a specialized registered extractor route
+  to `digitize-generic-document`.
+- Digitizers publish extracted values and parties through the normal publishers.
+  Existing structured attributes retain precedence; document values fill gaps
+  and remain available in lineage for ID&V review.
+
 ## Orchestration
 
 | Parent | Children | Execution | Failure policy |

@@ -51,7 +51,6 @@ import { WgqTabContent } from "@/components/kyc/WgqTabContent";
 import { CollabPanel } from "@/components/kyc/CollabPanel";
 import { EntityFiles } from "@/components/kyc/EntityFiles";
 import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
-import { DatastoreDocuments } from "@/components/kyc/DatastoreDocuments";
 import { SimpleFieldRow, InlineTraceDrawer } from "@/components/kyc/SimpleFieldRow";
 import { canonicalAttrKey, lineageConflict } from "@/lib/attrLabel";
 import { attributeChecks, entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
@@ -524,7 +523,7 @@ const ExceptionReview = () => {
             <ChevronRight className="size-3.5" />
           </button>
         </div>
-        {rightTab === "locker" && <div className="h-full overflow-y-auto"><DatastoreDocuments kycRef={paneKyc} /></div>}
+        {rightTab === "locker" && <div className="h-full overflow-y-auto"><EntityFiles kycRef={paneKyc} /></div>}
         {rightTab === "collab" && <CollabPanel entity={paneEntityName} kyc={paneKyc} />}
         {rightTab === "sourcing" && <div className="h-full overflow-y-auto"><AgentRunsPanel kycRef={focusedAgentRunKyc ?? paneKyc} focusAgentSlug={focusedAgentRun} /></div>}
       </aside>

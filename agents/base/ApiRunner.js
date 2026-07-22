@@ -69,7 +69,7 @@ export class ApiRunner {
 
     const executionPromise = (async () => {
       try {
-        const output = await this.execute(ctx);
+        const output = await this.execute({ ...ctx, currentRunId: runId });
         const { data: currentRun } = await this.sb.from('agent_runs').select('status').eq('id', runId).single();
         if (currentRun?.status === 'cancelled') throw Object.assign(new Error('Run cancelled by analyst'), { code: 'RUN_CANCELLED' });
         const outcome = output.metadata?.outcome ?? this._inferOutcome(output);
@@ -126,7 +126,7 @@ export class ApiRunner {
       if (externalOnStep) externalOnStep(message);
     };
     try {
-      const output = await this.execute(ctx);
+      const output = await this.execute({ ...ctx, currentRunId: agentRun.id });
       const stats  = await this._publish(ctx.kycRef, agentRun.id, output, ctx.initiatedBy);
       const outcome = output.metadata?.outcome ?? this._inferOutcome(output);
       const outcomeReason = output.metadata?.outcomeReason ?? null;

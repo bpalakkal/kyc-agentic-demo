@@ -35,6 +35,8 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import Anthropic from "@anthropic-ai/sdk";
 import { enumValues } from "./schema/index.js";
+import { FilePublisher } from "./agents/publishers/FilePublisher.js";
+import { DocumentProcessingRunner } from "./agents/runners/api/DocumentProcessingRunner.js";
 
 // Lazy Anthropic client — created on first use so the server starts even when
 // ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
@@ -152,7 +154,7 @@ app.use(cors({
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // ─── Zoom ─────────────────────────────────────────────────────────────────────
 
@@ -1318,6 +1320,51 @@ app.get('/api/agents/access', requireAuth, (req, res) => {
     email: req.user.email ?? null,
     allowlistConfigured: Boolean((process.env.AGENT_REGISTRY_ADMIN_EMAILS ?? '').trim()),
   });
+});
+
+// POST /api/entity/:kycRef/documents/upload — customer-provided evidence.
+// Body: { files: [{ filename, mimeType, contentBase64 }] }
+app.post('/api/entity/:kycRef/documents/upload', requireAuth, async (req, res) => {
+  const { kycRef } = req.params;
+  const inputFiles = req.body?.files;
+  if (!Array.isArray(inputFiles) || inputFiles.length === 0 || inputFiles.length > 10) {
+    return res.status(400).json({ error: 'Provide between 1 and 10 files' });
+  }
+  const allowedMimeTypes = new Set([
+    'application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+    'text/plain', 'text/html', 'application/json',
+  ]);
+  try {
+    const files = inputFiles.map((file, index) => {
+      if (!file?.filename || !file?.mimeType || !file?.contentBase64) throw new Error(`File ${index + 1} is incomplete`);
+      if (!allowedMimeTypes.has(file.mimeType)) throw new Error(`${file.filename}: unsupported file type ${file.mimeType}`);
+      const content = Buffer.from(file.contentBase64, 'base64');
+      if (!content.length) throw new Error(`${file.filename}: empty file`);
+      if (content.length > 15 * 1024 * 1024) throw new Error(`${file.filename}: file exceeds 15 MB`);
+      return {
+        filename: file.filename, title: file.filename, mimeType: file.mimeType,
+        fileCategory: 'document', caption: 'Customer-provided KYC document', content,
+      };
+    });
+    const publication = await new FilePublisher(getSb().sb).publish(kycRef, null, files, req.user.id);
+    if (publication.errors.length && publication.stored === 0) throw new Error(publication.errors.join(' | '));
+
+    const entity = await getSb().getEntity(kycRef);
+    const runner = new DocumentProcessingRunner(getSb().sb);
+    void runner.run({
+      kycRef, entityName: entity?.entity_name ?? kycRef, initiatedBy: req.user.id,
+      runPhase: 'post',
+    }).catch(error => console.error(`[customer-upload] document processing failed for ${kycRef}: ${error.message}`));
+
+    return res.status(202).json({
+      accepted: publication.stored,
+      duplicates: files.length - publication.stored - publication.errors.length,
+      errors: publication.errors,
+      processing: publication.stored ? 'started' : 'not_required',
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 app.get('/api/agents', requireAuth, async (_req, res) => {

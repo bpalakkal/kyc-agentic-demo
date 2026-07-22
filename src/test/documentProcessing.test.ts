@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FilePublisher } from '../../agents/publishers/FilePublisher.js';
 import { DOCUMENT_TYPES } from '../../agents/runners/api/sourcingArtifacts.js';
+import { DOCUMENT_DIGITIZERS, digitizerSlugForType } from '../../agents/runners/api/documentDigitizers.js';
 
 describe('post-sourcing document processing contract', () => {
   it('uses the Forge classifier vocabulary', () => {
@@ -10,6 +11,13 @@ describe('post-sourcing document processing contract', () => {
     expect(DOCUMENT_TYPES).toContain('Prospectus');
     expect(DOCUMENT_TYPES).toContain('Other');
     expect(DOCUMENT_TYPES).toContain('Unknown');
+  });
+
+  it('routes classified documents only to registered document-specific digitizers', () => {
+    expect(digitizerSlugForType('SEC Form ADV')).toBe('digitize-sec-form-adv');
+    expect(digitizerSlugForType('Passport')).toBe('digitize-passport');
+    expect(digitizerSlugForType('Unknown')).toBe('digitize-generic-document');
+    expect(new Set(DOCUMENT_DIGITIZERS.map(([, slug]) => slug)).size).toBe(DOCUMENT_DIGITIZERS.length);
   });
 
   it('does not upload byte-identical evidence already stored for the entity', async () => {
