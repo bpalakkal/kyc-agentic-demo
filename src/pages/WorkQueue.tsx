@@ -14,12 +14,13 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
+import { EMPTY_WORK_QUEUE_FILTERS, filterWorkQueueRows, type WorkQueueFilters } from "@/lib/workQueueFilters";
 
 // ─── API types ────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,21 @@ const statusColor = (s: Row["status"]) => {
   }
 };
 
+const FilterSelect = ({ label, value, options, onChange }: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) => (
+  <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+    {label}
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus:border-primary">
+      <option value="all">All</option>
+      {options.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
+  </label>
+);
+
 const EntityRow = ({
   r,
   selected,
@@ -238,6 +254,9 @@ const WorkQueue = () => {
     ?? user?.email?.split("@")[0]
     ?? "My";
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<WorkQueueFilters>(EMPTY_WORK_QUEUE_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
@@ -258,6 +277,9 @@ const WorkQueue = () => {
   }, []);
 
   const rows = useMemo(() => apiEntities.map(toRow), [apiEntities]);
+  const filteredRows = useMemo(() => filterWorkQueueRows(rows, query, filters), [rows, query, filters]);
+  const jurisdictions = useMemo(() => [...new Set(rows.map((row) => row.jurisdiction).filter((value) => value !== "—"))].sort(), [rows]);
+  const activeFilterCount = Object.values(filters).filter((value) => value !== "all").length;
   const drgByKyc = useMemo(() => {
     const m: Record<string, string> = {};
     for (const e of apiEntities) {
@@ -267,8 +289,8 @@ const WorkQueue = () => {
   }, [apiEntities]);
 
   const { groups, ungrouped } = useMemo(
-    () => buildDisplay(rows, drgByKyc, activeTab),
-    [rows, drgByKyc, activeTab],
+    () => buildDisplay(filteredRows, drgByKyc, activeTab),
+    [filteredRows, drgByKyc, activeTab],
   );
 
   // Open first group by default
@@ -280,15 +302,10 @@ const WorkQueue = () => {
     return openGroups;
   }, [groups, openGroups, firstGroupId]);
 
-  const allRows = useMemo(
-    () => [...groups.flatMap((g) => g.rows), ...ungrouped],
-    [groups, ungrouped],
-  );
-
-  const selectedCount = Object.values(selected).filter(Boolean).length;
-  const selectedEntities = allRows
+  const selectedEntities = rows
     .filter((r) => selected[r.id])
     .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id, drg: drgByKyc[r.id] ?? undefined }));
+  const selectedCount = selectedEntities.length;
 
   const handleToggle = (id: string, checked: boolean) =>
     setSelected((s) => ({ ...s, [id]: checked }));
@@ -318,16 +335,41 @@ const WorkQueue = () => {
             <input
               className="w-full h-11 pl-10 pr-12 text-sm rounded-xl border border-input bg-card shadow-sm outline-none hover:border-foreground/20 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
               placeholder="Search entities…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              aria-label="Search work queue entities"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-              {loading ? "…" : apiEntities.length}
-            </span>
+            {query ? (
+              <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Clear search">
+                <X className="size-4" />
+              </button>
+            ) : <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{loading ? "…" : filteredRows.length}</span>}
           </div>
 
-          <button className="h-11 px-4 rounded-xl border border-primary/40 bg-card text-primary text-sm font-semibold shadow-sm flex items-center gap-2 hover:bg-info-soft transition-colors">
-            <SlidersHorizontal className="size-4" />
-            Filter
-          </button>
+          <div className="relative">
+            <button type="button" onClick={() => setFilterOpen((open) => !open)} aria-expanded={filterOpen} aria-controls="work-queue-filters" className={cn("h-11 px-4 rounded-xl border bg-card text-sm font-semibold shadow-sm flex items-center gap-2 hover:bg-info-soft transition-colors", activeFilterCount ? "border-primary text-primary" : "border-input text-foreground")}>
+              <SlidersHorizontal className="size-4" /> Filter
+              {activeFilterCount > 0 && <span className="size-5 rounded-full bg-primary text-primary-foreground grid place-items-center text-[11px]">{activeFilterCount}</span>}
+            </button>
+            {filterOpen && (
+              <div id="work-queue-filters" className="absolute z-30 left-0 top-12 w-[300px] rounded-xl border border-border bg-popover p-4 shadow-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold">Filter work queue</span>
+                  <button type="button" onClick={() => setFilterOpen(false)} className="text-muted-foreground hover:text-foreground" aria-label="Close filters"><X className="size-4" /></button>
+                </div>
+                <div className="grid gap-3">
+                  <FilterSelect label="Priority" value={filters.priority} options={["High", "Medium", "Low"]} onChange={(priority) => setFilters((current) => ({ ...current, priority: priority as WorkQueueFilters["priority"] }))} />
+                  <FilterSelect label="Risk" value={filters.risk} options={["Elevated", "Moderate", "Minimal"]} onChange={(risk) => setFilters((current) => ({ ...current, risk: risk as WorkQueueFilters["risk"] }))} />
+                  <FilterSelect label="Status" value={filters.status} options={["Complete", "In Progress", "Pending Feedback", "Not Started"]} onChange={(status) => setFilters((current) => ({ ...current, status: status as WorkQueueFilters["status"] }))} />
+                  <FilterSelect label="Jurisdiction" value={filters.jurisdiction} options={jurisdictions} onChange={(jurisdiction) => setFilters((current) => ({ ...current, jurisdiction }))} />
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <button type="button" onClick={() => setFilters(EMPTY_WORK_QUEUE_FILTERS)} disabled={!activeFilterCount} className="text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40">Clear filters</button>
+                  <button type="button" onClick={() => setFilterOpen(false)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">Apply</button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-1 ml-2 p-1 rounded-xl bg-secondary/70 border border-border shadow-inner">
             {tabs.map((t) => (
