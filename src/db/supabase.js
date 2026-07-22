@@ -744,7 +744,10 @@ export async function getAttributesByRunId(kycRef, agentRunId) {
 export async function getEntityFiles(kycRef, { category } = {}) {
   let q = sb
     .from('case_files')
-    .select('*, agent_runs(agent_slug, completed_at)')
+    // case_files now has both agent_run_id and processing_agent_run_id FKs.
+    // Qualify the originating-run relationship so PostgREST does not reject
+    // this embed as ambiguous after migration 021.
+    .select('*, agent_runs!case_files_agent_run_id_fkey(agent_slug, completed_at)')
     .eq('kyc_ref', kycRef)
     .order('created_at', { ascending: false });
   if (category) q = q.eq('file_category', category);
