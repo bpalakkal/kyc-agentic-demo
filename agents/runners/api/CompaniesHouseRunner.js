@@ -20,7 +20,6 @@
  */
 
 import { ApiRunner } from '../../base/ApiRunner.js';
-import Anthropic from '@anthropic-ai/sdk';
 
 const CH_BASE = 'https://api.company-information.service.gov.uk';
 
@@ -106,13 +105,11 @@ export class CompaniesHouseRunner extends ApiRunner {
     const allFilings = latestIncorporation ? [latestIncorporation] : [];
     this.step(`Downloading ${allFilings.length} document(s)…`);
 
-    const downloadedFiles = [];
     for (const filing of allFilings) {
       try {
         const fileResult = await this._downloadFiling(filing, companyNumber, authHeader);
         if (fileResult) {
           files.push(fileResult);
-          downloadedFiles.push({ filing, buffer: fileResult.content });
           this.step(`  Downloaded: ${fileResult.filename}`);
         }
       } catch (err) {
@@ -120,26 +117,8 @@ export class CompaniesHouseRunner extends ApiRunner {
       }
     }
 
-    // ── Phase 3: Digitize documents via Claude ────────────────────────────────
-    const phase3Attrs = [];
-    if (downloadedFiles.length > 0) {
-      this.step(`Digitizing ${downloadedFiles.length} document(s) with Claude…`);
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-      for (const { filing, buffer } of downloadedFiles) {
-        try {
-          const extracted = await this._digitizeDocument(anthropic, buffer, filing, companyNumber);
-          phase3Attrs.push(...extracted);
-          this.step(`  Extracted ${extracted.length} attribute(s) from ${filing.description}`);
-        } catch (err) {
-          this.step(`  Warning: Claude digitization failed for "${filing.description}" — ${err.message} (skipping)`);
-        }
-      }
-    }
-
-    // Structured API data is authoritative; digitization only fills gaps.
-    const structuredNames = new Set(phase1Attrs.map(item => item.attributeName));
-    const allAttrs = [...phase1Attrs, ...phase3Attrs.filter(item => !structuredNames.has(item.attributeName))];
+    // Classification and digitization run once in the post-sourcing flow.
+    const allAttrs = phase1Attrs;
     this.step(`Total: ${allAttrs.length} attribute(s) across all phases — ready for review`);
 
     return {
@@ -488,128 +467,6 @@ export class CompaniesHouseRunner extends ApiRunner {
       content: buffer,
       sourceUrl: documentUrl,
     };
-  }
-
-  // ── Phase 3: Claude document digitization ───────────────────────────────────
-
-  async _digitizeDocument(anthropic, pdfBuffer, filing, companyNumber) {
-    const base64 = pdfBuffer.toString('base64');
-    const SOURCE = 'Companies House';
-    const fetchedAt = new Date().toISOString();
-    const sourceUrl = `https://find-and-update.company-information.service.gov.uk/company/${companyNumber}`;
-
-    const prompt = `You are a KYC document analysis assistant. Analyze this Companies House document and extract all relevant entity information.
-
-The document is a "${filing.description ?? 'corporate filing'}" for company number ${companyNumber}.
-
-Please extract the following fields if present (return as JSON object with snake_case keys):
-- entity_name: Legal entity name as it appears in the document
-- date_of_incorporation: Date of incorporation or registration (YYYY-MM-DD format if possible)
-- country_of_incorporation: Country where the entity was incorporated
-- registration_number: Company/registration number
-- legal_structure: Type of legal entity (e.g., Private Limited Company, LLP, etc.)
-- registered_office_address: Full registered office address
-- directors: Array of director names as plain strings (e.g. ["John Smith", "Jane Doe"])
-- share_capital: Authorized or issued share capital
-- objects_clause: Company's objects or purpose clause (brief summary)
-
-Return ONLY a JSON object with the fields you found. Use null for fields not present. Do not include fields not found in the document.`;
-
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'document',
-            source: {
-              type: 'base64',
-              media_type: 'application/pdf',
-              data: base64,
-            },
-          },
-          {
-            type: 'text',
-            text: prompt,
-          },
-        ],
-      }],
-    });
-
-    // Parse JSON from Claude's response
-    const text = response.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
-
-    let extracted = {};
-    try {
-      // Find JSON block in response (Claude may wrap it in markdown)
-      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : text;
-      extracted = JSON.parse(jsonStr);
-    } catch {
-      // If parsing fails, return no attributes from this document
-      console.warn(`[companies-house] Claude response could not be parsed as JSON for ${filing.description}`);
-      return [];
-    }
-
-    const attrs = [];
-    const confidence = 90;
-
-    const push = (attributeName, displayValue) => {
-      if (displayValue === null || displayValue === undefined) return;
-      // Coerce objects and object arrays to strings — Claude sometimes returns structured
-      // objects instead of plain strings for directors/shareholders fields.
-      const coerce = v => {
-        if (v === null || v === undefined) return '';
-        if (typeof v === 'object') return v.name ?? v.officer_name ?? v.company_name ?? JSON.stringify(v);
-        return String(v).trim();
-      };
-      const val = Array.isArray(displayValue)
-        ? displayValue.map(coerce).filter(Boolean).join('; ')
-        : coerce(displayValue);
-      if (!val || val === 'null') return;
-
-      attrs.push({
-        attributeName,
-        attributeGroup:   'core',
-        displayValue:     val,
-        source:           SOURCE,
-        confidence,
-        idFlag:           false,
-        verificationFlag: false,
-        exceptionFlag:    false,
-        lineage: [{
-          value:            val,
-          source:           SOURCE,
-          source_url:       sourceUrl,
-          timestamp:        fetchedAt,
-          confidence_score: confidence / 100,
-        }],
-      });
-    };
-
-    // Map extracted fields to AttributeOutput
-    if (extracted.entity_name)               push('entity_name', extracted.entity_name);
-    if (extracted.date_of_incorporation)     push('date_of_incorporation', extracted.date_of_incorporation);
-    if (extracted.country_of_incorporation)  push('country_of_incorporation', extracted.country_of_incorporation);
-    if (extracted.registration_number)       push('uk_registration_number', extracted.registration_number);
-    if (extracted.legal_structure)           push('legal_structure', extracted.legal_structure);
-    if (extracted.registered_office_address) push('legal_registered_address', extracted.registered_office_address);
-    if (extracted.share_capital)             push('share_capital', extracted.share_capital);
-    if (extracted.objects_clause)            push('objects_clause', extracted.objects_clause);
-
-    if (Array.isArray(extracted.directors) && extracted.directors.length > 0) {
-      extracted.directors.forEach((director, i) => {
-        if (director) push(`corporate_officer_${i + 1}`, director);
-      });
-    }
-    // Shareholders from incorporation documents are original subscribers, not current
-    // beneficial owners — CH does not provide verified beneficial ownership data.
-
-    return attrs;
   }
 
   // ── Normalization helpers ───────────────────────────────────────────────────

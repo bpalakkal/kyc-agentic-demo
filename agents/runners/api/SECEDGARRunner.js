@@ -1,5 +1,5 @@
 import { ApiRunner } from '../../base/ApiRunner.js';
-import { digitizeKycDocument, downloadSourceDocument, mergeStructuredAttributes } from './sourcingArtifacts.js';
+import { downloadSourceDocument } from './sourcingArtifacts.js';
 
 const TICKERS_URL      = 'https://www.sec.gov/files/company_tickers.json';
 const SUBMISSIONS_BASE = 'https://data.sec.gov/submissions';
@@ -49,15 +49,8 @@ export class SECEDGARRunner extends ApiRunner {
     if (!subRes.ok) throw new Error(`EDGAR submissions HTTP ${subRes.status}`);
 
     const company    = await subRes.json();
-    let attributes = this._toAttributes(company, paddedCik);
+    const attributes = this._toAttributes(company, paddedCik);
     const files = await this._downloadContractFilings(company, paddedCik);
-    for (const file of files) {
-      const digitized = await digitizeKycDocument(file, {
-        documentType: file.title, source: SOURCE,
-        scalarFields: ['entity_name', 'legal_registered_address', 'principal_place_of_business', 'previous_names', 'registration_number', 'regulatory_status', 'regulator_registration_number', 'regulator', 'listed_exchange', 'other_business_activity', 'tax_identification_number', 'country_of_incorporation', 'website_address', 'verification_of_existence'],
-      });
-      attributes = mergeStructuredAttributes(attributes, digitized.attributes);
-    }
     this.step(`Extracted ${attributes.length} attribute(s) — ready for review`);
 
     return {

@@ -8,6 +8,7 @@ export { SECEDGARRunner }          from './SECEDGARRunner.js';
 export { NFARunner, DelawareRunner, PuertoRicoRunner } from './USRegistryResearchRunners.js';
 export { UKSourcingFlowRunner }    from './UKSourcingFlowRunner.js';
 export { USSourcingFlowRunner }    from './USSourcingFlowRunner.js';
+export { DocumentProcessingRunner } from './DocumentProcessingRunner.js';
 
 // DD agent runners (Claude-based, no Forge)
 export { makeDdRunner, makeAllInOneRunner, DD_SLUGS, ALL_IN_ONE_DD_SLUG } from './DdRunner.js';

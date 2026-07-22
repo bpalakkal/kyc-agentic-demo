@@ -48,6 +48,29 @@ Every source runner must:
 9. Keep source outputs independent. Parent flows orchestrate children; they do
    not replace source-level run, lineage, file, or error history.
 
+## Post-sourcing document processing
+
+Every standalone source and both UK and US sourcing orchestrators declare
+`document-processing-flow` as a post-agent. Dependency-plan de-duplication means
+an orchestrated sourcing call invokes it exactly once, after all source children
+finish and persist their files.
+
+1. Screenshots are evidence only and are never classified or digitized.
+2. Documents are identified by SHA-256 of their bytes, scoped to the entity.
+   A byte-identical document already in the entity repository is not uploaded or
+   processed again, even when its filename or source URL differs.
+3. New documents are atomically claimed to prevent concurrent processing.
+4. Classification reads the actual document and assigns exactly one type from
+   the Forge Document Classifier vocabulary. Explicit content evidence is stored
+   with the classification. Ambiguous readable documents become `Other`;
+   unreadable documents become `Unknown`.
+5. Digitization runs once after successful classification and writes canonical
+   entity and party fields with document lineage. Existing structured-source
+   entity values take precedence, so document extraction only fills gaps.
+6. Processing state is retained on `case_files`: `pending`, `processing`,
+   `complete`, `failed`, `duplicate`, or `not_applicable`. Failed documents are
+   eligible for retry on the next sourcing run.
+
 ## Orchestration
 
 | Parent | Children | Execution | Failure policy |

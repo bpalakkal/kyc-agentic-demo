@@ -1,5 +1,5 @@
 import { ApiRunner } from '../../base/ApiRunner.js';
-import { digitizeKycDocument, downloadSourceDocument, mergeStructuredAttributes } from './sourcingArtifacts.js';
+import { downloadSourceDocument } from './sourcingArtifacts.js';
 
 const API_URL = 'https://api.sec-api.io/form-adv/firm';
 const SOURCE = 'IAPD (Investment Adviser Public Disclosure)';
@@ -38,16 +38,9 @@ export class IAPDRunner extends ApiRunner {
       }),
     ]);
 
-    let attributes = this._toAttributes(firm, status);
+    const attributes = this._toAttributes(firm, status);
     const persons = this._toPersons(ownerPayload, crd);
-    const digitized = await digitizeKycDocument(advFile, {
-      documentType: 'SEC Form ADV', source: SOURCE,
-      scalarFields: ['entity_name', 'registration_number', 'principal_place_of_business', 'legal_structure', 'regulator', 'other_business_activity', 'website_address', 'document_date', 'registration_country', 'sole_proprietorship_indicator', 'entity_status', 'entity_classification_type', 'commodities_future_trading_commission_registered_indicator', 'verification_of_existence'],
-      partyRoles: ['beneficial_owner', 'corporate_officer'],
-    });
-    attributes = mergeStructuredAttributes(attributes, digitized.attributes);
-    persons.push(...digitized.persons);
-    this.step(`Prepared ${attributes.length} attributes, ${persons.length} parties, and Form ADV evidence`);
+    this.step(`Prepared ${attributes.length} attributes, ${persons.length} parties, and Form ADV for post-sourcing processing`);
     return {
       agentSlug: this.slug, kycRef, outputType: 'attributes', attributes, persons,
       personSource: SOURCE, files: [advFile],

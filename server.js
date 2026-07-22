@@ -543,6 +543,7 @@ async function loadRunnerClass(slug) {
     'puerto-rico':      runners.PuertoRicoRunner,
     'uk-sourcing-flow': runners.UKSourcingFlowRunner,
     'us-sourcing-flow': runners.USSourcingFlowRunner,
+    'document-processing-flow': runners.DocumentProcessingRunner,
     // DD runners (Claude-based, no Forge)
     'dd-all-in-one':                          runners.DdAllInOneRunner,
     'ria-authorized-signatory-idv':           runners.RiaAuthorizedSignatoryIdvRunner,

@@ -5,6 +5,8 @@
  * A failed file is reported without aborting the rest of the batch.
  */
 
+import { createHash } from 'node:crypto';
+
 const BUCKET = 'kyc-files';
 
 export class FilePublisher {
@@ -30,6 +32,12 @@ export class FilePublisher {
       try {
         if (!file.content) throw new Error(`FileOutput for "${file.filename}" has no content`);
         const content = Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content);
+        const contentSha256 = createHash('sha256').update(content).digest('hex');
+        const { data: existing, error: lookupErr } = await this.sb.from('case_files')
+          .select('id').eq('kyc_ref', kycRef).eq('file_category', file.fileCategory)
+          .eq('content_sha256', contentSha256).maybeSingle();
+        if (lookupErr) throw lookupErr;
+        if (existing) continue;
         const folder = file.fileCategory === 'document' ? 'documents' : 'screenshots';
         const safeName = file.filename.replace(/[^A-Za-z0-9._\-]/g, '_');
         const storagePath = `${kycRef}/${folder}/${Date.now()}_${safeName}`;
@@ -50,6 +58,8 @@ export class FilePublisher {
           storage_path: storagePath,
           source_url: file.sourceUrl ?? null,
           uploaded_by: uploadedBy ?? null,
+          content_sha256: contentSha256,
+          processing_status: file.fileCategory === 'document' ? 'pending' : 'not_applicable',
         });
         if (dbErr) throw dbErr;
 
