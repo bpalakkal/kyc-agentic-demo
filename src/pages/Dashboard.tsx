@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   Calendar, CalendarX, ChevronDown, ChevronRight, AlertTriangle,
-  Sparkles, MessageSquare, FileText, Bot, CheckCircle2, ShieldAlert,
+  Sparkles, FileText, Bot, CheckCircle2, ShieldAlert,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Chip } from "@/components/Chip";
@@ -64,19 +64,29 @@ function toPriorityCase(e: ApiEntity): PriorityCase {
   };
 }
 
-type CollabType = "comment" | "ai" | "document" | "action";
+type CollabType = "ai" | "document" | "action";
 type CaseRef = { name: string; kyc: string };
 
 interface ActivityItem {
+  id: string;
   type: CollabType;
   title: string;
-  time: string;
+  timestamp: string;
   case: CaseRef;
   snippet?: string;
 }
 
-const COLLAB_META: Record<CollabType, { icon: typeof MessageSquare; tone: string }> = {
-  comment:  { icon: MessageSquare, tone: "bg-info-soft text-primary" },
+type ExcSeverity = "high" | "medium" | "low" | null;
+type DashboardInsights = {
+  frequentAgentRuns: { slug: string; name: string; runs: number }[];
+  exceptionSummary: { type: string; open: number; severity: ExcSeverity; ageDays: number }[];
+  recentActivity: Array<{
+    id: string; type: CollabType; title: string; timestamp: string;
+    kycRef: string; entityName: string; snippet: string | null;
+  }>;
+};
+
+const COLLAB_META: Record<CollabType, { icon: typeof Bot; tone: string }> = {
   ai:       { icon: Bot,           tone: "bg-success-soft text-success" },
   document: { icon: FileText,      tone: "bg-warning-soft text-warning" },
   action:   { icon: CheckCircle2,  tone: "bg-secondary text-foreground" },
@@ -91,27 +101,17 @@ const PENDING_VIEWS: { key: PendingBucket; label: string }[] = [
 
 const NAVY = "hsl(220, 56%, 22%)";
 
-const AGENT_RUNS = [
-  { name: "Companies House",  runs: 87 },
-  { name: "UK Parent Flow",   runs: 74 },
-  { name: "FCA Register",     runs: 63 },
-  { name: "SEC EDGAR",        runs: 58 },
-  { name: "US Parent Flow",   runs: 51 },
-  { name: "GLEIF",            runs: 42 },
-];
-
-type ExcSeverity = "High" | "Medium" | "Low";
-const EXCEPTION_SUMMARY: { type: string; open: number; severity: ExcSeverity; ageDays: number }[] = [
-  { type: "Missing PSC filing",        open: 4, severity: "High",   ageDays: 12 },
-  { type: "Stale identity document",   open: 3, severity: "Medium", ageDays:  8 },
-  { type: "AML screening gap",         open: 2, severity: "High",   ageDays:  5 },
-  { type: "Beneficial owner TBC",      open: 2, severity: "High",   ageDays: 15 },
-  { type: "LEI / GLEIF mismatch",      open: 1, severity: "Medium", ageDays:  3 },
-];
-
-const SEV_CHIP: Record<ExcSeverity, "high" | "medium" | "low"> = {
-  High: "high", Medium: "medium", Low: "low",
+const EMPTY_INSIGHTS: DashboardInsights = {
+  frequentAgentRuns: [], exceptionSummary: [], recentActivity: [],
 };
+
+function formatActivityTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+  }).format(date);
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -122,22 +122,21 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
+  const [insights, setInsights] = useState<DashboardInsights>(EMPTY_INSIGHTS);
   const [pendingView, setPendingView] = useState<PendingBucket>("ops");
   const [selectedPeriod, setSelectedPeriod] = useState<"month" | "week">("month");
 
   useEffect(() => {
-    apiFetch(`${AGENT_API_BASE}/api/entities`)
-      .then(r => (r.ok ? (r.json() as Promise<ApiEntity[]>) : undefined))
-      .then(data => { if (data) setApiEntities(data); })
-      .catch(() => {});
+    Promise.all([
+      apiFetch(`${AGENT_API_BASE}/api/entities`),
+      apiFetch(`${AGENT_API_BASE}/api/dashboard/insights`),
+    ]).then(async ([entitiesResponse, insightsResponse]) => {
+      if (entitiesResponse.ok) setApiEntities(await entitiesResponse.json() as ApiEntity[]);
+      if (insightsResponse.ok) setInsights(await insightsResponse.json() as DashboardInsights);
+    }).catch(() => {});
   }, []);
 
   const priorityCases = useMemo(() => apiEntities.map(toPriorityCase), [apiEntities]);
-
-  const entityByKyc = useMemo(
-    () => Object.fromEntries(apiEntities.map(e => [e.kyc_ref, e])),
-    [apiEntities]
-  );
 
   const kpis = useMemo(() => {
     const now = new Date();
@@ -190,16 +189,12 @@ const Dashboard = () => {
   const highCount = visibleCases.filter(c => c.priority === "High").length;
 
   const activityFeed = useMemo((): ActivityItem[] => {
-    const r = (kyc: string, fb: string): CaseRef => ({ name: entityByKyc[kyc]?.entity_name ?? fb, kyc });
-    return [
-      { type: "comment",  title: "Quinn Doe commented on Brevan Howard",      time: "Today, 7:08 AM",    case: r("KYC-30229", "Brevan Howard Asset Management LLP"), snippet: "PSC02 should land within SLA — reminder sent." },
-      { type: "ai",       title: "AI pulled 3 fresh Companies House filings",  time: "Yesterday, 3:12 PM", case: r("KYC-30229", "Brevan Howard Asset Management LLP"), snippet: "Auto-refreshed CS01 + PSC register for OC302636." },
-      { type: "action",   title: "You confirmed PSC for Marshall Wace LLP",    time: "Apr 22, 7:18 AM",   case: r("KYC-30188", "Marshall Wace LLP") },
-      { type: "comment",  title: "Aanya Sharma flagged a Jersey EDD finding",  time: "Apr 22, 6:03 AM",   case: r("KYC-30229", "Brevan Howard Asset Management LLP"), snippet: "BH Partnership Holdings needs source-of-funds before sign-off." },
-      { type: "document", title: "Form CS01 uploaded to KYC-30229",            time: "Apr 21, 4:40 PM",   case: r("KYC-30229", "Brevan Howard Asset Management LLP") },
-      { type: "ai",       title: "AI auto-cleared 1 sanctions false positive",  time: "Apr 21, 2:11 PM",   case: r("KYC-30188", "Marshall Wace LLP"), snippet: "DOB + nationality divergence confirmed, cleared." },
-    ];
-  }, [entityByKyc]);
+    return insights.recentActivity.map(item => ({
+      id: item.id, type: item.type, title: item.title, timestamp: item.timestamp,
+      case: { name: item.entityName, kyc: item.kycRef },
+      snippet: item.snippet ?? undefined,
+    }));
+  }, [insights.recentActivity]);
 
   return (
     <div className="page-shell space-y-6">
@@ -391,8 +386,11 @@ const Dashboard = () => {
                 <h3 className="text-sm font-semibold">Most Frequent Agent Runs</h3>
               </div>
               <div className="space-y-3">
-                {AGENT_RUNS.map(f => (
-                  <div key={f.name}>
+                {insights.frequentAgentRuns.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No agent runs recorded yet.</p>
+                )}
+                {insights.frequentAgentRuns.map(f => (
+                  <div key={f.slug}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">{f.name}</span>
                       <span className="text-xs font-semibold tabular-nums">{f.runs}</span>
@@ -400,7 +398,10 @@ const Dashboard = () => {
                     <div className="h-2 rounded-full bg-secondary overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${f.runs}%`, backgroundColor: NAVY }}
+                        style={{
+                          width: `${(f.runs / Math.max(...insights.frequentAgentRuns.map(run => run.runs), 1)) * 100}%`,
+                          backgroundColor: NAVY,
+                        }}
                       />
                     </div>
                   </div>
@@ -424,12 +425,17 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {EXCEPTION_SUMMARY.map(ex => (
+                  {insights.exceptionSummary.length === 0 && (
+                    <tr><td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">No open exceptions.</td></tr>
+                  )}
+                  {insights.exceptionSummary.map(ex => (
                     <tr key={ex.type} className="hover:bg-secondary/30 transition-colors">
                       <td className="py-2.5 text-[13px] font-medium pr-2">{ex.type}</td>
                       <td className="py-2.5 text-sm text-center tabular-nums font-semibold">{ex.open}</td>
                       <td className="py-2.5 text-center">
-                        <Chip variant={SEV_CHIP[ex.severity]} className="text-[10px]">{ex.severity}</Chip>
+                        {ex.severity
+                          ? <Chip variant={ex.severity} className="text-[10px]">{ex.severity[0].toUpperCase() + ex.severity.slice(1)}</Chip>
+                          : <span className="text-xs text-muted-foreground">—</span>}
                       </td>
                       <td className="py-2.5 text-xs text-right tabular-nums text-muted-foreground">{ex.ageDays}d</td>
                     </tr>
@@ -446,11 +452,14 @@ const Dashboard = () => {
           <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
             <ul className="space-y-1">
-              {activityFeed.map((item, i) => {
+              {activityFeed.length === 0 && (
+                <li className="py-10 text-center text-sm text-muted-foreground">No activity recorded yet.</li>
+              )}
+              {activityFeed.map(item => {
                 const meta = COLLAB_META[item.type];
                 const Icon = meta.icon;
                 return (
-                  <li key={i}>
+                  <li key={item.id}>
                     <Link
                       to="/work-queue/review"
                       state={{ entities: [item.case] }}
@@ -466,7 +475,7 @@ const Dashboard = () => {
                             "{item.snippet}"
                           </p>
                         )}
-                        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{item.time}</p>
+                        <p className="text-[11px] text-muted-foreground/70 mt-0.5">{formatActivityTime(item.timestamp)}</p>
                       </div>
                     </Link>
                   </li>

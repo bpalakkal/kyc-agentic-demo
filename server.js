@@ -232,6 +232,136 @@ app.get('/api/entities', requireAuth, async (_req, res) => {
   }
 });
 
+// GET /api/dashboard/insights — live dashboard aggregates; never returns fixtures.
+app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
+  try {
+    const { sb } = getSb();
+    const pageSize = 1000;
+    const fetchAll = async (table, columns, configure = query => query) => {
+      const rows = [];
+      for (let from = 0; ; from += pageSize) {
+        const query = configure(sb.from(table).select(columns)).range(from, from + pageSize - 1);
+        const { data, error } = await query;
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < pageSize) return rows;
+      }
+    };
+
+    const [entities, openExceptions, agentRuns, files, auditEvents, registry] = await Promise.all([
+      fetchAll('entities', 'kyc_ref,entity_name'),
+      fetchAll('exceptions', 'kyc_ref,exception_number,title,exception_type,attribute_name,field_name,severity,created_at',
+        query => query.eq('status', 'open')),
+      fetchAll('agent_runs', 'id,kyc_ref,agent_slug,status,outcome,outcome_reason,error,started_at,completed_at,run_phase'),
+      sb.from('case_files').select('id,kyc_ref,filename,title,file_category,created_at')
+        .order('created_at', { ascending: false }).limit(30).then(({ data, error }) => {
+          if (error) throw error;
+          return data ?? [];
+        }),
+      sb.from('exception_audit_log').select('id,kyc_ref,exception_number,action,actor,occurred_at')
+        .order('occurred_at', { ascending: false }).limit(30).then(({ data, error }) => {
+          if (error) throw error;
+          return data ?? [];
+        }),
+      fetchAll('agent_registry', 'slug,display_name'),
+    ]);
+
+    const entityNames = new Map(entities.map(row => [row.kyc_ref, row.entity_name]));
+    const agentNames = new Map(registry.map(row => [row.slug, row.display_name]));
+    const severityRank = { high: 3, medium: 2, low: 1 };
+    const exceptionGroups = new Map();
+    const now = Date.now();
+
+    for (const exception of openExceptions) {
+      const type = exception.title || exception.exception_type || exception.field_name
+        || exception.attribute_name || 'Other';
+      const key = type.trim();
+      const severity = exception.severity ?? null;
+      const current = exceptionGroups.get(key) ?? {
+        type: key, open: 0, severity: null, oldestCreatedAt: exception.created_at,
+      };
+      current.open += 1;
+      if ((severityRank[severity] ?? 0) > (severityRank[current.severity] ?? 0)) current.severity = severity;
+      if (exception.created_at < current.oldestCreatedAt) current.oldestCreatedAt = exception.created_at;
+      exceptionGroups.set(key, current);
+    }
+
+    const exceptionSummary = [...exceptionGroups.values()]
+      .map(row => ({
+        type: row.type,
+        open: row.open,
+        severity: row.severity,
+        ageDays: Math.max(0, Math.floor((now - new Date(row.oldestCreatedAt).getTime()) / 86_400_000)),
+      }))
+      .sort((a, b) => b.open - a.open || (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0)
+        || b.ageDays - a.ageDays || a.type.localeCompare(b.type))
+      .slice(0, 8);
+
+    const runCounts = new Map();
+    for (const run of agentRuns) {
+      runCounts.set(run.agent_slug, (runCounts.get(run.agent_slug) ?? 0) + 1);
+    }
+    const frequentAgentRuns = [...runCounts.entries()]
+      .map(([slug, runs]) => ({ slug, name: agentNames.get(slug) ?? slug, runs }))
+      .sort((a, b) => b.runs - a.runs || a.name.localeCompare(b.name))
+      .slice(0, 6);
+
+    const activity = [];
+    for (const run of agentRuns) {
+      const timestamp = run.completed_at || run.started_at;
+      const name = agentNames.get(run.agent_slug) ?? run.agent_slug;
+      const outcome = run.status === 'complete' && run.outcome ? ` (${run.outcome.replaceAll('_', ' ')})` : '';
+      activity.push({
+        id: `run:${run.id}`,
+        type: 'ai',
+        title: `${name} ${run.status}${outcome}`,
+        timestamp,
+        kycRef: run.kyc_ref,
+        entityName: entityNames.get(run.kyc_ref) ?? run.kyc_ref,
+        snippet: run.outcome_reason || run.error || null,
+      });
+    }
+    for (const file of files) {
+      activity.push({
+        id: `file:${file.id}`,
+        type: 'document',
+        title: `${file.title || file.filename} added`,
+        timestamp: file.created_at,
+        kycRef: file.kyc_ref,
+        entityName: entityNames.get(file.kyc_ref) ?? file.kyc_ref,
+        snippet: file.file_category === 'screenshot' ? 'Agent evidence screenshot' : 'Case document',
+      });
+    }
+    for (const event of auditEvents) {
+      activity.push({
+        id: `exception-audit:${event.id}`,
+        type: 'action',
+        title: `Exception #${event.exception_number}: ${event.action.replaceAll('_', ' ')}`,
+        timestamp: event.occurred_at,
+        kycRef: event.kyc_ref,
+        entityName: entityNames.get(event.kyc_ref) ?? event.kyc_ref,
+        snippet: event.actor ? `By ${event.actor}` : null,
+      });
+    }
+    for (const exception of openExceptions) {
+      activity.push({
+        id: `exception:${exception.kyc_ref}:${exception.exception_number}`,
+        type: 'action',
+        title: `Exception opened: ${exception.title || exception.exception_type || exception.field_name || exception.attribute_name || 'Other'}`,
+        timestamp: exception.created_at,
+        kycRef: exception.kyc_ref,
+        entityName: entityNames.get(exception.kyc_ref) ?? exception.kyc_ref,
+        snippet: exception.severity ? `${exception.severity} severity` : null,
+      });
+    }
+
+    activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    res.json({ frequentAgentRuns, exceptionSummary, recentActivity: activity.slice(0, 12) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/entity/:kycRef — single entity row
 app.get('/api/entity/:kycRef', requireAuth, async (req, res) => {
   try {
