@@ -63,26 +63,85 @@ async function firecrawlScrape(body) {
   return payload.data ?? payload;
 }
 
-export async function captureSourceScreenshot(url, { filename, title, filenamePrefix, caption } = {}) {
-  const payload = await firecrawlScrape({ url, formats: [{ type: 'screenshot', fullPage: true, quality: 85, viewport: { width: 1440, height: 1000 } }] });
-  const screenshot = payload.screenshot;
-  if (!screenshot) throw new Error('Firecrawl returned no screenshot');
-  let content;
-  if (screenshot.startsWith('data:')) content = Buffer.from(screenshot.split(',', 2)[1], 'base64');
-  else if (/^https?:\/\//i.test(screenshot)) {
-    const image = await fetch(screenshot, { signal: AbortSignal.timeout(30_000) });
-    if (!image.ok) throw new Error(`Screenshot download HTTP ${image.status}`);
-    content = Buffer.from(await image.arrayBuffer());
-  } else content = Buffer.from(screenshot, 'base64');
-  return {
-    filename: filename || `${filenamePrefix || 'source'}-${new Date().toISOString().replace(/[:.]/g, '-')}.png`,
-    mimeType: 'image/png',
-    fileCategory: 'screenshot',
-    title: title || caption || 'Source evidence screenshot',
-    caption: caption || `Full-page evidence captured from ${url}`,
-    sourceUrl: url,
-    content,
+async function firecrawlBrowserRequest(path, { method = 'POST', body, timeout = 75_000 } = {}) {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) throw new Error('FIRECRAWL_API_KEY is required for browser-source evidence');
+  const response = await fetch(`${FIRECRAWL_BASE}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (!response.ok) throw new Error(`Firecrawl browser HTTP ${response.status}`);
+  const payload = await response.json();
+  if (payload.success === false) throw new Error(payload.error || 'Firecrawl browser request failed');
+  return payload;
+}
+
+function evidenceLines(details) {
+  if (!details) return [];
+  if (Array.isArray(details)) return details.map(String).filter(Boolean);
+  return Object.entries(details).filter(([, value]) => value != null && String(value).trim())
+    .map(([key, value]) => `${key.replaceAll('_', ' ')}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`);
+}
+
+export async function captureBrowserSessionScreenshot(sessionId, {
+  entityName, sourceName, outcome, outcomeReason, details, filename, title, caption, sourceUrl,
+} = {}) {
+  const summary = {
+    entityName: String(entityName || 'Unknown entity'),
+    sourceName: String(sourceName || 'Source registry'),
+    outcome: outcome === 'data_found' ? 'DATA FOUND' : 'NO DATA FOUND',
+    outcomeReason: String(outcomeReason || ''),
+    details: evidenceLines(details),
+    capturedAt: new Date().toISOString(),
   };
+  const code = `
+const evidence = ${JSON.stringify(summary)};
+await page.evaluate((evidence) => {
+  document.getElementById('__kyc_evidence_banner__')?.remove();
+  const banner = document.createElement('section');
+  banner.id = '__kyc_evidence_banner__';
+  banner.setAttribute('data-kyc-evidence', 'true');
+  Object.assign(banner.style, { position: 'relative', zIndex: '2147483647', boxSizing: 'border-box', width: '100%', padding: '20px 28px', background: evidence.outcome === 'DATA FOUND' ? '#ecfdf5' : '#fff7ed', color: '#111827', borderBottom: '4px solid ' + (evidence.outcome === 'DATA FOUND' ? '#059669' : '#ea580c'), fontFamily: 'Arial, sans-serif' });
+  const line = (label, value) => '<div style="margin:4px 0"><strong>' + label + ':</strong> ' + String(value).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</div>';
+  banner.innerHTML = '<div style="font-size:20px;font-weight:700;margin-bottom:8px">KYC Source Evidence — ' + evidence.outcome + '</div>' + line('Entity searched', evidence.entityName) + line('Source', evidence.sourceName) + line('Captured', evidence.capturedAt) + (evidence.outcomeReason ? line('Result', evidence.outcomeReason) : '') + evidence.details.map(item => line('Captured field', item)).join('');
+  document.body.prepend(banner);
+}, evidence);
+await page.waitForTimeout(300);
+const image = await page.screenshot({ fullPage: true, type: 'png' });
+console.log('__KYC_SCREENSHOT__' + image.toString('base64'));
+`;
+  const execution = await firecrawlBrowserRequest(`/browser/${encodeURIComponent(sessionId)}/execute`, {
+    body: { code, language: 'node', timeout: 90 }, timeout: 105_000,
+  });
+  const output = String(execution.stdout ?? execution.result ?? '');
+  const marker = '__KYC_SCREENSHOT__';
+  const encoded = output.slice(output.lastIndexOf(marker) + marker.length).trim().split(/\s/)[0];
+  if (!output.includes(marker) || !encoded) throw new Error('Firecrawl browser returned no evidence screenshot');
+  const content = Buffer.from(encoded, 'base64');
+  if (content.length < 5_000 || content.subarray(1, 4).toString('ascii') !== 'PNG') throw new Error('Evidence screenshot was empty or invalid');
+  return {
+    filename: filename || `source-${new Date().toISOString().replace(/[:.]/g, '-')}.png`,
+    mimeType: 'image/png', fileCategory: 'screenshot', title: title || `${summary.sourceName} evidence - ${summary.entityName}`,
+    caption: caption || `${summary.outcome}: ${summary.entityName}`, sourceUrl, content,
+  };
+}
+
+export async function captureSourceScreenshot(url, options = {}) {
+  const session = await firecrawlBrowserRequest('/browser', { body: { ttl: 150, activityTtl: 150, streamWebView: false } });
+  if (!session.id) throw new Error('Firecrawl did not create an evidence browser session');
+  try {
+    await firecrawlBrowserRequest(`/browser/${encodeURIComponent(session.id)}/execute`, {
+      body: { code: `await page.goto(${JSON.stringify(url)}, { waitUntil: 'domcontentloaded', timeout: 60000 }); await page.waitForTimeout(3000);`, language: 'node', timeout: 75 }, timeout: 90_000,
+    });
+    return await captureBrowserSessionScreenshot(session.id, {
+      ...options, sourceUrl: url,
+      filename: options.filename || `${options.filenamePrefix || 'source'}-${new Date().toISOString().replace(/[:.]/g, '-')}.png`,
+    });
+  } finally {
+    await firecrawlBrowserRequest(`/browser/${encodeURIComponent(session.id)}`, { method: 'DELETE', timeout: 30_000 }).catch(() => {});
+  }
 }
 
 export async function scrapeBrowserEvidence(url, { prompt, schema, filename, title, filenamePrefix, caption }) {

@@ -4,6 +4,9 @@ vi.mock('../../agents/runners/api/sourcingArtifacts.js', () => ({
   captureSourceScreenshot: vi.fn(async (_url: string, options: any) => ({
     filename: options.filename, title: options.title, mimeType: 'image/png', content: Buffer.from('screenshot'), sourceUrl: _url,
   })),
+  captureBrowserSessionScreenshot: vi.fn(async (_sessionId: string, options: any) => ({
+    filename: options.filename, title: options.title, mimeType: 'image/png', content: Buffer.from('screenshot'), sourceUrl: options.sourceUrl,
+  })),
   scrapeBrowserEvidence: vi.fn(async (_url: string, options: any) => ({
     json: { found: true, entity_name: 'EXAMPLE HOLDINGS INC', listed_exchange: 'NYSE', corporate_officers: [] },
     screenshot: { filename: options.filename, title: options.title, mimeType: 'image/png', content: Buffer.from('screenshot'), sourceUrl: _url },

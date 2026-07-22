@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAgents } from "@/components/AgentSystem";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { apiFetch } from "@/lib/apiFetch";
+import { useAgentSequenceState } from "@/hooks/useAgentSequenceState";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
@@ -90,17 +91,7 @@ export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: s
   const { activeKycRefs } = useAgents();
   const entityBusy = activeKycRefs.has(caseKyc);
 
-  const { data: sequenceState } = useQuery<{ sourcing: boolean; due_diligence: boolean }>({
-    queryKey: ["agent-sequence-state", caseKyc],
-    queryFn: async () => {
-      const response = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(caseKyc)}/agent-sequence-state`);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error ?? `Sequence state HTTP ${response.status}`);
-      return data;
-    },
-    enabled: !!caseKyc,
-    refetchInterval: 2_000,
-  });
+  const { data: sequenceState } = useAgentSequenceState(caseKyc);
 
   // Fetch this entity's attributes to determine CIP classification.
   // TanStack Query caches the result — other components fetching the same key share it.
@@ -135,8 +126,12 @@ export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: s
         disabled={entityBusy || sequenceState?.due_diligence === true}
         disabledReason={sequenceState?.due_diligence ? "Due diligence is running or awaiting review for this entity" : undefined} />
       <CategorySection icon={ClipboardList} label="Due Diligence" agents={dueDiligence}
-        disabled={entityBusy || sequenceState?.sourcing === true}
-        disabledReason={sequenceState?.sourcing ? "Sourcing is running or awaiting review for this entity" : undefined} />
+        disabled={entityBusy || sequenceState?.sourcing === true || sequenceState?.pending_attribute_review === true}
+        disabledReason={sequenceState?.sourcing
+          ? "Sourcing is running or awaiting review for this entity"
+          : sequenceState?.pending_attribute_review
+            ? `${sequenceState.pending_attribute_count} sourced attribute${sequenceState.pending_attribute_count === 1 ? "" : "s"} require analyst review`
+            : undefined} />
       <CategorySection icon={ShieldCheck}   label="Screening"       agents={screening} disabled={entityBusy} />
     </div>
   );

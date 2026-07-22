@@ -43,6 +43,7 @@ import { apiFetch } from "@/lib/apiFetch";
 import { AttributeDiffModal, type PendingDiff } from "@/components/kyc/AttributeDiffModal";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { filterRunnableAgentSlugs } from "@/lib/agentRegistry";
+import { useAgentSequenceState } from "@/hooks/useAgentSequenceState";
 
 // ─── Agent registry ──────────────────────────────────────────────────────────
 // Add a new AgentId value and a corresponding entry in AGENTS[] to introduce
@@ -1027,6 +1028,21 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
   };
   const categories: AgentCategoryDef[] = [{ id: "registered-top-level", label: "Registered triggers", agentIds: topTriggers.map((agent) => agent.slug) }];
   const entityBusy = Boolean(entityContext?.kyc && activeKycRefs.has(entityContext.kyc));
+  const { data: sequenceState } = useAgentSequenceState(entityContext?.kyc);
+  const selectedCategories = new Set([...selected].map((id) => registryBySlug.get(id)?.category).filter(Boolean));
+  const selectionHasSourcing = selectedCategories.has("sourcing");
+  const selectionHasDd = selectedCategories.has("due_diligence");
+
+  const categoryBlocked = (category?: string) =>
+    (category === "sourcing" && (sequenceState?.due_diligence || selectionHasDd)) ||
+    (category === "due_diligence" && (sequenceState?.sourcing || sequenceState?.pending_attribute_review || selectionHasSourcing));
+
+  const categoryBlockedReason = (category?: string) => {
+    if (category === "sourcing" && (sequenceState?.due_diligence || selectionHasDd)) return "Sourcing cannot be combined with active or selected due diligence";
+    if (category === "due_diligence" && sequenceState?.pending_attribute_review) return `${sequenceState.pending_attribute_count} sourced attributes require analyst review`;
+    if (category === "due_diligence" && (sequenceState?.sourcing || selectionHasSourcing)) return "Due diligence cannot be combined with active or selected sourcing";
+    return undefined;
+  };
 
   // Reset selection whenever the bundle changes (e.g. route navigation)
   useEffect(() => {
@@ -1068,7 +1084,8 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={runRecommended}
-            disabled={!firstTrigger || entityBusy || !isAgentAvailable(firstTrigger)}
+            disabled={!firstTrigger || entityBusy || !isAgentAvailable(firstTrigger) || categoryBlocked(firstTrigger.category)}
+            title={firstTrigger ? categoryBlockedReason(firstTrigger.category) : undefined}
             className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-95"
           >
             {entityBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />} Run Recommended
@@ -1117,14 +1134,17 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                         const Icon = a?.icon ?? Bot;
                         const isSel = selected.has(id);
                         const isLive = isAgentAvailable(registeredAgent);
+                        const isBlocked = Boolean(categoryBlocked(registeredAgent.category));
                         const isRec = bundle.agents.includes(id);
                         return (
                           <button
                             key={id}
-                            onClick={() => isLive && toggle(id)}
+                            onClick={() => isLive && !isBlocked && toggle(id)}
+                            disabled={!isLive || isBlocked}
+                            title={categoryBlockedReason(registeredAgent.category) ?? registeredAgent.readiness_error ?? undefined}
                             className={cn(
                               "w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors",
-                              isLive ? "hover:bg-secondary/60" : "opacity-40 cursor-not-allowed"
+                              isLive && !isBlocked ? "hover:bg-secondary/60" : "opacity-40 cursor-not-allowed"
                             )}
                           >
                             <span className={cn(
@@ -1135,7 +1155,7 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                             </span>
                             <span className={cn(
                               "size-7 rounded-md grid place-items-center shrink-0",
-                              isLive ? "bg-success-soft text-success border border-success-soft-border" : "bg-secondary text-muted-foreground"
+                              isLive && !isBlocked ? "bg-success-soft text-success border border-success-soft-border" : "bg-secondary text-muted-foreground"
                             )}>
                               <Icon className="size-3.5" />
                             </span>

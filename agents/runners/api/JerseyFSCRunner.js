@@ -124,14 +124,14 @@ export class JerseyFSCRunner extends ApiRunner {
     if (!entityData?.found) {
       this.step('No JFSC entity record found');
       const searchUrl = `https://www.jerseyfsc.org/registry/registry-entities/?search=${encodeURIComponent(entityName)}`;
-      const screenshot = await captureSourceScreenshot(searchUrl, { filenamePrefix: 'jersey-fsc-no-match', caption: `JFSC no-match evidence for ${entityName}` });
+      const screenshot = await captureSourceScreenshot(searchUrl, { filenamePrefix: 'jersey-fsc-no-match', entityName, sourceName: 'Jersey Financial Services Commission', outcome: 'no_data', outcomeReason: 'No matching JFSC entity record' });
       return this._result(kycRef, [], startedAt, [searchUrl], [screenshot]);
     }
 
     this.step(`Found: ${entityData.entity_name ?? entityName}`);
     const attributes = this._mapToAttributes(entityData);
     const evidenceUrl = entityData.source_url ?? `https://www.jerseyfsc.org/registry/registry-entities/?search=${encodeURIComponent(entityName)}`;
-    const screenshot = await captureSourceScreenshot(evidenceUrl, { filenamePrefix: 'jersey-fsc', caption: `JFSC evidence for ${entityData.entity_name ?? entityName}` });
+    const screenshot = await captureSourceScreenshot(evidenceUrl, { filenamePrefix: 'jersey-fsc', entityName, sourceName: 'Jersey Financial Services Commission', outcome: 'data_found', details: entityData });
     this.step(`Mapped ${attributes.length} attribute(s)`);
 
     return this._result(kycRef, attributes, startedAt, [evidenceUrl], [screenshot]);

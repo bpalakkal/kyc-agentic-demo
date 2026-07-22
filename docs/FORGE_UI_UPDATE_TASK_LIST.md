@@ -209,6 +209,10 @@ Acceptance criteria:
   cross-session conflict responses.
 - [ ] Test nullable and legacy exception payloads, including missing titles and
   mixed recommended-action shapes.
+- [ ] Verify screenshot cards and viewers surface the searched entity, source,
+  capture time, outcome, and captured fields/no-match reason supplied by Forge.
+- [ ] Verify blank or invalid screenshots render a deliberate evidence error
+  instead of appearing as successful source evidence.
 - [ ] Validate keyboard navigation and accessible labels.
 - [ ] Validate responsive behavior at the Forge application's supported
   breakpoints.

@@ -100,6 +100,24 @@ finish and persist their files.
   Existing structured attributes retain precedence; document values fill gaps
   and remain available in lineage for ID&V review.
 
+## Screenshot evidence contract
+
+- A screenshot must be tied to the completed search outcome; capturing a fresh
+  landing page after the search is not acceptable evidence.
+- Browser-driven sources must capture from the active results/detail session.
+- Every screenshot must visibly state the searched entity, source, UTC capture
+  time, and either `DATA FOUND` or `NO DATA FOUND`.
+- A data-found screenshot must show the extracted registry fields used by the
+  sourcing result. A no-data screenshot must show the entity name and an
+  explicit no-match reason.
+- Empty, loading, cookie-only, login, and unsearched landing-page captures must
+  not be stored. Evidence images are validated as non-empty PNG files before
+  publication.
+- NFA and Puerto Rico API responses are represented in an annotated evidence
+  header on the official source page. Delaware captures its active browser
+  results session. NYSE and Jersey captures include the completed source URL
+  and an outcome-specific evidence header.
+
 ## Orchestration
 
 | Parent | Children | Execution | Failure policy |

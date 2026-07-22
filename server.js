@@ -630,18 +630,42 @@ async function getEntitySequenceState(kycRef) {
     .is('parent_run_id', null).in('status', ['running', 'pending_review']);
   if (runsError) throw runsError;
   const slugs = [...new Set((runs ?? []).map((run) => run.agent_slug))];
-  if (!slugs.length) return { sourcing: false, due_diligence: false };
-  const { data: agents, error: agentsError } = await sb.from('agent_registry')
-    .select('slug,category').in('slug', slugs);
-  if (agentsError) throw agentsError;
-  const active = new Set((agents ?? []).map((agent) => agent.category));
-  return { sourcing: active.has('sourcing'), due_diligence: active.has('due_diligence') };
+  let active = new Set();
+  if (slugs.length) {
+    const { data: agents, error: agentsError } = await sb.from('agent_registry')
+      .select('slug,category').in('slug', slugs);
+    if (agentsError) throw agentsError;
+    active = new Set((agents ?? []).map((agent) => agent.category));
+  }
+
+  const { getAttributes } = getSb();
+  const attributes = await getAttributes(kycRef);
+  const pendingAttributes = (attributes ?? []).filter((attribute) => {
+    if (attribute.id_flag || attribute.exception_flag || !Array.isArray(attribute.lineage)) return false;
+    const bySource = new Map();
+    for (const entry of attribute.lineage) {
+      if (!entry?.source || entry.value == null) continue;
+      if (!bySource.has(entry.source)) bySource.set(entry.source, String(entry.value).trim().toLowerCase());
+    }
+    return new Set([...bySource.values()].filter(Boolean)).size > 1;
+  }).map((attribute) => attribute.attribute_name);
+
+  return {
+    sourcing: active.has('sourcing'),
+    due_diligence: active.has('due_diligence'),
+    pending_attribute_review: pendingAttributes.length > 0,
+    pending_attribute_count: pendingAttributes.length,
+    pending_attributes: pendingAttributes,
+  };
 }
 
 async function sequenceConflict(kycRef, requestedCategory) {
   if (!SEQUENCE_SENSITIVE_CATEGORIES.has(requestedCategory)) return null;
   const state = await getEntitySequenceState(kycRef);
   const conflicting = requestedCategory === 'sourcing' ? 'due_diligence' : 'sourcing';
+  if (requestedCategory === 'due_diligence' && state.pending_attribute_review) {
+    return `Due diligence cannot start while ${state.pending_attribute_count} sourced attribute${state.pending_attribute_count === 1 ? '' : 's'} require analyst review.`;
+  }
   return state[conflicting]
     ? `${requestedCategory === 'sourcing' ? 'Sourcing' : 'Due diligence'} cannot start while ${conflicting === 'sourcing' ? 'sourcing' : 'due diligence'} is running or awaiting review for this entity.`
     : null;

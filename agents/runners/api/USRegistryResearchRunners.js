@@ -1,5 +1,5 @@
 import { ApiRunner } from '../../base/ApiRunner.js';
-import { captureSourceScreenshot } from './sourcingArtifacts.js';
+import { captureBrowserSessionScreenshot, captureSourceScreenshot } from './sourcingArtifacts.js';
 
 const NFA_API = 'https://www.nfa.futures.org/BasicNet/basic-api/DataHandlerSearch.ashx';
 const NFA_SOURCE_URL = 'https://www.nfa.futures.org/basicnet/';
@@ -80,9 +80,6 @@ export class NFARunner extends ApiRunner {
         filterOptions: { memStatus: null, regTypes: null, regActions: null },
       }],
     };
-    const screenshotPromise = captureSourceScreenshot(NFA_SOURCE_URL, {
-      filename: `nfa-basic-${kycRef}.png`, title: `NFA BASIC search evidence - ${entityName}`,
-    });
     const response = await fetch(NFA_API, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Referer: NFA_SOURCE_URL },
       body: JSON.stringify(request), signal: AbortSignal.timeout(30_000),
@@ -97,7 +94,11 @@ export class NFARunner extends ApiRunner {
     const candidates = exactRows.length ? exactRows : rows;
     if (!candidates.length) {
       this.step(`No matching NFA BASIC firm record found for "${entityName}"`);
-      return result(this.slug, kycRef, [], startedAt, 'no_data', 'No matching NFA BASIC firm record', NFA_SOURCE_URL, [await screenshotPromise]);
+      const screenshot = await captureSourceScreenshot(NFA_SOURCE_URL, {
+        filename: `nfa-basic-${kycRef}.png`, entityName, sourceName: 'NFA BASIC', outcome: 'no_data',
+        outcomeReason: 'No matching NFA BASIC firm record',
+      });
+      return result(this.slug, kycRef, [], startedAt, 'no_data', 'No matching NFA BASIC firm record', NFA_SOURCE_URL, [screenshot]);
     }
     const best = candidates.find((row) => /approved|member/i.test(row.PROCESSED_MEMBERSHIP_STATUS ?? '')) ?? candidates[0];
     const details = [best.CURRENT_REG_TYPES, best.PROCESSED_MEMBERSHIP_STATUS].filter(Boolean).join('; ');
@@ -111,7 +112,11 @@ export class NFARunner extends ApiRunner {
       attribute('NFA BASIC', NFA_SOURCE_URL, 'verification_of_existence', 'Yes', true, true),
     ].filter(Boolean);
     this.step(`Found NFA ID ${best.ENTITY_ID}; extracted ${attributes.length} attribute(s)`);
-    return result(this.slug, kycRef, attributes, startedAt, 'data_found', null, NFA_SOURCE_URL, [await screenshotPromise]);
+    const screenshot = await captureSourceScreenshot(NFA_SOURCE_URL, {
+      filename: `nfa-basic-${kycRef}.png`, entityName, sourceName: 'NFA BASIC', outcome: 'data_found',
+      details: { entity_name: best.FIRM_NAME, nfa_id: best.ENTITY_ID, status: best.PROCESSED_MEMBERSHIP_STATUS, registration_types: best.CURRENT_REG_TYPES },
+    });
+    return result(this.slug, kycRef, attributes, startedAt, 'data_found', null, NFA_SOURCE_URL, [screenshot]);
   }
 }
 
@@ -122,9 +127,6 @@ export class PuertoRicoRunner extends ApiRunner {
   async execute({ kycRef, entityName }) {
     const startedAt = Date.now();
     this.step(`Searching Puerto Rico Department of State for "${entityName}"…`);
-    const screenshotPromise = captureSourceScreenshot(PR_SOURCE_URL, {
-      filename: `puerto-rico-registry-${kycRef}.png`, title: `Puerto Rico registry search evidence - ${entityName}`,
-    });
     const response = await fetch(PR_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/problem+json; charset=utf-8', Referer: PR_SOURCE_URL },
@@ -139,7 +141,12 @@ export class PuertoRicoRunner extends ApiRunner {
     const records = payload.response.records;
     if (!records.length) {
       this.step(`No matching Puerto Rico entity record found for "${entityName}"`);
-      return result(this.slug, kycRef, [], startedAt, 'no_data', 'No matching Puerto Rico Department of State entity record', PR_SOURCE_URL, [await screenshotPromise]);
+      const resultsUrl = 'https://rcp.estado.pr.gov/en/search/results';
+      const screenshot = await captureSourceScreenshot(resultsUrl, {
+        filename: `puerto-rico-registry-${kycRef}.png`, entityName, sourceName: 'Puerto Rico Department of State', outcome: 'no_data',
+        outcomeReason: 'No matching Puerto Rico Department of State entity record',
+      });
+      return result(this.slug, kycRef, [], startedAt, 'no_data', 'No matching Puerto Rico Department of State entity record', PR_SOURCE_URL, [screenshot]);
     }
     const best = records.find((record) => record.statusEn === 'ACTIVE') ?? records[0];
     const attributes = [
@@ -152,7 +159,11 @@ export class PuertoRicoRunner extends ApiRunner {
       attribute('Puerto Rico Department of State', PR_SOURCE_URL, 'verification_of_existence', 'Yes', true, true),
     ].filter(Boolean);
     this.step(`Found registry ${best.registrationIndex ?? best.registrationNumber}; extracted ${attributes.length} attribute(s)`);
-    return result(this.slug, kycRef, attributes, startedAt, 'data_found', null, PR_SOURCE_URL, [await screenshotPromise]);
+    const screenshot = await captureSourceScreenshot('https://rcp.estado.pr.gov/en/search/results', {
+      filename: `puerto-rico-registry-${kycRef}.png`, entityName, sourceName: 'Puerto Rico Department of State', outcome: 'data_found',
+      details: { entity_name: best.corpName, registration_number: best.registrationIndex ?? best.registrationNumber, status: best.statusEn, legal_structure: best.classEn },
+    });
+    return result(this.slug, kycRef, attributes, startedAt, 'data_found', null, PR_SOURCE_URL, [screenshot]);
   }
 }
 
@@ -190,13 +201,14 @@ export class DelawareRunner extends ApiRunner {
       }
 
       const rows = parseDelawareRows(execution.stdout);
-      const screenshot = await captureSourceScreenshot(DELAWARE_SOURCE_URL, {
-        filename: `delaware-registry-${kycRef}.png`, title: `Delaware registry search evidence - ${entityName}`,
-      });
       const normalized = normalizeName(entityName);
       const best = rows.find((row) => normalizeName(row.entityName) === normalized);
       if (!best) {
         this.step(`No exact Delaware entity match found for "${entityName}"`);
+        const screenshot = await captureBrowserSessionScreenshot(sessionId, {
+          filename: `delaware-registry-${kycRef}.png`, entityName, sourceName: 'Delaware Division of Corporations', outcome: 'no_data',
+          outcomeReason: 'No exact Delaware entity match', sourceUrl: DELAWARE_SOURCE_URL,
+        });
         return result(this.slug, kycRef, [], startedAt, 'no_data', 'No exact Delaware Division of Corporations entity record', DELAWARE_SOURCE_URL, [screenshot]);
       }
       const attributes = [
@@ -207,6 +219,10 @@ export class DelawareRunner extends ApiRunner {
         attribute('Delaware Division of Corporations', DELAWARE_SOURCE_URL, 'verification_of_existence', 'Yes', true, true),
       ].filter(Boolean);
       this.step(`Found Delaware file number ${best.fileNumber}; extracted ${attributes.length} attribute(s)`);
+      const screenshot = await captureBrowserSessionScreenshot(sessionId, {
+        filename: `delaware-registry-${kycRef}.png`, entityName, sourceName: 'Delaware Division of Corporations', outcome: 'data_found',
+        details: { entity_name: best.entityName, file_number: best.fileNumber }, sourceUrl: DELAWARE_SOURCE_URL,
+      });
       return result(this.slug, kycRef, attributes, startedAt, 'data_found', null, DELAWARE_SOURCE_URL, [screenshot]);
     } finally {
       if (sessionId) {
