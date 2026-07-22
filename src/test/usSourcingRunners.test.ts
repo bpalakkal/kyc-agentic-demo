@@ -1,4 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../agents/runners/api/sourcingArtifacts.js', () => ({
+  captureSourceScreenshot: vi.fn(async (_url: string, options: any) => ({
+    filename: options.filename, title: options.title, mimeType: 'image/png', content: Buffer.from('screenshot'), sourceUrl: _url,
+  })),
+  scrapeBrowserEvidence: vi.fn(async (_url: string, options: any) => ({
+    json: { found: true, entity_name: 'EXAMPLE HOLDINGS INC', listed_exchange: 'NYSE', corporate_officers: [] },
+    screenshot: { filename: options.filename, title: options.title, mimeType: 'image/png', content: Buffer.from('screenshot'), sourceUrl: _url },
+  })),
+  downloadSourceDocument: vi.fn(async (url: string, options: any) => ({
+    filename: options.filename, title: options.title, mimeType: 'application/pdf', content: Buffer.from('document'), sourceUrl: url,
+  })),
+  digitizeKycDocument: vi.fn(async () => ({ attributes: [], persons: [] })),
+  mergeStructuredAttributes: (structured: any[], digitized: any[]) => {
+    const names = new Set(structured.map(item => item.attributeName));
+    return [...structured, ...digitized.filter(item => !names.has(item.attributeName))];
+  },
+}));
 import { IAPDRunner } from '../../agents/runners/api/IAPDRunner.js';
 import { SECEDGARRunner } from '../../agents/runners/api/SECEDGARRunner.js';
 import { NYSERunner } from '../../agents/runners/api/NYSERunner.js';
@@ -36,19 +54,20 @@ describe('US sourcing provider contracts', () => {
 
   it('uses the current Form ADV query and filings response shape', async () => {
     process.env.SEC_API_KEY = 'test-key';
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ filings: [{
-      Info: { FirmCrdNb: 123, SECNb: '801-123', BusNm: 'EXAMPLE ADVISERS LLC' },
-      MainAddr: { Strt1: '1 MAIN ST', City: 'NEW YORK', State: 'NY', PstlCd: '10001' },
-      Rgstn: [{ FirmType: 'Registered', St: 'ACTIVE' }],
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ filings: [{
+      Info: { FirmCrdNb: 123, SECNb: '801-123', LegalNm: 'EXAMPLE ADVISERS LLC', BusNm: 'EXAMPLE ADVISERS LLC', MainAddr: { Strt1: '1 MAIN ST', City: 'NEW YORK', State: 'NY', PstlCd: '10001' } },
       FormInfo: { Part1A: { Item1: { WebAddrs: { WebAddr: 'https://example.test' } }, Item5F: { Q5F2C: 1000000 } } },
-    }] }));
+    }] }))
+      .mockResolvedValueOnce(jsonResponse({ hits: { hits: [{ _source: { iacontent: JSON.stringify({ registrationStatus: [{ status: 'ACTIVE' }] }) } }] } }))
+      .mockResolvedValueOnce(jsonResponse([]));
     vi.stubGlobal('fetch', fetchMock);
 
     const output = await new IAPDRunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example Advisers LLC' });
     const request = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(request.query).toContain('Info.BusNm');
+    expect(request.query).toContain('Info.LegalNm');
     expect(output.metadata.outcome).not.toBe('no_data');
-    expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('801-123');
+    expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('123');
   });
 
   it('resolves EDGAR CIK through the official company ticker dataset', async () => {
@@ -63,14 +82,11 @@ describe('US sourcing provider contracts', () => {
     expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('1234');
   });
 
-  it('uses the SEC exchange association dataset instead of the NYSE website API', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({
-      fields: ['cik', 'name', 'ticker', 'exchange'],
-      data: [[1234, 'EXAMPLE HOLDINGS INC', 'EX', 'NYSE']],
-    })));
+  it('uses the official NYSE browser source and retains its screenshot', async () => {
     const output = await new NYSERunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example Holdings Inc.' });
     expect(output.attributes?.find((attr) => attr.attributeName === 'listing_status')?.displayValue).toBe('Listed');
     expect(output.attributes?.find((attr) => attr.attributeName === 'listed_exchange')?.displayValue).toBe('NYSE');
+    expect(output.files).toHaveLength(1);
   });
 
   it('queries NFA BASIC directly and distinguishes a confirmed no-match', async () => {

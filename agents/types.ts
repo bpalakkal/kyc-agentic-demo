@@ -14,9 +14,21 @@ export interface AgentRunOutput {
   kycRef: string;
   outputType: 'attributes' | 'exceptions' | 'both' | 'files-only';
   attributes?: AttributeOutput[];
+  persons?: PersonOutput[];
+  personSource?: string;
   exceptions?: ExceptionOutput[];
   files: FileOutput[];
   metadata: RunMetadata;
+}
+
+export interface PersonOutput {
+  source?: string;
+  role: string;
+  personIndex: number;
+  fullName?: string | null;
+  ownershipPct?: number | null;
+  nationality?: string | null;
+  attributes: Record<string, unknown>;
 }
 
 export interface RunMetadata {

@@ -7,8 +7,8 @@
  *   - Map all data to AttributeOutput[]
  *
  * Phase 2 — Document retrieval (CH API → Supabase Storage):
- *   - Fetch incorporation + name-change filing history
- *   - Download matched filing PDFs from Companies House
+ *   - Fetch incorporation filing history
+ *   - Download only the latest incorporation PDF from Companies House
  *   - Return as FileOutput[] (Buffer content)
  *
  * Phase 3 — Document digitization via Claude:
@@ -20,7 +20,6 @@
  */
 
 import { ApiRunner } from '../../base/ApiRunner.js';
-import { savePersons } from '../../../src/db/supabase.js';
 import Anthropic from '@anthropic-ai/sdk';
 
 const CH_BASE = 'https://api.company-information.service.gov.uk';
@@ -86,36 +85,25 @@ export class CompaniesHouseRunner extends ApiRunner {
     const phase1Attrs = this._mapToAttributes(companyDetails, companyNumber, sourceUrl);
     this.step(`${phase1Attrs.length} attribute(s) extracted from Companies House API`);
 
-    this.step(`Saving ${pscData.length} PSC(s) and ${officersData.length} officer(s) to entity_persons…`);
     const persons = this._mapToPersons(officersData, pscData, sourceUrl);
-    if (persons.length > 0) {
-      await savePersons(kycRef, persons);
-      this.step(`Saved ${persons.length} person record(s) (${pscData.length} PSC(s) → beneficial_owner + key_controller, ${officersData.length} officer(s) → corporate_officer)`);
-    }
+    this.step(`Prepared ${persons.length} source-scoped person record(s)`);
 
     // ── Phase 2: Download incorporation + name-change documents ──────────────
-    this.step('Retrieving incorporation and name-change filing history…');
+    this.step('Retrieving incorporation filing history…');
     const files = [];
 
     let incorpFilings = [];
-    let nameChangeFilings = [];
     try {
-      [incorpFilings, nameChangeFilings] = await Promise.all([
-        this._fetchFilings(companyNumber, 'incorporation', authHeader),
-        this._fetchFilings(companyNumber, 'change-of-name', authHeader),
-      ]);
-      this.step(`Found ${incorpFilings.length} incorporation filing(s) and ${nameChangeFilings.length} name-change filing(s)`);
+      incorpFilings = await this._fetchFilings(companyNumber, 'incorporation', authHeader);
+      this.step(`Found ${incorpFilings.length} incorporation filing(s)`);
     } catch (err) {
       this.step(`Warning: filing history fetch failed — ${err.message} (continuing)`);
     }
 
-    // Filter incorporation filings to only the description types we want,
-    // and keep only the latest per description group.
-    const filteredIncorp = this._selectLatestPerDescription(
-      incorpFilings.filter(f => INCORPORATION_DESCRIPTIONS.has(f.description))
-    );
-
-    const allFilings = [...filteredIncorp, ...nameChangeFilings];
+    const latestIncorporation = incorpFilings
+      .filter(filing => INCORPORATION_DESCRIPTIONS.has(filing.description) && filing.links?.document_metadata)
+      .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))[0];
+    const allFilings = latestIncorporation ? [latestIncorporation] : [];
     this.step(`Downloading ${allFilings.length} document(s)…`);
 
     const downloadedFiles = [];
@@ -149,9 +137,9 @@ export class CompaniesHouseRunner extends ApiRunner {
       }
     }
 
-    // Merge phase 1 + phase 3 attributes (phase 3 may add additional fields or
-    // provide higher-confidence versions of structured fields).
-    const allAttrs = [...phase1Attrs, ...phase3Attrs];
+    // Structured API data is authoritative; digitization only fills gaps.
+    const structuredNames = new Set(phase1Attrs.map(item => item.attributeName));
+    const allAttrs = [...phase1Attrs, ...phase3Attrs.filter(item => !structuredNames.has(item.attributeName))];
     this.step(`Total: ${allAttrs.length} attribute(s) across all phases — ready for review`);
 
     return {
@@ -159,6 +147,8 @@ export class CompaniesHouseRunner extends ApiRunner {
       kycRef,
       outputType: 'attributes',
       attributes: allAttrs,
+      persons,
+      personSource: 'Companies House',
       files,
       metadata: {
         completedAt:      new Date().toISOString(),
@@ -433,21 +423,6 @@ export class CompaniesHouseRunner extends ApiRunner {
     }
 
     return allFilings;
-  }
-
-  /**
-   * Given a list of filings, return the latest (most recent date) per description group.
-   */
-  _selectLatestPerDescription(filings) {
-    const latestByDesc = new Map();
-    for (const filing of filings) {
-      const desc = filing.description;
-      const existing = latestByDesc.get(desc);
-      if (!existing || filing.date > existing.date) {
-        latestByDesc.set(desc, filing);
-      }
-    }
-    return Array.from(latestByDesc.values());
   }
 
   // ── Phase 2: PDF download ───────────────────────────────────────────────────

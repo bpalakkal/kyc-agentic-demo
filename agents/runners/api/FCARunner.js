@@ -81,13 +81,16 @@ export class FCARunner extends ApiRunner {
     // Phase 5: Convert to AttributeOutput[]
     this.step('Extracting attributes…');
     const attributes = fcaToAttributes(merged, frn);
-    this.step(`Found ${attributes.length} attribute(s) — ready for review`);
+    const persons = this._toPersons(merged, frn);
+    this.step(`Found ${attributes.length} attribute(s) and ${persons.length} person record(s) — ready for review`);
 
     return {
       agentSlug:  this.slug,
       kycRef,
       outputType: 'attributes',
       attributes,
+      persons,
+      personSource: 'FCA Register',
       files: [],
       metadata: {
         completedAt:      new Date().toISOString(),
@@ -95,6 +98,29 @@ export class FCARunner extends ApiRunner {
         sourcesConsulted: [`register.fca.org.uk/s/firm?id=${frn}`],
       },
     };
+  }
+
+  _toPersons(merged, frn) {
+    const sourceUrl = `https://register.fca.org.uk/s/firm?id=${frn}`;
+    const timestamp = new Date().toISOString();
+    const wrapped = value => ({
+      id_flag: false, verification_flag: false, exception_flag: false,
+      lineage: [{ value, source: 'FCA Register', source_url: sourceUrl, timestamp, confidence_score: 1 }],
+    });
+    const persons = [];
+    for (const [index, officer] of (merged.corporate_officer ?? []).entries()) {
+      const attributes = {};
+      if (officer.officer_name) attributes.corporate_officer_name = wrapped(officer.officer_name);
+      if (officer.officer_type) attributes.corporate_officer_role = wrapped(officer.officer_type);
+      persons.push({ role: 'corporate_officer', personIndex: index, fullName: officer.officer_name, attributes });
+    }
+    for (const [index, controller] of (merged.key_controller ?? []).entries()) {
+      const attributes = {};
+      if (controller.key_controller_name) attributes.key_controller_name = wrapped(controller.key_controller_name);
+      if (controller.key_controller_role) attributes.key_controller_role = wrapped(controller.key_controller_role);
+      persons.push({ role: 'key_controller', personIndex: index, fullName: controller.key_controller_name, attributes });
+    }
+    return persons;
   }
 
   // ─── Phase 1: FRN resolution ──────────────────────────────────────────────

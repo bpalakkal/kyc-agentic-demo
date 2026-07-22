@@ -433,7 +433,7 @@ export async function getAttributeTrace(kycRef, attributeName) {
 
 // ─── Person queries ───────────────────────────────────────────────────────────
 
-const PERSON_SELECT = 'id, role, person_index, full_name, ownership_pct, nationality, attributes';
+const PERSON_SELECT = 'id, role, person_index, full_name, ownership_pct, nationality, attributes, source, agent_run_id, created_at';
 
 /**
  * Return all person records for an entity, merging:
@@ -479,10 +479,44 @@ export async function getPersons(kycRef) {
     .order('person_index');
   if (apErr) throw apErr;
 
-  // Merge: agent-run overrides snapshot for same role + person_index.
+  const runIds = [...new Set((agentPersons ?? []).map(p => p.agent_run_id).filter(Boolean))];
+  let completedRuns = [];
+  if (runIds.length) {
+    const { data, error } = await sb.from('agent_runs')
+      .select('id,started_at,status').in('id', runIds).eq('status', 'complete');
+    if (error) throw error;
+    completedRuns = data ?? [];
+  }
+  const runTimes = new Map(completedRuns.map(run => [run.id, run.started_at]));
+  const latestRunBySource = new Map();
+  for (const person of (agentPersons ?? [])) {
+    if (person.agent_run_id && !runTimes.has(person.agent_run_id)) continue;
+    const source = person.source ?? 'legacy-agent';
+    const timestamp = runTimes.get(person.agent_run_id) ?? person.created_at;
+    const current = latestRunBySource.get(source);
+    if (!current || timestamp > current.timestamp) latestRunBySource.set(source, { id: person.agent_run_id, timestamp });
+  }
+  const effectiveAgentPersons = (agentPersons ?? []).filter(person => {
+    if (person.agent_run_id && !runTimes.has(person.agent_run_id)) return false;
+    return latestRunBySource.get(person.source ?? 'legacy-agent')?.id === person.agent_run_id;
+  });
+
+  // Merge by role + normalized identity so parallel sources coexist and enrich
+  // the same party rather than overwriting one another by array index.
   const merged = new Map();
-  for (const p of snapshotPersons)        merged.set(`${p.role}:${p.person_index}`, p);
-  for (const p of (agentPersons ?? []))   merged.set(`${p.role}:${p.person_index}`, p);
+  const personKey = p => `${p.role}:${String(p.full_name ?? p.attributes?.[`${p.role}_name`]?.display_value ?? p.person_index).toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
+  for (const p of [...snapshotPersons, ...effectiveAgentPersons]) {
+    const key = personKey(p);
+    const current = merged.get(key);
+    merged.set(key, current ? {
+      ...current,
+      ...p,
+      full_name: p.full_name ?? current.full_name,
+      ownership_pct: p.ownership_pct ?? current.ownership_pct,
+      nationality: p.nationality ?? current.nationality,
+      attributes: { ...(current.attributes ?? {}), ...(p.attributes ?? {}) },
+    } : p);
+  }
 
   const grouped = {};
   for (const p of merged.values()) {
@@ -490,6 +524,7 @@ export async function getPersons(kycRef) {
   }
   for (const role of Object.keys(grouped)) {
     grouped[role].sort((a, b) => (a.person_index ?? 0) - (b.person_index ?? 0));
+    grouped[role].forEach((person, index) => { person.person_index = index; });
   }
 
   // Layer 3: apply analyst overrides from person_overrides table.

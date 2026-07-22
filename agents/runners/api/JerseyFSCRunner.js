@@ -9,6 +9,7 @@
 
 import { ApiRunner } from '../../base/ApiRunner.js';
 import Anthropic      from '@anthropic-ai/sdk';
+import { captureSourceScreenshot } from './sourcingArtifacts.js';
 
 const SOURCE     = 'Jersey FSC';
 const CONFIDENCE = 85;
@@ -122,23 +123,27 @@ export class JerseyFSCRunner extends ApiRunner {
 
     if (!entityData?.found) {
       this.step('No JFSC entity record found');
-      return this._result(kycRef, [], startedAt);
+      const searchUrl = `https://www.jerseyfsc.org/registry/registry-entities/?search=${encodeURIComponent(entityName)}`;
+      const screenshot = await captureSourceScreenshot(searchUrl, { filenamePrefix: 'jersey-fsc-no-match', caption: `JFSC no-match evidence for ${entityName}` });
+      return this._result(kycRef, [], startedAt, [searchUrl], [screenshot]);
     }
 
     this.step(`Found: ${entityData.entity_name ?? entityName}`);
     const attributes = this._mapToAttributes(entityData);
+    const evidenceUrl = entityData.source_url ?? `https://www.jerseyfsc.org/registry/registry-entities/?search=${encodeURIComponent(entityName)}`;
+    const screenshot = await captureSourceScreenshot(evidenceUrl, { filenamePrefix: 'jersey-fsc', caption: `JFSC evidence for ${entityData.entity_name ?? entityName}` });
     this.step(`Mapped ${attributes.length} attribute(s)`);
 
-    return this._result(kycRef, attributes, startedAt, [entityData.source_url ?? 'Jersey FSC Registry']);
+    return this._result(kycRef, attributes, startedAt, [evidenceUrl], [screenshot]);
   }
 
-  _result(kycRef, attributes, startedAt, sources = ['Jersey FSC Registry']) {
+  _result(kycRef, attributes, startedAt, sources = ['Jersey FSC Registry'], files = []) {
     return {
       agentSlug:  this.slug,
       kycRef,
       outputType: 'attributes',
       attributes,
-      files:      [],
+      files,
       metadata: {
         outcome:         attributes.length ? 'data_found' : 'no_data',
         outcomeReason:   attributes.length ? null : 'No matching Jersey FSC entity record',

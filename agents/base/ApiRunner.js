@@ -18,6 +18,7 @@
 import { AttributePublisher } from '../publishers/AttributePublisher.js';
 import { ExceptionPublisher } from '../publishers/ExceptionPublisher.js';
 import { FilePublisher      } from '../publishers/FilePublisher.js';
+import { PersonPublisher    } from '../publishers/PersonPublisher.js';
 
 export class ApiRunner {
   /** @param {import('@supabase/supabase-js').SupabaseClient} sb */
@@ -187,7 +188,7 @@ export class ApiRunner {
   }
 
   async _publish(kycRef, agentRunId, output, initiatedBy) {
-    const stats = { attrCount: 0, excCount: 0, fileStored: 0, fileErrors: [] };
+    const stats = { attrCount: 0, personCount: 0, excCount: 0, fileStored: 0, fileErrors: [] };
 
     if (output.attributes?.length) {
       stats.attrCount = await new AttributePublisher(this.sb)
@@ -197,6 +198,11 @@ export class ApiRunner {
     if (output.exceptions?.length) {
       stats.excCount = await new ExceptionPublisher(this.sb)
         .publish(kycRef, agentRunId, this.slug, output.exceptions);
+    }
+
+    if (output.persons?.length) {
+      stats.personCount = await new PersonPublisher(this.sb)
+        .publish(kycRef, agentRunId, output.personSource ?? this.slug, output.persons);
     }
 
     if (output.files?.length) {
