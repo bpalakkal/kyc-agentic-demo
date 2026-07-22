@@ -621,6 +621,40 @@ async function resolveAgentExecutionPlan(rootSlug) {
   return sequence;
 }
 
+const SEQUENCE_SENSITIVE_CATEGORIES = new Set(['sourcing', 'due_diligence']);
+
+async function getEntitySequenceState(kycRef) {
+  const { sb } = getSb();
+  const { data: runs, error: runsError } = await sb.from('agent_runs')
+    .select('agent_slug,status').eq('kyc_ref', kycRef)
+    .is('parent_run_id', null).in('status', ['running', 'pending_review']);
+  if (runsError) throw runsError;
+  const slugs = [...new Set((runs ?? []).map((run) => run.agent_slug))];
+  if (!slugs.length) return { sourcing: false, due_diligence: false };
+  const { data: agents, error: agentsError } = await sb.from('agent_registry')
+    .select('slug,category').in('slug', slugs);
+  if (agentsError) throw agentsError;
+  const active = new Set((agents ?? []).map((agent) => agent.category));
+  return { sourcing: active.has('sourcing'), due_diligence: active.has('due_diligence') };
+}
+
+async function sequenceConflict(kycRef, requestedCategory) {
+  if (!SEQUENCE_SENSITIVE_CATEGORIES.has(requestedCategory)) return null;
+  const state = await getEntitySequenceState(kycRef);
+  const conflicting = requestedCategory === 'sourcing' ? 'due_diligence' : 'sourcing';
+  return state[conflicting]
+    ? `${requestedCategory === 'sourcing' ? 'Sourcing' : 'Due diligence'} cannot start while ${conflicting === 'sourcing' ? 'sourcing' : 'due diligence'} is running or awaiting review for this entity.`
+    : null;
+}
+
+app.get('/api/entity/:kycRef/agent-sequence-state', requireAuth, async (req, res) => {
+  try {
+    res.json(await getEntitySequenceState(req.params.kycRef));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/agent-run/api/:slug — start an API runner in the background.
 // Returns { runId, status: 'running' } immediately; frontend polls for progress.
 app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
@@ -639,6 +673,13 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
     }
   } catch (err) {
     return res.status(503).json({ error: `Agent registry unavailable: ${err.message}` });
+  }
+
+  try {
+    const conflict = await sequenceConflict(kycRef, rootAgent.category);
+    if (conflict) return res.status(409).json({ error: conflict, code: 'AGENT_SEQUENCE_CONFLICT' });
+  } catch (err) {
+    return res.status(503).json({ error: `Could not verify agent sequencing: ${err.message}` });
   }
 
   let RunnerClass = null;
@@ -662,7 +703,10 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
       kyc_ref: kycRef, agent_slug: slug, runner_type: 'api', initiated_by: initiatedBy,
       status: 'running', run_phase: 'orchestrator',
     }).select().single();
-    if (parentError) return res.status(500).json({ error: parentError.message });
+    if (parentError) {
+      const conflict = parentError.message?.includes('AGENT_SEQUENCE_CONFLICT');
+      return res.status(conflict ? 409 : 500).json({ error: parentError.message, ...(conflict ? { code: 'AGENT_SEQUENCE_CONFLICT' } : {}) });
+    }
 
     const steps = [];
     apiRunnerSteps.set(parentRun.id, steps);
@@ -787,7 +831,8 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
       });
   } catch (err) {
     console.error(`[api-runner] ${slug} failed to start: ${err.message}`);
-    res.status(500).json({ error: err.message });
+    const conflict = err.message?.includes('AGENT_SEQUENCE_CONFLICT');
+    res.status(conflict ? 409 : 500).json({ error: err.message, ...(conflict ? { code: 'AGENT_SEQUENCE_CONFLICT' } : {}) });
   }
 });
 
@@ -1655,6 +1700,8 @@ app.post('/api/entity/:kycRef/dd/run', requireAuth, async (req, res) => {
   const initiatedBy = req.user.id;
 
   try {
+    const conflict = await sequenceConflict(kycRef, 'due_diligence');
+    if (conflict) return res.status(409).json({ error: conflict, code: 'AGENT_SEQUENCE_CONFLICT' });
     const { getEntity } = getSb();
     const entity = await getEntity(kycRef);
     const name = entityName ?? entity?.entity_name ?? kycRef;
@@ -1701,7 +1748,8 @@ app.post('/api/entity/:kycRef/dd/run', requireAuth, async (req, res) => {
 
     res.json({ started, count: started.length });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const conflict = err.message?.includes('AGENT_SEQUENCE_CONFLICT');
+    res.status(conflict ? 409 : 500).json({ error: err.message, ...(conflict ? { code: 'AGENT_SEQUENCE_CONFLICT' } : {}) });
   }
 });
 

@@ -20,13 +20,13 @@ import { apiFetch } from "@/lib/apiFetch";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
-function TriggerButton({ icon: Icon, label, children, disabled = false }: {
-  icon: typeof Zap; label: string; children: React.ReactNode; disabled?: boolean;
+function TriggerButton({ icon: Icon, label, children, disabled = false, disabledReason }: {
+  icon: typeof Zap; label: string; children: React.ReactNode; disabled?: boolean; disabledReason?: string;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button disabled={disabled} title={disabled ? "An agent is already running for this entity" : undefined} className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border disabled:cursor-not-allowed disabled:opacity-50">
+        <button disabled={disabled} title={disabled ? (disabledReason ?? "An agent is already running for this entity") : undefined} className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border disabled:cursor-not-allowed disabled:opacity-50">
           {disabled ? <Loader2 className="size-3 animate-spin" /> : <Icon className="size-3" />}
           {label} <ChevronDown className="size-3 opacity-60" />
         </button>
@@ -39,12 +39,13 @@ function TriggerButton({ icon: Icon, label, children, disabled = false }: {
 }
 
 function CategorySection({
-  icon, label, agents, disabled,
+  icon, label, agents, disabled, disabledReason,
 }: {
   icon: typeof Database;
   label: string;
   agents: RegistryAgent[];
   disabled: boolean;
+  disabledReason?: string;
 }) {
   const { runAgents } = useAgents();
   const triggerAll = agents.find((a) => a.trigger_all);
@@ -53,7 +54,7 @@ function CategorySection({
   if (agents.length === 0) return null;
 
   return (
-    <TriggerButton icon={icon} label={label} disabled={disabled}>
+    <TriggerButton icon={icon} label={label} disabled={disabled} disabledReason={disabledReason}>
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {triggerAll && (
         <DropdownMenuItem
@@ -89,6 +90,18 @@ export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: s
   const { activeKycRefs } = useAgents();
   const entityBusy = activeKycRefs.has(caseKyc);
 
+  const { data: sequenceState } = useQuery<{ sourcing: boolean; due_diligence: boolean }>({
+    queryKey: ["agent-sequence-state", caseKyc],
+    queryFn: async () => {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(caseKyc)}/agent-sequence-state`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? `Sequence state HTTP ${response.status}`);
+      return data;
+    },
+    enabled: !!caseKyc,
+    refetchInterval: 2_000,
+  });
+
   // Fetch this entity's attributes to determine CIP classification.
   // TanStack Query caches the result — other components fetching the same key share it.
   const { data: attributes = [] } = useQuery<Array<{ attribute_name: string; display_value: string | null }>>({
@@ -118,8 +131,12 @@ export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: s
 
   return (
     <div className="flex items-center gap-2">
-      <CategorySection icon={Database}      label="Sourcing"        agents={sourcing} disabled={entityBusy} />
-      <CategorySection icon={ClipboardList} label="Due Diligence"   agents={dueDiligence} disabled={entityBusy} />
+      <CategorySection icon={Database} label="Sourcing" agents={sourcing}
+        disabled={entityBusy || sequenceState?.due_diligence === true}
+        disabledReason={sequenceState?.due_diligence ? "Due diligence is running or awaiting review for this entity" : undefined} />
+      <CategorySection icon={ClipboardList} label="Due Diligence" agents={dueDiligence}
+        disabled={entityBusy || sequenceState?.sourcing === true}
+        disabledReason={sequenceState?.sourcing ? "Sourcing is running or awaiting review for this entity" : undefined} />
       <CategorySection icon={ShieldCheck}   label="Screening"       agents={screening} disabled={entityBusy} />
     </div>
   );
