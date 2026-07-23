@@ -363,6 +363,7 @@ const WorkQueue = () => {
       const response = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentSlug, kycRefs: selectedEntities.map((entity) => entity.kyc), idempotencyKey }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? `Batch HTTP ${response.status}`);
+      setSelected({});
       const statusResponse = await apiFetch(`${AGENT_API_BASE}/api/work-queue/agent-run-batches/${data.batchId}`);
       if (!statusResponse.ok) throw new Error(`Batch status HTTP ${statusResponse.status}`);
       setBatch(await statusResponse.json()); setAgentDialogOpen(false); setPreflight(null);
@@ -472,7 +473,10 @@ const WorkQueue = () => {
         <Link
           to={`/work-queue/review/${selectedEntities[0]?.kyc ?? ''}`}
           state={{ entities: selectedEntities }}
-          onClick={(e) => { if (selectedCount === 0) e.preventDefault(); }}
+          onClick={(e) => {
+            if (selectedCount === 0) e.preventDefault();
+            else setSelected({});
+          }}
           className={cn(
             "h-10 px-5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-all",
             selectedCount > 0

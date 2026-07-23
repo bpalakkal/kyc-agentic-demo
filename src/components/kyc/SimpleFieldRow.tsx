@@ -91,6 +91,14 @@ export type SimpleFieldRowProps = {
   /** Attribute is optional for this entity type (collect if provided, no IDV). */
   optional?: boolean;
   checks?: { id: boolean; verification: boolean };
+  /** Control metadata generated from the canonical master schema. */
+  ui?: {
+    label?: string;
+    control?: string;
+    options?: string[];
+    defaultValue?: unknown;
+    description?: string | null;
+  } | null;
   /** A pending sourcing proposal for this attribute (inline review). */
   pendingProposal?: InlineProposal | null;
   onAcceptProposal?: () => void;
@@ -103,7 +111,8 @@ export const SimpleFieldRow = ({
   savedOverrides, openTraceFor, setOpenTraceFor, openOverrideFor, setOpenOverrideFor,
   trace, traceDocs,
   runAgents, overrideDraft, setOverrideDraft, overrideNote, setOverrideNote, handleSaveOverride,
-  optional, checks = { id: true, verification: true }, pendingProposal, onAcceptProposal, onRejectProposal,
+  optional, checks = { id: true, verification: true }, ui,
+  pendingProposal, onAcceptProposal, onRejectProposal,
 }: SimpleFieldRowProps) => {
   const overrideKey = `${entity}::${label}`;
   const override = savedOverrides[overrideKey];
@@ -146,7 +155,7 @@ export const SimpleFieldRow = ({
       <div className={cn("p-3 transition-colors", (isOpen || isOverrideOpen) && "col-span-2")}>
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none flex items-center gap-1.5">
-            {prettifyAttrLabel(label)}
+            {ui?.label ?? prettifyAttrLabel(label)}
             {optional && (
               <span className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border normal-case tracking-normal">
                 optional
@@ -216,7 +225,7 @@ export const SimpleFieldRow = ({
             // No DB data for this attribute yet — offer a direct manual entry shortcut.
             <button
               onClick={() => {
-                setOverrideDraft("");
+                setOverrideDraft(ui?.defaultValue == null ? "" : String(ui.defaultValue));
                 setOverrideNote("");
                 setOpenOverrideFor(isOverrideOpen ? null : { label, entity });
               }}
@@ -278,7 +287,19 @@ export const SimpleFieldRow = ({
           <p className="text-[10px] font-semibold text-warning mb-2 flex items-center gap-1.5">
             <Zap className="size-3" /> Override value — <span className="font-normal text-muted-foreground">{label}</span>
           </p>
-          {overrideDraft.length > 80 ? (
+          {ui?.control === "select" ? (
+            <select
+              className="h-8 w-full rounded-md border border-input bg-background px-3 text-[12px] mb-2"
+              value={overrideDraft}
+              onChange={e => setOverrideDraft(e.target.value)}
+              autoFocus
+            >
+              <option value="">Select {ui.label ?? prettifyAttrLabel(label)}</option>
+              {(ui.options ?? []).map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          ) : ui?.control === "textarea" || overrideDraft.length > 80 ? (
             <Textarea
               className="text-[12px] min-h-[60px] max-h-[120px] resize-y mb-2"
               value={overrideDraft}
@@ -288,6 +309,12 @@ export const SimpleFieldRow = ({
             />
           ) : (
             <Input
+              type={
+                ui?.control === "date" ? "date"
+                  : ui?.control === "number" ? "number"
+                    : ui?.control === "url" ? "url"
+                      : "text"
+              }
               className="h-8 text-[12px] mb-2"
               value={overrideDraft}
               onChange={e => setOverrideDraft(e.target.value)}

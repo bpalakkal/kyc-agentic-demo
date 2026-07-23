@@ -53,7 +53,7 @@ import { EntityFiles } from "@/components/kyc/EntityFiles";
 import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
 import { SimpleFieldRow, InlineTraceDrawer } from "@/components/kyc/SimpleFieldRow";
 import { canonicalAttrKey, lineageConflict } from "@/lib/attrLabel";
-import { attributeChecks, entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
+import { attributeChecks, attributeUi, entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
 import Screening from "@/pages/Screening";
 import { AgentTriggers } from "@/components/kyc/AgentTriggers";
 
@@ -2540,6 +2540,7 @@ const AttributeFormView = ({
                                 label={label}
                                 optional={OPTIONAL_CORE_ATTRS.has(label)}
                                 checks={attributeChecks(label)}
+                                ui={attributeUi(label)}
                                 entity={entity}
                                 forgeAttr={forgeAttrs[label] ?? null}
                                 savedOverrides={savedOverrides}

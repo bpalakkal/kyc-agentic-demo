@@ -9,6 +9,11 @@ describe("RIA Attribute View schema contract", () => {
     expect(attrs).not.toContain("public_accounting_firm_indicator");
     expect(attrs).not.toContain("entity_classification");
     expect(attrs).toContain("registration_country");
+    expect(attrs).toContain("policy");
+    expect(attrs).toContain("risk_rating");
+    expect(attrs).toContain("regulator.regulator");
+    expect(attrs).toContain("regulator.regulator_registration_number");
+    expect(attrs).toContain("regulator.regulatory_status");
   });
 
   it("distinguishes ID-only, ID-and-V, and no-check attributes", () => {
@@ -27,5 +32,16 @@ describe("RIA Attribute View schema contract", () => {
       .not.toContain("nationality");
     expect(parties.find((party) => party.role === "Proxy_BO")?.columns)
       .toContain("evidence_of_existence");
+    expect(parties.find((party) => party.role === "beneficial_owner")?.columns)
+      .toEqual(expect.arrayContaining([
+        "principal_place_of_business",
+        "registration_country",
+        "ownership_reasoning",
+      ]));
+    expect(parties.find((party) => party.role === "corporate_officer")?.columns)
+      .toEqual(expect.arrayContaining([
+        "principal_place_of_business",
+        "registration_country",
+      ]));
   });
 });

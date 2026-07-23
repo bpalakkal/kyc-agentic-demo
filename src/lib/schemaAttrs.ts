@@ -23,7 +23,10 @@ export function entityLevelCoreAttrs(entityType: string = DEFAULT_ENTITY_TYPE): 
   const { required, optional } = getVisibleAttributes(entityType);
   return [...required, ...optional].filter((p) => {
     const m = schemaMeta.attributes[p];
-    return !!m && m.kind === 'scalar' && !m.party && !p.includes('.') && !METADATA_ATTRS.has(p);
+    const parent = m?.party ? schemaMeta.attributes[m.party] : null;
+    const isEntityField = !m?.party && !p.includes('.');
+    const isEntityGroupField = parent?.kind === 'array' && parent.collectionType === 'group';
+    return !!m && m.kind === 'scalar' && (isEntityField || isEntityGroupField) && !METADATA_ATTRS.has(p);
   });
 }
 
@@ -36,6 +39,11 @@ export function attributeChecks(attrName: string, entityType: string = DEFAULT_E
   if (applicability(entityType, attrName) === 'not_applicable') return { id: false, verification: false };
   const meta = schemaMeta.attributes[attrName];
   return { id: meta?.identifiable === true, verification: meta?.verifiable === true };
+}
+
+/** Generated rendering contract for one field (control, enum, default, label). */
+export function attributeUi(attrName: string) {
+  return schemaMeta.attributes[attrName] ?? null;
 }
 
 /**
@@ -58,7 +66,7 @@ export function ddAgentList(): Array<{ slug: string; label: string; agentKey: st
 }
 
 /** Party array names that aren't people (rendered elsewhere). */
-const NON_PERSON_ARRAYS = new Set(['documents']);
+const NON_PERSON_ARRAYS = new Set(['documents', 'regulator']);
 
 /** Human labels for party roles (fallback: title-case the role). */
 const PARTY_LABELS: Record<string, string> = {

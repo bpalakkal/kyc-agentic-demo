@@ -129,7 +129,10 @@ Legacy snapshot tables and columns remain for backward-compatible data ingestion
 
 ## Schema rules
 
-`schema/kyc_master_attribute_schema.json` is the single source of truth. Never edit generated `schema/schema-meta.json` or `schema/schema-meta.js` directly.
+`schema/kyc_master_attribute_schema.json` and
+`schema/screening_results_schema.json` are the schema sources of truth. Run
+`npm run schema:update` after replacing either file; never edit the generated
+runtime metadata or TypeScript declarations directly.
 
 The stored CIP classification must be exactly:
 

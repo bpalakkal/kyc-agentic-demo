@@ -10,6 +10,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -22,3 +23,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+/.superpowers/**/state/*.log
+
+# local disposable demo data utility (contains showcase-specific mock content)
+/scripts/seed-demo-showcase.mjs

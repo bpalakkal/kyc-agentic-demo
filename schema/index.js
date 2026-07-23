@@ -13,6 +13,10 @@ export { schemaMeta };
 
 /** All enum value-lists ($defs), keyed by enum name (e.g. "Country"). */
 export const enums = schemaMeta.enums;
+export const schemaVersion = schemaMeta.schemaVersion;
+export const requiredCaseFields = schemaMeta.required;
+export const exceptionModel = schemaMeta.exceptionModel;
+export const screeningSchema = schemaMeta.screening;
 
 /** @returns {string[]} canonical values for an enum, or [] if unknown. */
 export function enumValues(enumName) {
@@ -39,6 +43,28 @@ export function arrayAttributes() {
   return Object.entries(schemaMeta.attributes)
     .filter(([, m]) => m.kind === 'array')
     .map(([name, m]) => ({ name, children: m.children ?? [] }));
+}
+
+/** Entity-level fields in canonical schema order, ready for generic rendering. */
+export function entityFormFields() {
+  return schemaMeta.ui.entityFields
+    .map((path) => ({ path, ...schemaMeta.attributes[path] }))
+    .filter((field) => field.kind === 'scalar');
+}
+
+/** Repeatable schema groups (parties, documents, and non-person groups). */
+export function schemaCollections() {
+  return schemaMeta.ui.collections.map((name) => {
+    const collection = schemaMeta.attributes[name];
+    return {
+      name,
+      ...collection,
+      fields: (collection.children ?? []).map((child) => {
+        const path = `${name}.${child}`;
+        return { path, ...schemaMeta.attributes[path] };
+      }),
+    };
+  });
 }
 
 /** All entity-type keys (cip_classification values). */
