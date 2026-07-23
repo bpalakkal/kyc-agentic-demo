@@ -195,7 +195,9 @@ async function main() {
 
   const dependentTables = [
     'entity_snapshots', 'entity_attributes', 'entity_persons', 'exceptions',
-    'exception_number_counters', 'exception_audit_log', 'agent_runs', 'case_files', 'screening_runs',
+    // exception_number_counters is deliberately not selectable through
+    // PostgREST; its FK uses ON DELETE CASCADE, so deleting the entity clears it.
+    'exception_audit_log', 'agent_runs', 'case_files', 'screening_runs',
     'screening_dispositions', 'person_overrides', 'case_tab_reviews',
   ];
   for (const table of dependentTables) {
