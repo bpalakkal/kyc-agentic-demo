@@ -3,9 +3,11 @@
   "title": "KYC Master Attribute Schema",
   "type": "object",
   "required": [
-    "entity_id",
+    "entity_name",
     "case_id",
-    "entity_name"
+    "entity_id",
+    "policy",
+    "risk_rating"
   ],
   "properties": {
     "entity_id": {
@@ -38,11 +40,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -83,19 +81,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "commodities_future_trading_commission_registered_indicator": {
@@ -120,11 +110,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -165,19 +151,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "country_of_incorporation": {
@@ -216,11 +194,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -264,19 +238,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "registration_country": {
@@ -315,11 +281,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -363,19 +325,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "date_of_incorporation": {
@@ -414,11 +368,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -463,19 +413,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "legal_structure": {
@@ -514,11 +456,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -562,19 +500,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "entity_giin": {
@@ -613,11 +543,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -661,19 +587,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "entity_name": {
@@ -712,11 +630,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -760,19 +674,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "entity_nature_of_business": {
@@ -797,11 +703,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -842,19 +744,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "activity_type": {
@@ -893,11 +787,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -941,19 +831,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "entity_risk_rating": {
@@ -992,11 +874,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1040,19 +918,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "entity_status": {
@@ -1091,11 +961,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1139,19 +1005,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "legal_registered_address": {
@@ -1190,11 +1048,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1238,19 +1092,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "lei_code": {
@@ -1285,11 +1131,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1333,19 +1175,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "listed_exchange": {
@@ -1370,11 +1204,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1415,19 +1245,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "listing_status": {
@@ -1452,11 +1274,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1497,19 +1315,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "other_business_activity": {
@@ -1548,11 +1358,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1596,19 +1402,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "parent_publicly_listed_on_united_states_exchange_indicator": {
@@ -1633,11 +1431,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1678,19 +1472,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "previous_names": {
@@ -1715,11 +1501,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1763,19 +1545,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "principal_place_of_business": {
@@ -1814,11 +1588,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -1862,121 +1632,284 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "regulator": {
-      "description": "Primary regulatory authority or authorities supervising the entity's licensed activities.",
-      "id_flag": {
-        "type": "string",
-        "enum": [
-          "Yes",
-          "No"
-        ],
-        "default": "No"
-      },
-      "verification_flag": {
-        "type": "string",
-        "enum": [
-          "Yes",
-          "No"
-        ],
-        "default": "No"
-      },
-      "id_source": {
-        "type": "string"
-      },
-      "verification_source": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        }
-      },
-      "exception_flag": {
-        "type": "string",
-        "enum": [
-          "Yes",
-          "No"
-        ],
-        "default": "No"
-      },
-      "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
-      },
-      "lineage": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "value": {
+      "type": "array",
+      "description": "Regulatory registrations associated with the entity.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "regulator": {
+            "description": "Regulatory authority supervising the entity.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/PlaceholderEnum"
+                "type": "string"
               }
             },
-            "context": {
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "$ref": "#/$defs/Regulator"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
               "type": "string"
             },
-            "confidence_score": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            },
-            "timestamp": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "source": {
+            "verification_reasoning": {
               "type": "string"
             },
-            "document_id": {
-              "type": "string",
-              "description": "Identifier of the source document this lineage value was extracted from."
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
             }
           },
-          "required": [
-            "value",
-            "source",
-            "timestamp",
-            "confidence_score"
-          ]
-        }
-      },
-      "id_reasoning": {
-        "type": "string"
-      },
-      "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
+          "regulator_registration_number": {
+            "description": "Registration or reference number assigned to the entity by this regulator.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
+            }
+          },
+          "regulatory_status": {
+            "description": "Current status of the entity registration with this regulator.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "$ref": "#/$defs/RegulatoryStatus"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
+            }
+          }
         },
-        "default": []
-      },
-      "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "required": [
+          "regulator"
+        ]
       }
     },
     "securities_exchange_act_of_1934_section_13_or_15d_indicator": {
@@ -2001,11 +1934,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2046,19 +1975,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "sole_proprietorship_indicator": {
@@ -2083,11 +2004,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2128,19 +2045,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "source_of_funds": {
@@ -2179,11 +2088,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2230,19 +2135,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "source_of_wealth": {
@@ -2281,11 +2178,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2332,19 +2225,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "sub_advisor": {
@@ -2389,11 +2274,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -2440,19 +2321,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "sub_advisor_address": {
@@ -2491,11 +2364,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -2542,19 +2411,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
@@ -2582,11 +2443,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2627,19 +2484,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "transacting_with_own_or_third_party_funds_indicator": {
@@ -2664,11 +2513,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2709,19 +2554,11 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "tax_identification_number": {
@@ -2760,11 +2597,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2811,19 +2644,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "registration_number": {
@@ -2862,11 +2687,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -2913,19 +2734,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "verification_of_existence": {
@@ -2964,11 +2777,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -3012,19 +2821,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "website_address": {
@@ -3063,11 +2864,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -3111,19 +2908,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "wbq_flag": {
@@ -3162,11 +2951,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -3210,19 +2995,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "public_accounting_firm_indicator": {
@@ -3261,11 +3038,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -3309,19 +3082,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "fca_firm_reference_number": {
@@ -3360,11 +3125,7 @@
         "default": "No"
       },
       "exception_type": {
-        "type": "array",
-        "items": {
-          "$ref": "#/$defs/ExceptionType"
-        },
-        "default": []
+        "$ref": "#/$defs/ExceptionType"
       },
       "lineage": {
         "type": "array",
@@ -3408,19 +3169,11 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reason": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+      "exception_reasoning": {
+        "type": "string"
       },
       "exception_recommendation": {
-        "type": "array",
-        "items": {
-          "type": "string"
-        },
-        "default": []
+        "type": "string"
       }
     },
     "documents": {
@@ -3757,11 +3510,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -3805,19 +3554,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "acting_person_date_of_birth": {
@@ -3856,11 +3597,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -3905,19 +3642,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "acting_person_name": {
@@ -3956,11 +3685,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4004,19 +3729,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "acting_person_nationality": {
@@ -4055,11 +3772,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4103,19 +3816,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
@@ -4163,11 +3868,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4211,19 +3912,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_country": {
@@ -4262,11 +3955,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4310,19 +3999,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_date_of_birth": {
@@ -4361,11 +4042,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4410,19 +4087,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_government_identification_number": {
@@ -4461,11 +4130,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4509,19 +4174,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_legal_structure": {
@@ -4546,11 +4203,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4591,19 +4244,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_name": {
@@ -4642,11 +4287,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4690,19 +4331,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_nationality": {
@@ -4741,11 +4374,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4789,19 +4418,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_signatory_date": {
@@ -4840,11 +4461,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4889,19 +4506,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_signature": {
@@ -4940,11 +4549,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -4988,19 +4593,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "authorized_signatory_title": {
@@ -5025,11 +4622,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5070,19 +4663,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
@@ -5130,11 +4715,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5178,19 +4759,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_cip_classification": {
@@ -5215,11 +4788,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5260,19 +4829,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_country_of_incorporation": {
@@ -5311,11 +4872,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5359,19 +4916,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_country_of_residence": {
@@ -5410,11 +4959,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5458,19 +5003,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_date_of_birth": {
@@ -5509,11 +5046,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5558,19 +5091,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_evidence_of_existence": {
@@ -5609,11 +5134,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5657,19 +5178,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_legal_structure": {
@@ -5694,11 +5207,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5739,19 +5248,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_name": {
@@ -5790,11 +5291,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5838,19 +5335,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_nationality": {
@@ -5889,11 +5378,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -5937,19 +5422,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_nature_of_business": {
@@ -5974,11 +5451,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6019,19 +5492,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_past_nationality": {
@@ -6056,11 +5521,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6104,19 +5565,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_percentage_of_ownership": {
@@ -6141,11 +5594,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6186,19 +5635,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "beneficial_owner_source_of_wealth": {
@@ -6237,11 +5678,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6285,19 +5722,272 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
+              "type": "string"
+            }
+          },
+          "beneficial_owner_principal_place_of_business": {
+            "description": "Primary place from which the beneficial owner conducts business.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "default": []
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
+            }
+          },
+          "beneficial_owner_registration_country": {
+            "description": "Country in which the beneficial owner is registered.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "$ref": "#/$defs/Country"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
+            }
+          },
+          "beneficial_owner_ownership_reasoning": {
+            "description": "Reasoning supporting the beneficial ownership determination.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
             }
           }
         }
@@ -6345,11 +6035,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6393,19 +6079,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_cip_classification": {
@@ -6430,11 +6108,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6475,19 +6149,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_country_of_incorporation": {
@@ -6526,11 +6192,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6574,19 +6236,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_country_of_residence": {
@@ -6625,11 +6279,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6673,19 +6323,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_date_of_birth": {
@@ -6724,11 +6366,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6773,19 +6411,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_evidence_of_existence": {
@@ -6824,11 +6454,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6872,19 +6498,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_legal_structure": {
@@ -6909,11 +6527,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -6954,19 +6568,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_name": {
@@ -7005,11 +6611,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7053,19 +6655,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_nationality": {
@@ -7104,11 +6698,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7152,19 +6742,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_nature_of_business": {
@@ -7189,11 +6771,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7234,19 +6812,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_past_nationality": {
@@ -7271,11 +6841,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7319,19 +6885,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "Proxy_BO_percentage_of_ownership": {
@@ -7356,11 +6914,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7401,19 +6955,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
@@ -7461,11 +7007,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7509,19 +7051,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_country": {
@@ -7560,11 +7094,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7608,19 +7138,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_country_of_incorporation": {
@@ -7659,11 +7181,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7707,19 +7225,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_country_of_residence": {
@@ -7758,11 +7268,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7806,19 +7312,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_date_of_birth": {
@@ -7857,11 +7355,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7906,19 +7400,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_cip_classification": {
@@ -7943,11 +7429,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -7988,19 +7470,11 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_legal_structure": {
@@ -8039,11 +7513,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8087,19 +7557,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_name": {
@@ -8138,11 +7600,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8186,19 +7644,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_nationality": {
@@ -8237,11 +7687,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8285,19 +7731,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_regulator": {
@@ -8336,11 +7774,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8384,19 +7818,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "corporate_officer_role": {
@@ -8435,11 +7861,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8483,19 +7905,185 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
+              "type": "string"
+            }
+          },
+          "corporate_officer_principal_place_of_business": {
+            "description": "Primary place from which the corporate officer conducts business.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
               "type": "array",
               "items": {
                 "type": "string"
-              },
-              "default": []
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
+            }
+          },
+          "corporate_officer_registration_country": {
+            "description": "Country in which the corporate officer is registered.",
+            "id_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "verification_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "id_source": {
+              "type": "string"
+            },
+            "verification_source": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exception_flag": {
+              "type": "string",
+              "enum": [
+                "Yes",
+                "No"
+              ],
+              "default": "No"
+            },
+            "exception_type": {
+              "$ref": "#/$defs/ExceptionType"
+            },
+            "lineage": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "$ref": "#/$defs/Country"
+                  },
+                  "context": {
+                    "type": "string"
+                  },
+                  "confidence_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "document_id": {
+                    "type": "string",
+                    "description": "Identifier of the source document this lineage value was extracted from."
+                  }
+                },
+                "required": [
+                  "value",
+                  "source",
+                  "timestamp",
+                  "confidence_score"
+                ]
+              }
+            },
+            "id_reasoning": {
+              "type": "string"
+            },
+            "verification_reasoning": {
+              "type": "string"
+            },
+            "exception_reasoning": {
+              "type": "string"
+            },
+            "exception_recommendation": {
+              "type": "string"
             }
           }
         }
@@ -8543,11 +8131,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8591,19 +8175,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "investment_advisor_country_of_incorporation": {
@@ -8642,11 +8218,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8690,19 +8262,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "investment_advisor_date_of_birth": {
@@ -8741,11 +8305,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8790,19 +8350,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "investment_advisor_incorporation_date": {
@@ -8841,11 +8393,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8890,19 +8438,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "investment_advisor_name": {
@@ -8941,11 +8481,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -8989,19 +8525,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "investment_advisor_nationality": {
@@ -9040,11 +8568,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9088,19 +8612,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "investment_advisor_type": {
@@ -9139,11 +8655,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9187,19 +8699,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
@@ -9247,11 +8751,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9295,19 +8795,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "power_of_attorney_date_of_birth": {
@@ -9346,11 +8838,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9395,19 +8883,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "power_of_attorney_name": {
@@ -9446,11 +8926,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9494,19 +8970,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "power_of_attorney_nationality": {
@@ -9545,11 +9013,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9593,19 +9057,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
@@ -9653,11 +9109,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9701,19 +9153,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "trustee_date_of_birth": {
@@ -9752,11 +9196,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9801,19 +9241,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "trustee_name": {
@@ -9852,11 +9284,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9900,19 +9328,11 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           },
           "trustee_nationality": {
@@ -9951,11 +9371,7 @@
               "default": "No"
             },
             "exception_type": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ExceptionType"
-              },
-              "default": []
+              "$ref": "#/$defs/ExceptionType"
             },
             "lineage": {
               "type": "array",
@@ -9999,22 +9415,189 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reason": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+            "exception_reasoning": {
+              "type": "string"
             },
             "exception_recommendation": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": []
+              "type": "string"
             }
           }
         }
+      }
+    },
+    "policy": {
+      "description": "Country policy under which the KYC case is created and assessed.",
+      "id_flag": {
+        "type": "string",
+        "enum": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      "verification_flag": {
+        "type": "string",
+        "enum": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      "id_source": {
+        "type": "string"
+      },
+      "verification_source": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "exception_flag": {
+        "type": "string",
+        "enum": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      "exception_type": {
+        "$ref": "#/$defs/ExceptionType"
+      },
+      "lineage": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "$ref": "#/$defs/Country"
+            },
+            "context": {
+              "type": "string"
+            },
+            "confidence_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "source": {
+              "type": "string"
+            },
+            "document_id": {
+              "type": "string",
+              "description": "Identifier of the source document this lineage value was extracted from."
+            }
+          },
+          "required": [
+            "value",
+            "source",
+            "timestamp",
+            "confidence_score"
+          ]
+        }
+      },
+      "id_reasoning": {
+        "type": "string"
+      },
+      "verification_reasoning": {
+        "type": "string"
+      },
+      "exception_reasoning": {
+        "type": "string"
+      },
+      "exception_recommendation": {
+        "type": "string"
+      }
+    },
+    "risk_rating": {
+      "description": "Risk rating assigned when the KYC case is created.",
+      "id_flag": {
+        "type": "string",
+        "enum": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      "verification_flag": {
+        "type": "string",
+        "enum": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      "id_source": {
+        "type": "string"
+      },
+      "verification_source": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "exception_flag": {
+        "type": "string",
+        "enum": [
+          "Yes",
+          "No"
+        ],
+        "default": "No"
+      },
+      "exception_type": {
+        "$ref": "#/$defs/ExceptionType"
+      },
+      "lineage": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "$ref": "#/$defs/CaseRiskRating",
+              "default": "medium"
+            },
+            "context": {
+              "type": "string"
+            },
+            "confidence_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "source": {
+              "type": "string"
+            },
+            "document_id": {
+              "type": "string",
+              "description": "Identifier of the source document this lineage value was extracted from."
+            }
+          },
+          "required": [
+            "value",
+            "source",
+            "timestamp",
+            "confidence_score"
+          ]
+        }
+      },
+      "id_reasoning": {
+        "type": "string"
+      },
+      "verification_reasoning": {
+        "type": "string"
+      },
+      "exception_reasoning": {
+        "type": "string"
+      },
+      "exception_recommendation": {
+        "type": "string"
       }
     }
   },
@@ -10822,6 +10405,25 @@
         "Waste Management",
         "n/a"
       ]
+    },
+    "RegulatoryStatus": {
+      "type": "string",
+      "description": "Current status of a registration with a regulatory authority.",
+      "enum": [
+        "Active",
+        "Inactive",
+        "n/a"
+      ]
+    },
+    "CaseRiskRating": {
+      "type": "string",
+      "description": "Risk rating assigned when the KYC case is created.",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "default": "medium"
     }
   },
   "x-entity-type-applicability": {

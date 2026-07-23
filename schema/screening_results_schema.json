@@ -1,0 +1,511 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "KYC Screening Results",
+  "description": "Output of the OpenSanctions screening agents. One screening batch per entity/case. Persisted and displayed; foreign-keyed to the KYC Master Attribute Schema.",
+  "type": "object",
+  "properties": {
+    "entity_id": {
+      "description": "Foreign key to KYC Master Attribute Schema entity_id.",
+      "type": "string"
+    },
+    "case_id": {
+      "description": "Foreign key to KYC Master Attribute Schema case_id.",
+      "type": "string"
+    },
+    "screening_timestamp": {
+      "description": "ISO datetime when this screening batch was executed.",
+      "type": "string"
+    },
+    "screening_config": {
+      "description": "Parameters used for this screening run.",
+      "type": "object",
+      "properties": {
+        "dataset_scope": {
+          "description": "OpenSanctions endpoint scope used.",
+          "type": "string",
+          "enum": [
+            "default",
+            "sanctions",
+            "peps"
+          ]
+        },
+        "score_threshold": {
+          "description": "Minimum match score threshold applied (0.0 to 1.0).",
+          "type": "number"
+        },
+        "algorithm": {
+          "description": "Matching algorithm used (e.g. regression-v2, name-only).",
+          "type": "string"
+        },
+        "topics_filter": {
+          "description": "Topic filters applied (e.g. sanction, role.pep).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "dataset_scope",
+        "score_threshold",
+        "algorithm",
+        "topics_filter"
+      ]
+    },
+    "screening_results": {
+      "description": "One entry per screened party. Parties with zero matches still appear with an empty matches array.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "party_role": {
+            "description": "Which KYC Master array this party comes from.",
+            "type": "string",
+            "enum": [
+              "entity",
+              "beneficial_owner",
+              "key_controller",
+              "corporate_officer",
+              "board_director",
+              "authorized_signatory",
+              "investment_advisor",
+              "trustee",
+              "power_of_attorney",
+              "acting_person"
+            ]
+          },
+          "party_index": {
+            "description": "Zero-based index within the KYC Master array. Null for party_role entity.",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "party_name": {
+            "description": "Name as submitted to screening for traceability.",
+            "type": "string"
+          },
+          "query_schema": {
+            "description": "FtM schema type submitted to /match.",
+            "type": "string",
+            "enum": [
+              "Person",
+              "Company",
+              "LegalEntity",
+              "Organization"
+            ]
+          },
+          "query_properties": {
+            "description": "FtM properties submitted to /match. Keys are FtM property names, values are arrays of strings.",
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "birthDate": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nationality": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "country": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "idNumber": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "registrationNumber": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "address": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "alias": {
+                "description": "Alternative names / trading names / previous names submitted. From FtM properties.alias.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "taxNumber": {
+                "description": "Tax ID numbers submitted. From FtM properties.taxNumber.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "jurisdiction": {
+                "description": "Jurisdictions submitted. From FtM properties.jurisdiction.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "gender": {
+                "description": "Gender submitted (Person only). From FtM properties.gender.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "birthDate",
+              "nationality",
+              "country",
+              "idNumber",
+              "registrationNumber",
+              "address"
+            ]
+          },
+          "match_count": {
+            "description": "Total matches returned above threshold.",
+            "type": "number"
+          },
+          "matches": {
+            "description": "Ranked match results from OpenSanctions /match API.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "OpenSanctions canonical entity ID (e.g. NK-aU5ybkbRFJucf8YMwsJvDw).",
+                  "type": "string"
+                },
+                "schema": {
+                  "description": "FtM entity type of the matched entity.",
+                  "type": "string",
+                  "enum": [
+                    "Person",
+                    "Company",
+                    "Organization",
+                    "Vessel",
+                    "Airplane",
+                    "CryptoWallet",
+                    "Security",
+                    "LegalEntity"
+                  ]
+                },
+                "caption": {
+                  "description": "Display name of the matched entity.",
+                  "type": "string"
+                },
+                "target": {
+                  "description": "True if direct target (sanctioned or PEP). False if contextual or linked.",
+                  "type": "boolean"
+                },
+                "score": {
+                  "description": "Match confidence score (0.0 to 1.0) from /match API.",
+                  "type": "number"
+                },
+                "match": {
+                  "description": "Whether the API considers this a confirmed match at configured threshold.",
+                  "type": "boolean"
+                },
+                "topics": {
+                  "description": "Risk tags: sanction, sanction.linked, role.pep, role.rca, poi, debarment, reg.action, reg.warn, corp.disqual.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "datasets": {
+                  "description": "Source dataset IDs (e.g. us_ofac_sdn, eu_fsf, gb_fcdo_sanctions).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_name": {
+                  "description": "All known name variants from properties.name.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_alias": {
+                  "description": "Known aliases from properties.alias.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_birthDate": {
+                  "description": "Birth dates from properties.birthDate.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_birthPlace": {
+                  "description": "Birth places from properties.birthPlace.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_nationality": {
+                  "description": "Nationalities from properties.nationality.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_country": {
+                  "description": "Countries from properties.country.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_gender": {
+                  "description": "Gender from properties.gender.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_address": {
+                  "description": "Addresses from properties.address.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_idNumber": {
+                  "description": "ID numbers from properties.idNumber.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_registrationNumber": {
+                  "description": "Registration numbers from properties.registrationNumber.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_jurisdiction": {
+                  "description": "Jurisdictions from properties.jurisdiction.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_programId": {
+                  "description": "Sanctions program IDs from properties.programId (e.g. EU-UKR, US-RUSHAR).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_position": {
+                  "description": "PEP positions from properties.position.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_notes": {
+                  "description": "Background notes from properties.notes.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "matched_sourceUrl": {
+                  "description": "Source URLs from properties.sourceUrl.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "referents": {
+                  "description": "Source-specific IDs (e.g. ofac-45937, gb-fcdo-rus2051).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "first_seen": {
+                  "description": "ISO datetime when entity first appeared in OpenSanctions.",
+                  "type": "string"
+                },
+                "last_seen": {
+                  "description": "ISO datetime of most recent observation.",
+                  "type": "string"
+                },
+                "explanation_name_score": {
+                  "description": "Name match feature score from explanations.name_match.score.",
+                  "type": "number"
+                },
+                "explanation_name_detail": {
+                  "description": "Name match detail string from explanations.name_match.detail.",
+                  "type": "string"
+                },
+                "explanation_dob_score": {
+                  "description": "DOB match feature score from explanations.dob_year_disjoint.score.",
+                  "type": "number"
+                },
+                "explanation_dob_detail": {
+                  "description": "DOB match detail string from explanations.dob_year_disjoint.detail.",
+                  "type": "string"
+                },
+                "disposition_status": {
+                  "description": "Current disposition state of this match.",
+                  "type": "string",
+                  "enum": [
+                    "pending_review",
+                    "true_match",
+                    "false_positive",
+                    "discounted",
+                    "escalated"
+                  ]
+                },
+                "discount_rules_applied": {
+                  "description": "Rules that fired to evaluate this match.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "rule_id": {
+                        "description": "Rule identifier (e.g. DOB_MISMATCH, NATIONALITY_MISMATCH, GENDER_MISMATCH, SCORE_BELOW_THRESHOLD, EXACT_NAME_MATCH).",
+                        "type": "string"
+                      },
+                      "rule_description": {
+                        "description": "Human-readable rule description.",
+                        "type": "string"
+                      },
+                      "result": {
+                        "description": "Outcome of this rule.",
+                        "type": "string",
+                        "enum": [
+                          "discount",
+                          "escalate",
+                          "no_effect"
+                        ]
+                      },
+                      "details": {
+                        "description": "Comparison details (e.g. Query DOB 1975-03-12 vs candidate 1951-12-01).",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "rule_id",
+                      "rule_description",
+                      "result",
+                      "details"
+                    ]
+                  }
+                },
+                "analyst_decision": {
+                  "description": "Human override decision if applicable. Null until an analyst reviews this match.",
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "confirmed_true_match",
+                    "confirmed_false_positive",
+                    "requires_escalation",
+                    null
+                  ]
+                },
+                "analyst_notes": {
+                  "description": "Analyst commentary on this match. Null until reviewed.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decision_timestamp": {
+                  "description": "ISO datetime of disposition decision. Null until reviewed.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "schema",
+                "caption",
+                "target",
+                "score",
+                "match",
+                "topics",
+                "datasets",
+                "matched_name",
+                "matched_alias",
+                "matched_birthDate",
+                "matched_birthPlace",
+                "matched_nationality",
+                "matched_country",
+                "matched_gender",
+                "matched_address",
+                "matched_idNumber",
+                "matched_registrationNumber",
+                "matched_jurisdiction",
+                "matched_programId",
+                "matched_position",
+                "matched_notes",
+                "matched_sourceUrl",
+                "referents",
+                "first_seen",
+                "last_seen",
+                "explanation_name_score",
+                "explanation_name_detail",
+                "explanation_dob_score",
+                "explanation_dob_detail",
+                "disposition_status",
+                "discount_rules_applied",
+                "analyst_decision",
+                "analyst_notes",
+                "decision_timestamp"
+              ]
+            }
+          }
+        },
+        "required": [
+          "party_role",
+          "party_index",
+          "party_name",
+          "query_schema",
+          "query_properties",
+          "match_count",
+          "matches"
+        ]
+      }
+    }
+  },
+  "required": [
+    "entity_id",
+    "case_id",
+    "screening_timestamp",
+    "screening_config",
+    "screening_results"
+  ]
+}
