@@ -37,6 +37,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { enumValues } from "./schema/index.js";
 import { FilePublisher } from "./agents/publishers/FilePublisher.js";
 import { DocumentProcessingRunner } from "./agents/runners/api/DocumentProcessingRunner.js";
+import { trackedAgentRuns as filterTrackedAgentRuns } from "./agents/dashboardTracking.js";
 
 // Lazy Anthropic client — created on first use so the server starts even when
 // ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
@@ -265,11 +266,15 @@ app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
           if (error) throw error;
           return data ?? [];
         }),
-      fetchAll('agent_registry', 'slug,display_name'),
+      fetchAll('agent_registry', 'slug,display_name,agent_kind'),
     ]);
 
     const entityNames = new Map(entities.map(row => [row.kyc_ref, row.entity_name]));
     const agentNames = new Map(registry.map(row => [row.slug, row.display_name]));
+    // Document flows are lifecycle wrappers. Their document-specific child
+    // digitizers have their own persisted runs and are the useful unit for
+    // frequency and activity reporting.
+    const trackedAgentRuns = filterTrackedAgentRuns(agentRuns, registry);
     const severityRank = { high: 3, medium: 2, low: 1 };
     const exceptionGroups = new Map();
     const now = Date.now();
@@ -300,7 +305,7 @@ app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
       .slice(0, 8);
 
     const runCounts = new Map();
-    for (const run of agentRuns) {
+    for (const run of trackedAgentRuns) {
       runCounts.set(run.agent_slug, (runCounts.get(run.agent_slug) ?? 0) + 1);
     }
     const frequentAgentRuns = [...runCounts.entries()]
@@ -309,7 +314,7 @@ app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
       .slice(0, 6);
 
     const activity = [];
-    for (const run of agentRuns) {
+    for (const run of trackedAgentRuns) {
       const timestamp = run.completed_at || run.started_at;
       const name = agentNames.get(run.agent_slug) ?? run.agent_slug;
       const outcome = run.status === 'complete' && run.outcome ? ` (${run.outcome.replaceAll('_', ' ')})` : '';
