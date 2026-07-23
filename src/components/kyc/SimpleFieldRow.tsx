@@ -173,7 +173,7 @@ export const SimpleFieldRow = ({
             )}
             {forgeAttr?.exception_flag && (
               <span className="text-[9px] px-1.5 py-0.5 rounded border font-semibold bg-warning-soft text-warning border-warning/40">
-                {forgeAttr.exception_type ?? "Exception"}
+                {forgeAttr.exception_type?.join(", ") || "Exception"}
               </span>
             )}
           </div>
@@ -473,7 +473,7 @@ export const InlineTraceDrawer = ({
                   </p>
                 )}
                 {vFailed && forgeAttr.exception_type && (
-                  <p className="text-[10px] text-alert mt-0.5">{forgeAttr.exception_type}</p>
+                  <p className="text-[10px] text-alert mt-0.5">{forgeAttr.exception_type.join(", ")}</p>
                 )}
               </div>
             </div>

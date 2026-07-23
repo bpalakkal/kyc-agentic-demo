@@ -37,8 +37,11 @@ function block(row, { verifiable }) {
     ...(verifiable ? { verification_source: asArray(row?.verification_source) } : {}),
     id_reasoning: row?.id_reasoning ?? null,
     ...(verifiable ? { verification_reasoning: row?.verification_reasoning ?? null } : {}),
-    exception_reasoning: row?.exception_reasoning ?? null,
-    exception_type: row?.exception_type ?? null,
+    exception_reason: Array.isArray(row?.exception_reason) ? row.exception_reason : [],
+    exception_recommendation: Array.isArray(row?.exception_recommendation) ? row.exception_recommendation : [],
+    exception_type: Array.isArray(row?.exception_type)
+      ? row.exception_type
+      : (row?.exception_type ? [row.exception_type] : []),
     lineage: Array.isArray(row?.lineage) ? row.lineage.map(mapLineage) : [],
   };
   return base;

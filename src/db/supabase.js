@@ -79,6 +79,11 @@ function toDisplayValue(val) {
   return String(val);
 }
 
+function asStringArray(value) {
+  const values = Array.isArray(value) ? value : (value == null ? [] : [value]);
+  return values.map(item => String(item ?? '').trim()).filter(Boolean);
+}
+
 /**
  * Given an attribute object from KYC JSON, return a flat record
  * suitable for inserting into entity_attributes.
@@ -96,7 +101,9 @@ function parseAttribute(attrName, attrObj, group) {
     verification_flag:   attrObj.verification_flag ?? false,
     verification_source: Array.isArray(attrObj.verification_source) ? attrObj.verification_source : null,
     exception_flag:      attrObj.exception_flag ?? false,
-    exception_type:      attrObj.exception_type ?? null,
+    exception_type:      asStringArray(attrObj.exception_type),
+    exception_reason:    asStringArray(attrObj.exception_reason ?? attrObj.exception_reasoning),
+    exception_recommendation: asStringArray(attrObj.exception_recommendation),
     lineage:             lineage.length > 0 ? lineage : null,
   };
 }
@@ -186,7 +193,12 @@ async function syncForgeExceptions(kycRef, forgeData) {
   for (const [key, val] of Object.entries(forgeData)) {
     if (NON_ATTRIBUTE_KEYS.has(key)) continue;
     if (!val?.exception_flag) continue;
-    candidates.push({ key, exceptionType: val.exception_type ?? 'Missing Value' });
+    candidates.push({
+      key,
+      exceptionTypes: asStringArray(val.exception_type ?? 'Missing Value'),
+      reasons: asStringArray(val.exception_reason ?? val.exception_reasoning),
+      recommendations: asStringArray(val.exception_recommendation),
+    });
   }
   if (candidates.length === 0) return 0;
 
@@ -221,8 +233,9 @@ async function syncForgeExceptions(kycRef, forgeData) {
     source_type:      'forge',
     status:           'open',
     title:            `Data quality — ${c.key.replace(/_/g, ' ')}`,
-    reasoning:        [`Forge flagged exception_type: ${c.exceptionType}`],
-    recommended_actions: [],
+    exception_types: c.exceptionTypes,
+    reasoning:        c.reasons.length ? c.reasons : [`Entity data flagged: ${c.exceptionTypes.join(', ')}`],
+    recommended_actions: c.recommendations,
   }));
 
   const { error } = await sb.from('exceptions').insert(rows);
@@ -288,7 +301,7 @@ export async function saveSnapshot(kycRef, data, { agentId, runId } = {}) {
  * Optionally filter by group ('core', 'wgq').
  */
 export async function getAttributes(kycRef, { group } = {}) {
-  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, lineage';
+  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, exception_reason, exception_recommendation, lineage';
 
   // ── Layer 1: latest imported snapshot ──────────────────────────────────────
   let snapshotAttrs = [];
@@ -385,7 +398,7 @@ export async function getAttributes(kycRef, { group } = {}) {
  * Used by the Tracing panel.
  */
 export async function getAttributeTrace(kycRef, attributeName) {
-  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, lineage';
+  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, exception_reason, exception_recommendation, lineage';
 
   // Layer 1: latest imported snapshot
   const { data: snap } = await sb
@@ -727,7 +740,7 @@ export async function getAgentRegistry() {
 export async function getAttributesByRunId(kycRef, agentRunId) {
   const { data, error } = await sb
     .from('entity_attributes')
-    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, lineage')
+    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, exception_reason, exception_recommendation, lineage')
     .eq('kyc_ref', kycRef)
     .eq('agent_run_id', agentRunId)
     .order('attribute_name');

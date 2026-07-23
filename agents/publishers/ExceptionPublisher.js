@@ -33,18 +33,29 @@ export class ExceptionPublisher {
     const sourceType = `agent:${agentSlug}`;
     const attrNames  = exceptions.map(e => e.attributeName);
 
-    // Skip attributes that already have an open exception from this same agent.
+    const asStringArray = value => {
+      const values = Array.isArray(value) ? value : (value == null ? [] : [value]);
+      return values.map(item => String(item ?? '').trim()).filter(Boolean);
+    };
+
+    // Skip only the same open issue from this agent. A different exception type
+    // on the same attribute is a distinct workflow item and must be retained.
     const { data: existing, error: fetchErr } = await this.sb
       .from('exceptions')
-      .select('attribute_name')
+      .select('attribute_name,exception_types')
       .eq('kyc_ref', kycRef)
       .eq('source_type', sourceType)
       .neq('status', 'resolved')
       .in('attribute_name', attrNames);
     if (fetchErr) throw fetchErr;
 
-    const alreadyOpen = new Set((existing ?? []).map(r => r.attribute_name));
-    const toInsert = exceptions.filter(e => !alreadyOpen.has(e.attributeName));
+    const toInsert = exceptions.filter(exception => {
+      const candidateTypes = asStringArray(exception.exceptionType);
+      return !(existing ?? []).some(row =>
+        row.attribute_name === exception.attributeName
+        && asStringArray(row.exception_types).some(type => candidateTypes.includes(type))
+      );
+    });
     if (toInsert.length === 0) return 0;
 
     // Atomically reserve a sequential block of exception numbers.
@@ -54,6 +65,15 @@ export class ExceptionPublisher {
     });
     if (rpcErr) throw rpcErr;
     let nextNum = startNum;
+
+    const { data: runAttributes, error: attributeError } = await this.sb
+      .from('entity_attributes')
+      .select('id,attribute_name')
+      .eq('kyc_ref', kycRef)
+      .eq('agent_run_id', agentRunId)
+      .in('attribute_name', toInsert.map(exc => exc.attributeName));
+    if (attributeError) throw attributeError;
+    const attributeIds = new Map((runAttributes ?? []).map(row => [row.attribute_name, row.id]));
 
     const rows = toInsert.map(exc => ({
       kyc_ref:             kycRef,
@@ -65,8 +85,11 @@ export class ExceptionPublisher {
       status:              'open',
       severity:            exc.severity ?? null,
       title:               exc.title,
+      exception_types:     asStringArray(exc.exceptionType),
       reasoning:           exc.reasoning ?? [],
       recommended_actions: exc.recommendedActions ?? [],
+      entity_attribute_id: exc.entityAttributeId ?? attributeIds.get(exc.attributeName) ?? null,
+      entity_person_id:    exc.entityPersonId ?? null,
     }));
 
     const { error } = await this.sb.from('exceptions').insert(rows);

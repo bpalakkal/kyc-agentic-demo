@@ -48,7 +48,9 @@ export interface AttributeOutput {
   idFlag: boolean;
   verificationFlag: boolean;
   exceptionFlag: boolean;
-  exceptionType?: string;
+  exceptionType?: string | string[];
+  exceptionReason?: string | string[];
+  exceptionRecommendation?: string | string[];
   lineage: LineageEntry[];
   // DD-result fields (populated by DdRunner; null for sourcing agents)
   idReasoning?: string | null;
@@ -68,7 +70,7 @@ export interface LineageEntry {
 // ─── Exception output ─────────────────────────────────────────────────────────
 
 export interface ExceptionOutput {
-  exceptionType: string;        // e.g. "Missing Value", "Inconsistent Data"
+  exceptionType: string | string[]; // e.g. ["Missing Value", "Inconsistent Data"]
   title: string;                // human-readable title shown in the UI
   fieldName: string;            // snake_case field that triggered the exception
   attributeName: string;        // matches entity_attributes.attribute_name
@@ -76,6 +78,8 @@ export interface ExceptionOutput {
   recommendedActions: string[]; // e.g. ["Request updated document", "Escalate to compliance"]
   confidence: number;           // 0–100
   severity: 'low' | 'medium' | 'high';
+  entityAttributeId?: string | null;
+  entityPersonId?: string | null;
 }
 
 // ─── File output ──────────────────────────────────────────────────────────────

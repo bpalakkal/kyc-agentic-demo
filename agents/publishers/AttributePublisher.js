@@ -10,6 +10,13 @@ function normalizeValue(attributeName, value) {
   return { value: r.value, unmapped: !r.matched };
 }
 
+function asStringArray(value) {
+  const values = Array.isArray(value) ? value : (value == null ? [] : [value]);
+  return values
+    .map(item => typeof item === 'string' ? item.trim() : String(item ?? '').trim())
+    .filter(Boolean);
+}
+
 /**
  * AttributePublisher — writes agent-run attribute data to entity_attributes.
  *
@@ -66,7 +73,9 @@ export class AttributePublisher {
         verification_reasoning: allowIdv ? (attr.verificationReasoning ?? null) : null,
         // Flag an unmapped enum value for analyst review (unless already flagged).
         exception_flag:         attr.exceptionFlag || norm.unmapped || false,
-        exception_type:         attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null),
+        exception_type:         asStringArray(attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null)),
+        exception_reason:       asStringArray(attr.exceptionReason),
+        exception_recommendation: asStringArray(attr.exceptionRecommendation),
         lineage,
       };
     });

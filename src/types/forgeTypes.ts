@@ -8,7 +8,9 @@ export type ForgeAttrRow = {
   verification_flag: boolean;
   verification_source: string[] | null;
   exception_flag: boolean;
-  exception_type: string | null;
+  exception_type: string[] | null;
+  exception_reason?: string[] | null;
+  exception_recommendation?: string[] | null;
   lineage?: ForgeLineageEntry[] | null;
 };
 

@@ -57,7 +57,7 @@ npm run start
 
 `npm run start` launches Vite on port 8080 and Express on port 3001.
 
-Before first use, run the SQL files in `scripts/migrations/` in numeric order through migration 018, then initialize storage and seed data if needed:
+Before first use, run every SQL file in `scripts/migrations/` in numeric order through migration 026, then initialize storage and seed data if needed:
 
 ```bash
 node scripts/setup-storage.js

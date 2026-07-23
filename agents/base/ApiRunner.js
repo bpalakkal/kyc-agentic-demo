@@ -191,8 +191,36 @@ export class ApiRunner {
     const stats = { attrCount: 0, personCount: 0, excCount: 0, fileStored: 0, fileErrors: [] };
 
     if (output.attributes?.length) {
+      const exceptionsByAttribute = new Map();
+      for (const exception of (output.exceptions ?? [])) {
+        if (!exception.attributeName) continue;
+        const current = exceptionsByAttribute.get(exception.attributeName) ?? {
+          types: [], reasons: [], recommendations: [],
+        };
+        const append = (target, value) => {
+          for (const item of (Array.isArray(value) ? value : (value == null ? [] : [value]))) {
+            const text = String(item ?? '').trim();
+            if (text && !target.includes(text)) target.push(text);
+          }
+        };
+        append(current.types, exception.exceptionType);
+        append(current.reasons, exception.reasoning);
+        append(current.recommendations, exception.recommendedActions);
+        exceptionsByAttribute.set(exception.attributeName, current);
+      }
+
+      const assessedAttributes = output.attributes.map(attribute => {
+        const assessment = exceptionsByAttribute.get(attribute.attributeName);
+        return assessment ? {
+          ...attribute,
+          exceptionFlag: true,
+          exceptionType: assessment.types,
+          exceptionReason: assessment.reasons,
+          exceptionRecommendation: assessment.recommendations,
+        } : attribute;
+      });
       stats.attrCount = await new AttributePublisher(this.sb)
-        .publish(kycRef, agentRunId, output.attributes, { allowIdv: this.canSetIdvFlags });
+        .publish(kycRef, agentRunId, assessedAttributes, { allowIdv: this.canSetIdvFlags });
     }
 
     if (output.exceptions?.length) {

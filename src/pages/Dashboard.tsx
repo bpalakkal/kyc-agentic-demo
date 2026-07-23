@@ -123,6 +123,7 @@ const Dashboard = () => {
 
   const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
   const [insights, setInsights] = useState<DashboardInsights>(EMPTY_INSIGHTS);
+  const [insightsError, setInsightsError] = useState(false);
   const [pendingView, setPendingView] = useState<PendingBucket>("ops");
   const [selectedPeriod, setSelectedPeriod] = useState<"month" | "week">("month");
 
@@ -132,8 +133,13 @@ const Dashboard = () => {
       apiFetch(`${AGENT_API_BASE}/api/dashboard/insights`),
     ]).then(async ([entitiesResponse, insightsResponse]) => {
       if (entitiesResponse.ok) setApiEntities(await entitiesResponse.json() as ApiEntity[]);
-      if (insightsResponse.ok) setInsights(await insightsResponse.json() as DashboardInsights);
-    }).catch(() => {});
+      if (insightsResponse.ok) {
+        setInsights(await insightsResponse.json() as DashboardInsights);
+        setInsightsError(false);
+      } else {
+        setInsightsError(true);
+      }
+    }).catch(() => setInsightsError(true));
   }, []);
 
   const priorityCases = useMemo(() => apiEntities.map(toPriorityCase), [apiEntities]);
@@ -386,7 +392,10 @@ const Dashboard = () => {
                 <h3 className="text-sm font-semibold">Most Frequent Agent Runs</h3>
               </div>
               <div className="space-y-3">
-                {insights.frequentAgentRuns.length === 0 && (
+                {insightsError && (
+                  <p className="py-8 text-center text-sm text-alert">Agent run insights could not be loaded.</p>
+                )}
+                {!insightsError && insights.frequentAgentRuns.length === 0 && (
                   <p className="py-8 text-center text-sm text-muted-foreground">No agent runs recorded yet.</p>
                 )}
                 {insights.frequentAgentRuns.map(f => (

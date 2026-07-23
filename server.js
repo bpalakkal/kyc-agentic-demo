@@ -252,7 +252,7 @@ app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
 
     const [entities, openExceptions, agentRuns, files, auditEvents, registry] = await Promise.all([
       fetchAll('entities', 'kyc_ref,entity_name'),
-      fetchAll('exceptions', 'kyc_ref,exception_number,title,exception_type,attribute_name,field_name,severity,created_at',
+      fetchAll('exceptions', 'kyc_ref,exception_number,title,attribute_name,field_name,severity,created_at',
         query => query.eq('status', 'open')),
       fetchAll('agent_runs', 'id,kyc_ref,agent_slug,status,outcome,outcome_reason,error,started_at,completed_at,run_phase'),
       sb.from('case_files').select('id,kyc_ref,filename,title,file_category,created_at')
@@ -275,7 +275,7 @@ app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
     const now = Date.now();
 
     for (const exception of openExceptions) {
-      const type = exception.title || exception.exception_type || exception.field_name
+      const type = exception.title || exception.field_name
         || exception.attribute_name || 'Other';
       const key = type.trim();
       const severity = exception.severity ?? null;
@@ -349,7 +349,7 @@ app.get('/api/dashboard/insights', requireAuth, async (_req, res) => {
       activity.push({
         id: `exception:${exception.kyc_ref}:${exception.exception_number}`,
         type: 'action',
-        title: `Exception opened: ${exception.title || exception.exception_type || exception.field_name || exception.attribute_name || 'Other'}`,
+        title: `Exception opened: ${exception.title || exception.field_name || exception.attribute_name || 'Other'}`,
         timestamp: exception.created_at,
         kycRef: exception.kyc_ref,
         entityName: entityNames.get(exception.kyc_ref) ?? exception.kyc_ref,

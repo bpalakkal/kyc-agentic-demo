@@ -25,7 +25,7 @@ export const ForgeLineagePanel = ({ trace }: { trace: ForgeTraceRow }) => {
         </span>
         {trace.exception_flag && (
           <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border text-warning border-warning/40 bg-warning-soft/30">
-            <AlertTriangle className="size-3" />{trace.exception_type ?? "Exception"}
+            <AlertTriangle className="size-3" />{trace.exception_type?.join(", ") || "Exception"}
           </span>
         )}
       </div>

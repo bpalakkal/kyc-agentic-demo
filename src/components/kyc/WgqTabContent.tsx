@@ -62,7 +62,7 @@ export const WgqTabContent = ({
                         <span className="text-[10px] text-muted-foreground/50 italic">—</span>
                       )}
                       {attr.exception_flag && (
-                        <AlertTriangle className="size-3.5 text-warning" title={attr.exception_type ?? undefined} />
+                        <AlertTriangle className="size-3.5 text-warning" title={attr.exception_type?.join(", ") || undefined} />
                       )}
                     </div>
                   </div>
