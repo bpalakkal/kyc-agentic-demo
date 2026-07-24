@@ -24,6 +24,17 @@ import { enumValues } from "@schema";
 type PageSize = 10 | 20 | 50 | "all";
 const PAGE_SIZE_OPTIONS: PageSize[] = [10, 20, 50, "all"];
 const CIP_CLASSIFICATIONS = enumValues("CIPClassification");
+const MODEL_PROFILE_LABELS: Record<string, string> = {
+  "bedrock-claude-haiku": "Claude Haiku",
+  "bedrock-claude-sonnet": "Claude Sonnet",
+  "bedrock-claude-opus": "Claude Opus",
+};
+
+function modelProfileLabel(agent: RegistryAgent) {
+  if (agent.execution_mode === "orchestrator") return "Inherited";
+  if (!agent.model_profile) return "No LLM";
+  return MODEL_PROFILE_LABELS[agent.model_profile] ?? agent.model_profile;
+}
 
 const relationshipFields = [
   ["pre_agents", "Pre-agents"], ["child_agents", "Child agents"], ["post_agents", "Post-agents"],
@@ -233,6 +244,7 @@ export default function Agents() {
     ? agents.filter((agent) => [
         agent.display_name, agent.slug, agent.description, agent.category,
         agent.jurisdiction, agent.cip_classification, agent.runner_type, agent.output_type,
+        agent.model_profile, modelProfileLabel(agent),
       ].some((value) => value?.toLowerCase().includes(normalizedSearch)))
     : agents;
   const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filteredAgents.length / pageSize));
@@ -310,6 +322,7 @@ export default function Agents() {
                   <TableHead>CIP Classification</TableHead>
                   <TableHead>Jurisdiction</TableHead>
                   <TableHead>Runner</TableHead>
+                  <TableHead>Model</TableHead>
                   <TableHead>Output</TableHead>
                   <TableHead>Status</TableHead>
                   {canEdit && <TableHead className="w-20">Manage</TableHead>}
@@ -337,6 +350,11 @@ export default function Agents() {
                       </TableCell>
                       <TableCell className="text-sm">{a.jurisdiction ?? "—"}</TableCell>
                       <TableCell className="text-sm">{a.runner_type ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant={a.model_profile ? "outline" : "secondary"}>
+                          {modelProfileLabel(a)}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-sm">{a.output_type ?? "—"}</TableCell>
                       <TableCell>
                         <Badge
@@ -352,7 +370,7 @@ export default function Agents() {
                 })}
                 {filteredAgents.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 9 : 8} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={canEdit ? 10 : 9} className="py-8 text-center text-sm text-muted-foreground">
                       {search ? `No agents match “${search}”.` : "No agents registered yet."}
                     </TableCell>
                   </TableRow>

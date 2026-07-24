@@ -4,8 +4,8 @@
 
 This is the **no-Forge replica** of the Forge KYC platform.
 - **UI behaviour**: identical to the Forge version — same layouts, same agent trigger panels, same attribute grid, same screening flow.
-- **What's different**: no Forge platform dependency. Agents run via direct REST APIs, Firecrawl Browser, or Claude API. No `proposals` / `acceptProposals` / `rejectProposals` proposal system. No Forge registration dialog or `forge_slug` column.
-- **Governing rule**: _"This should behave exactly the same as the Forge version with the exception that the agents are running directly using direct API calls where available or using Claude API directly plus additional MCPs and tools."_
+- **What's different**: no Forge platform dependency. Agents run via direct REST APIs, Firecrawl Browser, or registry-selected Claude models on Amazon Bedrock. No `proposals` / `acceptProposals` / `rejectProposals` proposal system. No Forge registration dialog or `forge_slug` column.
+- **Governing rule**: _"This should behave exactly the same as the Forge version with the exception that the agents run directly through authoritative APIs or the model provider selected in the Agent Register."_
 
 ---
 
@@ -34,9 +34,10 @@ AI-powered KYC (Know Your Customer) compliance platform for financial analysts. 
 - **Neo4j** — ownership/relationship graph
 
 ### AI
-- **Anthropic Claude** (`claude-sonnet-4-6`) — floating chat assistant + tool use, CompaniesHouseRunner PDF digitization, all DD agent runs
+- **Amazon Bedrock Claude** — registered agent calls. Haiku is the default for LLM-assisted sourcing, document processing, and screening; Sonnet is the default for DD; Opus is available for explicit Agent Register selection.
+- **Direct Anthropic Claude** (`claude-sonnet-4-6`) — floating chat assistant and its tool loop only
 - **Firecrawl Browser** — disposable browser sessions for Delaware Division of Corporations searches
-- No AWS ELB or Forge platform
+- No AWS ELB agent runtime or Forge platform
 
 ---
 
@@ -59,8 +60,8 @@ kyc-agentic/
 │   │   ├── ExceptionPublisher.js          # Writes ExceptionOutput[] → exceptions
 │   │   └── FilePublisher.js               # Uploads files → Supabase Storage + case_files
 │   └── runners/
-│       └── api/                           # Synchronous REST / Claude API runners
-│           ├── CompaniesHouseRunner.js    # CH REST + Claude PDF digitization
+│       └── api/                           # Synchronous REST / Bedrock Claude runners
+│           ├── CompaniesHouseRunner.js    # CH REST + post-sourcing document processing
 │           ├── FCARunner.js               # FCA Register REST (no LLM)
 │           ├── GLEIFRunner.js             # GLEIF REST (no LLM)
 │           ├── IAPDRunner.js              # IAPD REST (no LLM)
@@ -70,7 +71,7 @@ kyc-agentic/
 │           ├── UKSourcingFlowRunner.js    # FCA + CH in parallel
 │           ├── USRegistryResearchRunners.js # NFA + Puerto Rico APIs; Delaware via Firecrawl
 │           ├── ScreeningRunner.js         # OpenSanctions + Claude discounting
-│           ├── DdRunner.js                # Base DD orchestrator (Claude API)
+│           ├── DdRunner.js                # Base DD orchestrator (Claude on Bedrock)
 │           ├── dd/                        # Per-attribute DD runner classes
 │           │   ├── DdAllInOneRunner.js    # Compatibility class; registry parent runs children
 │           │   ├── RiaEntityNameIdvRunner.js
@@ -252,6 +253,7 @@ Sourcing agents write party data to `entity_persons` (one row per person), not a
 | `POST /api/entity/:kycRef/attributes/:name/confirm` | Set ID+V flags manually |
 | `GET /api/agents` | Persisted Supabase registry with runtime readiness |
 | `GET /api/agents/access` | Current user's Agent Register administration access |
+| `GET /api/model-profiles` | Controlled Bedrock profiles with runtime readiness |
 | `POST /api/agents` | Admin-only creation of registry-driven virtual orchestrators |
 | `PATCH /api/agents/:slug` | Admin-only audited registry configuration update |
 | `GET /api/health` | Supabase + Neo4j health check |
@@ -280,6 +282,12 @@ The registry editor persists explicit pre/child/post array order through numbere
 `cip_classification` must be the FULL string `'Registered Investment Advisor or Commodity Trading Advisor'` — this is what the DB stores and what the UI filters on. Never use short aliases like `'RIA'`.
 
 Agent Register create/edit controls load their CIP choices from `enumValues('CIPClassification')`; `server.js` validates against the same generated canonical enum. Do not add a free-form classification directly to a registry row.
+
+Agent Register leaf rows may select `bedrock-claude-haiku`,
+`bedrock-claude-sonnet`, or `bedrock-claude-opus`. Orchestrators cannot select
+a model; their leaf children own model configuration. Model IDs and secrets
+remain in Railway. `agents/models/bedrock.js` resolves the logical profile, and
+each model-backed run snapshots the exact provider, profile, and model ID.
 
 ### Runner class map (server.js `loadRunnerClass()`)
 Slug → runner class lookup. If a slug isn't in this map, the server returns 404 and the run shows ⚠ in the dock.
@@ -363,7 +371,12 @@ See `.env.example`. All required:
 ```
 SUPABASE_URL, SUPABASE_SERVICE_KEY          — Supabase backend (service key)
 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY  — Supabase frontend (anon key)
-ANTHROPIC_API_KEY                           — Claude API (DD agents + CH PDF digitization)
+ANTHROPIC_API_KEY                           — Direct Claude API (assistant chat only)
+AWS_BEARER_TOKEN_BEDROCK                    — Bedrock bearer authentication for registered agents
+AWS_REGION                                  — Bedrock execution region
+BEDROCK_CLAUDE_HAIKU_MODEL_ID               — Haiku model or inference-profile ID
+BEDROCK_CLAUDE_SONNET_MODEL_ID              — Sonnet model or inference-profile ID
+BEDROCK_CLAUDE_OPUS_MODEL_ID                — Opus model or inference-profile ID
 COMPANIES_HOUSE_API_KEY                     — Companies House REST API
 FCA_AUTH_EMAIL, FCA_API_KEY                 — FCA Register API (set in Railway Variables)
 OPENSANCTIONS_API_KEY                       — OpenSanctions /match/default (screening)
@@ -374,7 +387,9 @@ NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD      — Neo4j (optional — graph tab onl
 ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET
 ```
 
-Production credentials, including `FCA_AUTH_EMAIL`, `FCA_API_KEY`, `OPENSANCTIONS_API_KEY`, `SEC_API_KEY`, and `FIRECRAWL_API_KEY`, belong in Railway Variables and must never be committed.
+Production credentials, including the Bedrock bearer token and model IDs,
+`FCA_AUTH_EMAIL`, `FCA_API_KEY`, `OPENSANCTIONS_API_KEY`, `SEC_API_KEY`, and
+`FIRECRAWL_API_KEY`, belong in Railway Variables and must never be committed.
 
 ---
 
@@ -465,8 +480,9 @@ Returns `{ ok: true }` when Supabase is reachable. `ok: false` means DB is down 
 | FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
 | IAPD, US sourcing | `SEC_API_KEY` | `SEC_API_KEY environment variable is required for the IAPD runner` |
 | Delaware, US sourcing | `FIRECRAWL_API_KEY` | `FIRECRAWL_API_KEY environment variable is required for the Delaware runner` |
-| All DD agents, CH PDF phase | `ANTHROPIC_API_KEY` | `ANTHROPIC_API_KEY is not set` |
-| Screening | `OPENSANCTIONS_API_KEY` | `OPENSANCTIONS_API_KEY is not set` |
+| LLM-assisted sourcing/document agents | Bedrock bearer token, region, Haiku model ID | `Model profile "bedrock-claude-haiku" is unavailable` |
+| All DD agents | Bedrock bearer token, region, Sonnet model ID | `Model profile "bedrock-claude-sonnet" is unavailable` |
+| Screening | `OPENSANCTIONS_API_KEY` plus Bedrock Haiku variables | Missing OpenSanctions or model-profile configuration |
 | Any agent | Supabase down | `agent_runs insert error` or `Supabase unavailable` |
 
 ### 5. Check migrations
@@ -476,6 +492,11 @@ SELECT column_name FROM information_schema.columns
 WHERE table_name = 'agent_runs' ORDER BY column_name;
 ```
 Expected columns include: `error`, `steps`, `raw_output`, `sources_consulted`.
+
+Migration `027_agent_model_profiles.sql` is required before model-backed agents
+run. Expected `agent_runs` columns include `llm_provider`,
+`llm_profile_key`, and `llm_model_id`; `agent_registry` must include
+`model_profile`.
 
 ### 6. Server restart mid-run
 If Railway restarted between when the run was launched and when the frontend polls for status, the orphan detection marks it `failed` with the message `"Server restarted while run was in progress"`. Re-run the agent — this is expected behaviour.

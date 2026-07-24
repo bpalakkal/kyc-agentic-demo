@@ -4,7 +4,7 @@
 
 KYC Sentinel is a no-Forge KYC compliance application. Financial-crime analysts use it to review entities and exceptions, inspect KYC attributes and evidence, run sourcing and due-diligence agents, screen parties, and record resolutions.
 
-The application does not call Forge or an AWS ELB agent runtime. Agents execute in the Express service through direct third-party REST APIs or Anthropic Claude.
+The application does not call Forge or an AWS ELB agent runtime. Agents execute in the Express service through direct third-party REST APIs or Claude on Amazon Bedrock.
 
 ```text
 Browser (GitHub Pages, /kyc-agentic/)
@@ -14,7 +14,8 @@ Browser (GitHub Pages, /kyc-agentic/)
 Express API (Railway)
   |-- Supabase PostgreSQL and private Storage
   |-- Neo4j ownership graph (optional)
-  |-- Anthropic Claude (chat, DD, document digitization)
+  |-- Amazon Bedrock (registered Claude agent calls)
+  |-- Anthropic Claude API (assistant chat only)
   |-- Companies House, FCA, JFSC, IAPD, SEC, NYSE, NFA, Delaware, Puerto Rico, GLEIF
   |-- OpenSanctions screening
   `-- Zoom meeting creation
@@ -28,7 +29,8 @@ Express API (Railway)
 | Backend | Railway | Express API and agent execution |
 | Primary data | Supabase | Authentication, PostgreSQL, private file storage |
 | Graph | Neo4j | Optional ownership and relationship graph |
-| AI | Anthropic | Assistant chat, DD agents, Companies House PDF digitization |
+| Agent AI | Amazon Bedrock | Registry-selected Claude Haiku, Sonnet, or Opus |
+| Assistant AI | Anthropic | SSE assistant chat only |
 | Screening | OpenSanctions | Sanctions and PEP matching |
 
 ## Application behavior
@@ -108,6 +110,30 @@ This validates both schemas and generates versioned UI controls, enum options,
 defaults, required fields, repeatable collections, screening metadata, and
 TypeScript attribute unions. No database schema registry is used.
 
+The generated model is consumed by the existing Attribute View and the reusable
+`src/components/kyc/SchemaDrivenForm.tsx` renderer. It supports required
+indicators, defaults, enum selects, typed inputs, and add/remove controls for
+repeatable groups.
+
+Current schema handoff as of 2026-07-23:
+
+- Generated schema version: `a0c73bc14b619b34`
+- 131 attributes, 11 collections, and 19 enums
+- Required case fields: `entity_name`, `case_id`, `entity_id`, `policy`,
+  `risk_rating`
+- `regulator` is a repeatable group with regulator, registration number, and
+  regulatory status
+- Master and screening schemas in Git matched the authoritative external copies
+- Validation passed: TypeScript, 9 test files / 25 tests, and production build
+
+From the `No Forge` directory, refresh both repository schemas with:
+
+```powershell
+node .\kyc-agentic\scripts\update-schema.mjs `
+  --master "..\Master Schema\kyc_master_attribute_schema.json" `
+  --screening "..\Master Schema\screening_results_schema.json"
+```
+
 `npm run generate` also regenerates the legacy entity fixture file from `entities.md`. Production data is read from Supabase, but that generated fixture is still part of the current build pipeline.
 
 ## Deployment
@@ -163,6 +189,7 @@ Run migrations in `scripts/migrations` in numeric order:
 024_source_dd_sequence_guard.sql
 025_work_queue_agent_batches.sql
 026_normalized_exception_assessments.sql
+027_agent_model_profiles.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.
@@ -178,7 +205,14 @@ Agent Register CIP classifications are selected and server-validated against the
 Migrations `021` and `022` add document processing and concrete digitizers.
 Migration `024` enforces sourcing/DD sequencing, migration `025` adds durable
 Work Queue batches, and migration `026` introduces normalized multi-value
-exception assessments.
+exception assessments. Migration `027` adds registry-selected Bedrock model
+profiles and immutable provider/model attribution on `agent_runs`.
+
+Apply migration `027` before deploying the Bedrock-enabled backend. It assigns
+Haiku to LLM-assisted sourcing, document-processing, and screening agents;
+assigns Sonnet to DD leaf agents; and leaves REST-only agents without a model.
+Virtual orchestrators do not select a model because their children own that
+configuration.
 
 One-time environment setup:
 
@@ -212,7 +246,12 @@ showcase entity after use with
 | `VITE_SUPABASE_URL` | GitHub Actions/local | Frontend Supabase URL |
 | `VITE_SUPABASE_ANON_KEY` | GitHub Actions/local | Frontend authentication |
 | `VITE_AGENT_API_BASE` | GitHub Actions/local | Express API base URL |
-| `ANTHROPIC_API_KEY` | Railway/local | Chat, DD agents, PDF digitization |
+| `ANTHROPIC_API_KEY` | Railway/local | Assistant chat only |
+| `AWS_BEARER_TOKEN_BEDROCK` | Railway/local | Amazon Bedrock agent authentication |
+| `AWS_REGION` | Railway/local | Bedrock execution region |
+| `BEDROCK_CLAUDE_HAIKU_MODEL_ID` | Railway/local | Haiku model or inference-profile ID |
+| `BEDROCK_CLAUDE_SONNET_MODEL_ID` | Railway/local | Sonnet model or inference-profile ID |
+| `BEDROCK_CLAUDE_OPUS_MODEL_ID` | Railway/local | Opus model or inference-profile ID |
 | `COMPANIES_HOUSE_API_KEY` | Railway/local | Companies House API |
 | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | Railway/local | FCA Register API |
 | `SEC_API_KEY` | Railway/local | sec-api.io access for IAPD |
@@ -225,6 +264,8 @@ showcase entity after use with
 | `PORT` | Railway/local | Express port; defaults to 3001 |
 
 There is no `AWS_AGENT_BASE` or Forge credential in the current architecture.
+Bedrock is called directly from the Express service using the region, bearer
+token, and model IDs stored in Railway.
 
 ## Operations and troubleshooting
 
@@ -234,7 +275,7 @@ Check failures in this order:
 2. Check Railway logs for `[api-runner]` and `[dd-run]` messages.
 3. Call `GET /api/health`. `ok: false` means Supabase is unavailable.
 4. Confirm migration `009` has run if commit reports missing `agent_runs` columns.
-5. Confirm migrations `021`, `022`, and `026` have run for document-processing or exception-array column errors.
+5. Confirm migrations `021`, `022`, `026`, and `027` have run for document-processing, exception-array, model-profile, or run-attribution column errors.
 6. Confirm the relevant third-party credential is present in Railway.
 7. For browser 401 responses, confirm the request uses `apiFetch()` and the session is active.
 8. For CORS or network failures, confirm the deployed frontend origin is allowed and `VITE_AGENT_API_BASE` points to the current Railway URL without a trailing slash.
@@ -247,14 +288,17 @@ Check failures in this order:
 | FCA and UK aggregate sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` |
 | IAPD and US aggregate sourcing | `SEC_API_KEY` |
 | Delaware and US aggregate sourcing | `FIRECRAWL_API_KEY` |
-| DD agents and Companies House PDF processing | `ANTHROPIC_API_KEY` |
-| Screening | `OPENSANCTIONS_API_KEY` |
+| LLM-assisted sourcing and document agents | Bedrock bearer token, region, and Haiku model ID |
+| DD agents | Bedrock bearer token, region, and Sonnet model ID |
+| Screening | `OPENSANCTIONS_API_KEY` plus the Bedrock Haiku configuration |
+| Assistant chat | `ANTHROPIC_API_KEY` |
 | All persisted runs | Supabase backend variables |
 
 ## Production considerations
 
 - Uncommitted run output is process-local; durable storage would improve restart resilience and horizontal scaling.
 - Agent availability is computed from the persisted registry, backend runner wiring, and `required_env`. An enabled row can still be reported as unavailable when production credentials are missing.
+- The Agent Register selects a controlled logical model profile rather than accepting arbitrary model IDs. Concrete model IDs and credentials remain in Railway, and each model-backed `agent_run` snapshots `llm_provider`, `llm_profile_key`, and `llm_model_id`.
 - Detailed health checks require `HEALTH_SECRET` and an `x-health-token` request header; otherwise the endpoint returns only `{ ok }`.
 - Zoom creation is public at the API layer and should receive authentication or a narrowly scoped authorization policy before wider deployment.
 - CORS currently permits the GitHub Pages origin prefix plus configured origins; keep `CORS_ORIGIN` narrowly scoped.
