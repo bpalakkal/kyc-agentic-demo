@@ -1,4 +1,5 @@
 // Helpers for attribute labels and source conflicts in the Attributes tab.
+import { comparableAttributeValue } from "@/lib/valueNormalization";
 
 // Canonical key for de-duplicating attribute labels that arrive in different
 // formats from different sources — e.g. the schema key `entity_name`, the live
@@ -44,7 +45,7 @@ export const lineageConflict = (
     if (!bySource.has(e.source)) bySource.set(e.source, String(e.value ?? "").trim());
   }
   const distinct = new Set(
-    Array.from(bySource.values()).map((v) => v.toLowerCase()).filter(Boolean),
+    Array.from(bySource.values()).map(comparableAttributeValue).filter(Boolean),
   );
   if (distinct.size <= 1) return null;
   return Array.from(bySource.entries()).map(([source, value]) => ({ source, value }));

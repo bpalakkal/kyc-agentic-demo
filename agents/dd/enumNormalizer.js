@@ -14,7 +14,7 @@
  *
  * Adapted for direct no-Forge execution.
  */
-import { enumValues, enumFor } from '../../schema/index.js';
+import { enumValues, enumFor, schemaMeta } from '../../schema/index.js';
 
 /** Values that mean "not applicable" — legitimate (e.g. an individual's
  * country_of_incorporation) and must NOT be flagged as a bad enum value. */
@@ -26,6 +26,19 @@ const NA_TOKENS = new Set([
 /** Collapse a value to a comparison key: lowercase, strip non-alphanumerics. */
 function key(s) {
   return String(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '');
+}
+
+const TRUE_TOKENS = new Set(['true', 'yes', 'y', '1']);
+const FALSE_TOKENS = new Set(['false', 'no', 'n', '0']);
+
+/** Canonicalize boolean-shaped values to the schema's display convention. */
+export function normalizeBoolean(value) {
+  if (value === true) return { matched: true, value: 'Yes', original: value };
+  if (value === false) return { matched: true, value: 'No', original: value };
+  const token = String(value ?? '').trim().toLowerCase();
+  if (TRUE_TOKENS.has(token)) return { matched: true, value: 'Yes', original: value };
+  if (FALSE_TOKENS.has(token)) return { matched: true, value: 'No', original: value };
+  return { matched: false, value, original: value };
 }
 
 /**
@@ -120,6 +133,33 @@ export function resolveEnumPath(name) {
  * @returns {{ matched: boolean, value: any, original: any, enumName: string|null, unmapped?: string[] }}
  */
 export function normalizeForAttribute(value, attrPath) {
+  const resolvedPath = schemaMeta.attributes[attrPath]
+    ? attrPath
+    : (resolveEnumPath(attrPath) ?? attrPath);
+  if (schemaMeta.attributes[resolvedPath]?.dataType === 'boolean') {
+    if (Array.isArray(value)) {
+      const results = value.map(normalizeBoolean);
+      const unmapped = results.filter(result => !result.matched).map(result => String(result.original));
+      return {
+        matched: unmapped.length === 0,
+        value: results.map(result => result.value),
+        original: value,
+        enumName: null,
+        dataType: 'boolean',
+        ...(unmapped.length ? { unmapped } : {}),
+      };
+    }
+    const result = normalizeBoolean(value);
+    return {
+      matched: result.matched,
+      value: result.value,
+      original: value,
+      enumName: null,
+      dataType: 'boolean',
+      ...(result.matched ? {} : { unmapped: [String(value)] }),
+    };
+  }
+
   const enumName = enumFor(attrPath) ? enumFor(attrPath) : (enumFor(resolveEnumPath(attrPath) ?? '') || null);
   if (!enumName) return { matched: true, value, original: value, enumName: null };
 

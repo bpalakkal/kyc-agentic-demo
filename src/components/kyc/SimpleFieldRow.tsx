@@ -13,6 +13,7 @@ import { AGENT_API_BASE } from "@/components/AgentSystem";
 import type { AgentId, InlineProposal } from "@/components/AgentSystem";
 import type { ForgeAttrRow } from "@/types/forgeTypes";
 import { prettifyAttrLabel, lineageConflict } from "@/lib/attrLabel";
+import { comparableAttributeValue } from "@/lib/valueNormalization";
 import {
   type AttrTrace, type EntityAttr, type AttrDoc, type AuditEntry,
   SOURCE_STYLE, DOC_KIND_META,
@@ -42,8 +43,8 @@ const SourceStrip = ({ lineage, displayValue }: SourceStripProps) => {
 
   if (sources.length < 2) return null;
 
-  const primary = (displayValue ?? "").toLowerCase().trim();
-  const allAgree = sources.every(s => s.value.toLowerCase().trim() === primary);
+  const primary = comparableAttributeValue(displayValue);
+  const allAgree = sources.every(s => comparableAttributeValue(s.value) === primary);
   if (allAgree) return null;
 
   return (
@@ -51,7 +52,7 @@ const SourceStrip = ({ lineage, displayValue }: SourceStripProps) => {
       <GitMerge className="size-2.5 text-muted-foreground/40 shrink-0" />
       {(
         sources.map((s, i) => {
-          const matches = s.value.toLowerCase().trim() === primary;
+          const matches = comparableAttributeValue(s.value) === primary;
           const label = s.value.length > 28 ? s.value.slice(0, 28) + "…" : s.value;
           return (
             <span key={i} className={cn(
@@ -386,6 +387,12 @@ export const InlineTraceDrawer = ({
   // Source-document viewer (opens a datastore PDF via the auth-guarded proxy).
   const [docView, setDocView] = useState<{ file: string; blobUrl: string } | null>(null);
   const [docOpening, setDocOpening] = useState<string | null>(null);
+  const [sourceView, setSourceView] = useState<{
+    source: string;
+    rows: { attribute: ForgeAttrRow; sourceValue: unknown; sourceConfidence: number | null }[];
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
   const openDoc = async (file: string) => {
     if (!kycRef) return;
     setDocOpening(file);
@@ -396,6 +403,35 @@ export const InlineTraceDrawer = ({
     } catch { /* ignore */ } finally { setDocOpening(null); }
   };
   const closeDoc = () => { if (docView) URL.revokeObjectURL(docView.blobUrl); setDocView(null); };
+  const openSource = async (source: string) => {
+    if (!kycRef) return;
+    setSourceView({ source, rows: [], loading: true, error: null });
+    try {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/attributes`);
+      if (!response.ok) throw new Error(`Unable to load source attributes (HTTP ${response.status})`);
+      const attributes = await response.json() as ForgeAttrRow[];
+      const rows = attributes.flatMap(attribute => {
+        const entry = attribute.lineage?.find(lineage => lineage.source === source);
+        if (!entry) return [];
+        const rawConfidence = entry.confidence_score == null ? null : Number(entry.confidence_score);
+        return [{
+          attribute,
+          sourceValue: entry.value,
+          sourceConfidence: rawConfidence == null || Number.isNaN(rawConfidence)
+            ? null
+            : Math.round(rawConfidence * (rawConfidence <= 1 ? 100 : 1)),
+        }];
+      }).sort((a, b) => a.attribute.attribute_name.localeCompare(b.attribute.attribute_name));
+      setSourceView({ source, rows, loading: false, error: null });
+    } catch (error) {
+      setSourceView({
+        source,
+        rows: [],
+        loading: false,
+        error: error instanceof Error ? error.message : "Unable to load source attributes",
+      });
+    }
+  };
   const isManualOverride = !!savedOverrides[`${entity}::${label}`];
   // Use real DB confidence (0-100 int)
   const rawConf = forgeAttr?.confidence ?? null;
@@ -575,7 +611,7 @@ export const InlineTraceDrawer = ({
                 .filter(l => l.value != null && String(l.value).trim())
                 .map((l, i) => {
                   const val = String(l.value ?? "").trim();
-                  const isPrimary = val.toLowerCase() === (forgeAttr.display_value ?? "").toLowerCase().trim();
+                  const isPrimary = comparableAttributeValue(val) === comparableAttributeValue(forgeAttr.display_value);
                   const conf = l.confidence_score != null ? Math.round(Number(l.confidence_score) * (Number(l.confidence_score) <= 1 ? 100 : 1)) : null;
                   return (
                     <div key={i} className={cn(
@@ -583,9 +619,18 @@ export const InlineTraceDrawer = ({
                       isPrimary ? "border-success/30 bg-success-soft/20" : "border-border bg-secondary/40",
                     )}>
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={cn("text-[9px] font-bold uppercase tracking-widest", isPrimary ? "text-success" : "text-muted-foreground")}>
+                        <button
+                          type="button"
+                          onClick={() => openSource(l.source ?? "Unknown source")}
+                          disabled={!kycRef || !l.source}
+                          className={cn(
+                            "text-[9px] font-bold uppercase tracking-widest text-left hover:underline disabled:no-underline",
+                            isPrimary ? "text-success" : "text-muted-foreground",
+                          )}
+                          title={l.source ? `View all attributes from ${l.source}` : undefined}
+                        >
                           {l.source ?? "Unknown source"}
-                        </span>
+                        </button>
                         {isPrimary && <span className="text-[8px] px-1 rounded bg-success/10 text-success border border-success/20">primary</span>}
                         {conf != null && (
                           <span className={cn("ml-auto text-[9px] font-semibold", conf >= 90 ? "text-primary" : conf >= 70 ? "text-warning" : "text-muted-foreground")}>
@@ -697,6 +742,63 @@ export const InlineTraceDrawer = ({
             </DialogHeader>
             <div className="bg-secondary/20 overflow-auto" style={{ height: "76vh" }}>
               <iframe src={docView.blobUrl} title={docView.file} className="w-full h-full border-0" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* All attributes contributed by a selected lineage source. Dialog closes
+          on outside click via the shared Radix Dialog behavior. */}
+      {sourceView && (
+        <Dialog open onOpenChange={(open) => { if (!open) setSourceView(null); }}>
+          <DialogContent className="max-w-3xl p-0 overflow-hidden gap-0">
+            <DialogHeader className="px-4 py-3 border-b border-border">
+              <DialogTitle className="text-[13px]">Source data · {sourceView.source}</DialogTitle>
+              <p className="text-[10px] text-muted-foreground">
+                All current case attributes containing lineage from this source.
+              </p>
+            </DialogHeader>
+            <div className="max-h-[70vh] overflow-auto p-3">
+              {sourceView.loading && (
+                <div className="flex items-center justify-center gap-2 py-10 text-[11px] text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Loading source attributes…
+                </div>
+              )}
+              {sourceView.error && (
+                <p className="rounded-md border border-alert/30 bg-alert-soft px-3 py-2 text-[11px] text-alert">
+                  {sourceView.error}
+                </p>
+              )}
+              {!sourceView.loading && !sourceView.error && sourceView.rows.length === 0 && (
+                <p className="py-10 text-center text-[11px] italic text-muted-foreground">
+                  No current attributes were found for this source.
+                </p>
+              )}
+              <div className="divide-y divide-border rounded-lg border border-border">
+                {sourceView.rows.map(({ attribute, sourceValue, sourceConfidence }) => (
+                  <div key={attribute.attribute_name} className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold text-foreground">
+                        {prettifyAttrLabel(attribute.attribute_name)}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {attribute.id_flag && <span className="rounded border border-primary/20 bg-primary/10 px-1 text-[8px] text-primary">identified</span>}
+                        {attribute.verification_flag && <span className="rounded border border-success/20 bg-success/10 px-1 text-[8px] text-success">verified</span>}
+                        {attribute.exception_flag && <span className="rounded border border-alert/20 bg-alert/10 px-1 text-[8px] text-alert">exception</span>}
+                        {sourceConfidence != null && <span className="text-[8px] text-muted-foreground">{sourceConfidence}% confidence</span>}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="break-words text-[11px] font-medium text-foreground">{String(sourceValue ?? "—")}</p>
+                      {comparableAttributeValue(sourceValue) !== comparableAttributeValue(attribute.display_value) && (
+                        <p className="mt-1 break-words text-[9px] text-muted-foreground">
+                          Current value: {attribute.display_value ?? "—"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </DialogContent>
         </Dialog>

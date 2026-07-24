@@ -6,7 +6,7 @@ import { normalizeForAttribute } from '../dd/enumNormalizer.js';
 function normalizeValue(attributeName, value) {
   if (value == null) return { value, unmapped: false };
   const r = normalizeForAttribute(value, attributeName);
-  if (!r.enumName) return { value, unmapped: false };
+  if (!r.enumName && !r.dataType) return { value, unmapped: false };
   return { value: r.value, unmapped: !r.matched };
 }
 
