@@ -188,13 +188,19 @@ if (firstExceptionBlock) {
       options: ['Yes', 'No'],
       defaultValue: 'No',
     },
-    exception_type: {
-      dataType: 'string',
-      control: 'select',
-      valueEnum: 'ExceptionType',
-      options: meta.enums.ExceptionType ?? [],
+    exception_assessments: {
+      dataType: 'array',
+      control: 'exception-assessments',
+      item: {
+        exception_type: {
+          dataType: 'string',
+          control: 'select',
+          valueEnum: 'ExceptionType',
+          options: meta.enums.ExceptionType ?? [],
+        },
+        exception_reasoning: { dataType: 'string', control: 'textarea' },
+      },
     },
-    exception_reasoning: { dataType: 'string', control: 'textarea' },
     exception_recommendation: { dataType: 'string', control: 'textarea' },
   };
 }

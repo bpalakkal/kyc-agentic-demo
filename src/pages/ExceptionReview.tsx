@@ -89,6 +89,7 @@ type Exc = {
   evidence: Evidence[];
   acceptability: string;
   resolutions: Resolution[];
+  exceptionQueue?: string | null;
   attrLabel?: string; // field_name from DB — the attribute this exception is tied to
 };
 
@@ -139,23 +140,34 @@ type DbExcRow = {
     rows: { field: string; source_a: string; source_b: string }[];
   } | null;
   reasoning: string[] | null;
+  exception_assessments?: { exception_type?: string; exception_reasoning?: string }[] | null;
+  exception_queue?: string | null;
+  routing_confidence?: number | null;
   recommended_actions: ({ option?: number; description?: string; title?: string; action?: string } | string)[] | null;
   status: string;
 };
 
 function dbRowToExc(row: DbExcRow, entityName: string): Exc {
   const title = row.title?.trim() || `Exception #${row.exception_number}`;
-  const reasoning = Array.isArray(row.reasoning) ? row.reasoning.filter((item): item is string => typeof item === "string") : [];
+  const groupedReasoning = Array.isArray(row.exception_assessments)
+    ? row.exception_assessments
+        .filter(item => item?.exception_type && item?.exception_reasoning)
+        .map(item => `${item.exception_type}: ${item.exception_reasoning}`)
+    : [];
+  const reasoning = groupedReasoning.length
+    ? groupedReasoning
+    : (Array.isArray(row.reasoning) ? row.reasoning.filter((item): item is string => typeof item === "string") : []);
   const actions = Array.isArray(row.recommended_actions) ? row.recommended_actions : [];
   return {
     id: `db-${row.kyc_ref}-${row.exception_number}`,
     title,
-    confidence: 82,
+    confidence: row.routing_confidence ?? 82,
     status: row.status === "open" ? "Pending" : "Addressed",
     entity: entityName,
     kyc: row.kyc_ref,
     category: row.field_name ?? "General",
     attrLabel: row.field_name ?? undefined,
+    exceptionQueue: row.exception_queue,
     flagText: reasoning[0] ?? title,
     narrative: reasoning.slice(1).join(" "),
     reasoningSteps: reasoning,
@@ -940,6 +952,11 @@ const ExceptionReview = () => {
               <span className="px-2 py-0.5 rounded-full bg-success-soft text-success border border-success-soft-border text-[11px] font-medium">
                 {active.confidence}% Confidence
               </span>
+              {active.exceptionQueue && (
+                <span className="px-2 py-0.5 rounded-full bg-info-soft text-primary border border-primary/20 text-[11px] font-medium">
+                  Queue: {active.exceptionQueue}
+                </span>
+              )}
               <span className="text-xs text-muted-foreground">Reasoned in {active.reasoningSteps.length} steps</span>
             </div>
           </header>

@@ -51,6 +51,7 @@ export interface AttributeOutput {
   exceptionType?: string | string[];
   exceptionReason?: string | string[];
   exceptionRecommendation?: string | string[];
+  exceptionAssessments?: ExceptionAssessment[];
   lineage: LineageEntry[];
   // DD-result fields (populated by DdRunner; null for sourcing agents)
   idReasoning?: string | null;
@@ -78,8 +79,18 @@ export interface ExceptionOutput {
   recommendedActions: string[]; // e.g. ["Request updated document", "Escalate to compliance"]
   confidence: number;           // 0–100
   severity: 'low' | 'medium' | 'high';
+  assessments?: ExceptionAssessment[];
+  recommendation?: string;
+  exceptionQueue?: 'Compliance' | 'Analyst' | 'Client' | 'CRM' | 'Auto-Resolve';
+  guidanceReferences?: string[];
+  evidenceSources?: string[];
   entityAttributeId?: string | null;
   entityPersonId?: string | null;
+}
+
+export interface ExceptionAssessment {
+  exceptionType: 'Missing Value' | 'Invalid Format' | 'Validation Failed' | 'Source Conflict' | 'Requires Manual Review' | 'Other';
+  exceptionReasoning: string;
 }
 
 // ─── File output ──────────────────────────────────────────────────────────────

@@ -70,8 +70,7 @@ function validateSchema(schema, label) {
     if (Object.hasOwn(node, 'exception_flag')) {
       for (const field of [
         'exception_flag',
-        'exception_type',
-        'exception_reasoning',
+        'exception_assessments',
         'exception_recommendation',
       ]) {
         if (!Object.hasOwn(node, field)) errors.push(`${path}: missing ${field}`);

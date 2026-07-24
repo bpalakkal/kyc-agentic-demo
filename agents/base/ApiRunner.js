@@ -202,7 +202,7 @@ export class ApiRunner {
       for (const exception of (output.exceptions ?? [])) {
         if (!exception.attributeName) continue;
         const current = exceptionsByAttribute.get(exception.attributeName) ?? {
-          types: [], reasons: [], recommendations: [],
+          types: [], reasons: [], recommendations: [], assessments: [],
         };
         const append = (target, value) => {
           for (const item of (Array.isArray(value) ? value : (value == null ? [] : [value]))) {
@@ -213,6 +213,9 @@ export class ApiRunner {
         append(current.types, exception.exceptionType);
         append(current.reasons, exception.reasoning);
         append(current.recommendations, exception.recommendedActions);
+        for (const item of (exception.assessments ?? [])) {
+          if (item?.exceptionType && item?.exceptionReasoning) current.assessments.push(item);
+        }
         exceptionsByAttribute.set(exception.attributeName, current);
       }
 
@@ -224,6 +227,7 @@ export class ApiRunner {
           exceptionType: assessment.types,
           exceptionReason: assessment.reasons,
           exceptionRecommendation: assessment.recommendations,
+          exceptionAssessments: assessment.assessments,
         } : attribute;
       });
       stats.attrCount = await new AttributePublisher(this.sb)

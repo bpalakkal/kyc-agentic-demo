@@ -76,6 +76,12 @@ export class AttributePublisher {
         exception_type:         asStringArray(attr.exceptionType ?? (norm.unmapped ? 'Unmapped Value' : null)),
         exception_reason:       asStringArray(attr.exceptionReason),
         exception_recommendation: asStringArray(attr.exceptionRecommendation),
+        exception_assessments: Array.isArray(attr.exceptionAssessments)
+          ? attr.exceptionAssessments.map(item => ({
+              exception_type: String(item.exceptionType ?? '').trim(),
+              exception_reasoning: String(item.exceptionReasoning ?? '').trim(),
+            })).filter(item => item.exception_type && item.exception_reasoning)
+          : [],
         lineage,
       };
     });

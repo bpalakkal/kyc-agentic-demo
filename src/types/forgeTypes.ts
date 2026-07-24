@@ -11,6 +11,7 @@ export type ForgeAttrRow = {
   exception_type: string[] | null;
   exception_reason?: string[] | null;
   exception_recommendation?: string[] | null;
+  exception_assessments?: { exception_type: string; exception_reasoning: string }[] | null;
   lineage?: ForgeLineageEntry[] | null;
 };
 

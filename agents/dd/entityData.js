@@ -37,11 +37,10 @@ function block(row, { verifiable }) {
     ...(verifiable ? { verification_source: asArray(row?.verification_source) } : {}),
     id_reasoning: row?.id_reasoning ?? null,
     ...(verifiable ? { verification_reasoning: row?.verification_reasoning ?? null } : {}),
-    exception_reason: Array.isArray(row?.exception_reason) ? row.exception_reason : [],
-    exception_recommendation: Array.isArray(row?.exception_recommendation) ? row.exception_recommendation : [],
-    exception_type: Array.isArray(row?.exception_type)
-      ? row.exception_type
-      : (row?.exception_type ? [row.exception_type] : []),
+    exception_assessments: Array.isArray(row?.exception_assessments) ? row.exception_assessments : [],
+    exception_recommendation: Array.isArray(row?.exception_recommendation)
+      ? (row.exception_recommendation[0] ?? null)
+      : (row?.exception_recommendation ?? null),
     lineage: Array.isArray(row?.lineage) ? row.lineage.map(mapLineage) : [],
   };
   return base;
@@ -107,7 +106,16 @@ function blockToAttribute(attributeName, blk) {
     idFlag: isYes(blk.id_flag),
     verificationFlag: isYes(blk.verification_flag),
     exceptionFlag: isYes(blk.exception_flag),
-    exceptionType: isYes(blk.exception_flag) ? (blk.exception_type ?? null) : null,
+    exceptionType: isYes(blk.exception_flag)
+      ? (blk.exception_assessments ?? []).map(item => item.exception_type)
+      : null,
+    exceptionAssessments: isYes(blk.exception_flag)
+      ? (blk.exception_assessments ?? []).map(item => ({
+          exceptionType: item.exception_type,
+          exceptionReasoning: item.exception_reasoning,
+        }))
+      : [],
+    exceptionRecommendation: blk.exception_recommendation ?? null,
     lineage: Array.isArray(blk.lineage)
       ? blk.lineage.map((l) => ({
           value: Array.isArray(l.value) ? l.value.join(', ') : (l.value == null ? '' : String(l.value)),

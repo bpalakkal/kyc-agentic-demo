@@ -84,11 +84,14 @@ Legacy `entity_snapshots` and nullable `snapshot_id` columns remain in the schem
 
 Exception data has two deliberate layers:
 
-- Current assessment on `entity_attributes`: `exception_flag` and JSON arrays
-  `exception_type`, `exception_reason`, and `exception_recommendation`.
+- Current assessment on `entity_attributes`: `exception_flag`, grouped
+  `exception_assessments` entries that pair one enum type with its reasoning,
+  and one overall recommendation. Legacy parallel arrays remain for backward
+  compatibility during the transition.
 - Durable workflow in `exceptions`: lifecycle status, severity,
-  `exception_types`, reasoning, recommended actions, sources, resolution data,
-  and links to `entity_attribute_id` or `entity_person_id`.
+  grouped assessments, routing queue, guidance references, evidence sources,
+  routing confidence, recommendation, resolution data, and links to
+  `entity_attribute_id` or `entity_person_id`.
 
 Publishers synchronize agent exceptions into the current assessment while
 preserving workflow and audit history.
@@ -190,6 +193,7 @@ Run migrations in `scripts/migrations` in numeric order:
 025_work_queue_agent_batches.sql
 026_normalized_exception_assessments.sql
 027_agent_model_profiles.sql
+028_exception_routing_agent.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.
@@ -207,6 +211,13 @@ Migration `024` enforces sourcing/DD sequencing, migration `025` adds durable
 Work Queue batches, and migration `026` introduces normalized multi-value
 exception assessments. Migration `027` adds registry-selected Bedrock model
 profiles and immutable provider/model attribution on `agent_runs`.
+
+Migration `028` has been applied in production. It registers the Sonnet-backed
+`exception-routing` dependency agent and attaches it after `dd-all-in-one`.
+The agent combines deterministic schema and ID/V checks with binding RIA policy
+analysis. It routes genuine findings to Compliance, Analyst, Client, or CRM;
+No decisions are retained in the raw run output for audit but do not create
+review-queue records.
 
 Apply migration `027` before deploying the Bedrock-enabled backend. It assigns
 Haiku to LLM-assisted sourcing, document-processing, and screening agents;

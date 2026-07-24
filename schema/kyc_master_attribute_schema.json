@@ -39,8 +39,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -81,9 +85,6 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -109,8 +110,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -149,9 +154,6 @@
         }
       },
       "id_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -193,8 +195,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -236,9 +242,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -280,8 +283,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -325,9 +332,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -367,8 +371,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -413,9 +421,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -455,8 +460,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -500,9 +509,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -542,8 +548,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -587,9 +597,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -629,8 +636,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -674,9 +685,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -702,8 +710,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -742,9 +754,6 @@
         }
       },
       "id_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -786,8 +795,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -831,9 +844,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -873,8 +883,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -918,9 +932,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -960,8 +971,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1005,9 +1020,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -1047,8 +1059,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1090,9 +1106,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -1130,8 +1143,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1175,9 +1192,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -1203,8 +1217,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1245,9 +1263,6 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -1273,8 +1288,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1313,9 +1332,6 @@
         }
       },
       "id_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -1357,8 +1373,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1402,9 +1422,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -1430,8 +1447,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1472,9 +1493,6 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -1500,8 +1518,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1545,9 +1567,6 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -1587,8 +1606,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1630,9 +1653,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -1680,8 +1700,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -1725,9 +1749,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -1767,8 +1788,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -1812,9 +1837,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -1854,8 +1876,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -1899,9 +1925,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -1933,8 +1956,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -1973,9 +2000,6 @@
         }
       },
       "id_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -2003,8 +2027,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2043,9 +2071,6 @@
         }
       },
       "id_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -2087,8 +2112,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2135,9 +2164,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -2177,8 +2203,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2223,9 +2253,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -2273,8 +2300,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -2319,9 +2350,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -2363,8 +2391,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -2411,9 +2443,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -2442,8 +2471,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2484,9 +2517,6 @@
       "id_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -2512,8 +2542,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2552,9 +2586,6 @@
         }
       },
       "id_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -2596,8 +2627,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2642,9 +2677,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -2686,8 +2718,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2734,9 +2770,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -2776,8 +2809,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2819,9 +2856,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -2863,8 +2897,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2908,9 +2946,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -2950,8 +2985,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -2995,9 +3034,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -3037,8 +3073,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -3080,9 +3120,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -3124,8 +3161,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -3167,9 +3208,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -3509,8 +3547,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -3554,9 +3596,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -3596,8 +3635,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -3642,9 +3685,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -3684,8 +3724,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -3727,9 +3771,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -3771,8 +3812,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -3814,9 +3859,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -3867,8 +3909,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -3910,9 +3956,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -3954,8 +3997,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -3997,9 +4044,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -4041,8 +4085,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4087,9 +4135,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4129,8 +4174,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4174,9 +4223,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4202,8 +4248,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4242,9 +4292,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -4286,8 +4333,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4331,9 +4382,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4373,8 +4421,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4418,9 +4470,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4460,8 +4509,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4506,9 +4559,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4548,8 +4598,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4593,9 +4647,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4621,8 +4672,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4661,9 +4716,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -4714,8 +4766,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4759,9 +4815,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -4787,8 +4840,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4827,9 +4884,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -4871,8 +4925,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -4914,9 +4972,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -4958,8 +5013,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5003,9 +5062,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5045,8 +5101,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5091,9 +5151,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5133,8 +5190,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5178,9 +5239,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5206,8 +5264,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5246,9 +5308,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -5290,8 +5349,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5335,9 +5398,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5377,8 +5437,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5422,9 +5486,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5450,8 +5511,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5492,9 +5557,6 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5520,8 +5582,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5565,9 +5631,6 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5593,8 +5656,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5633,9 +5700,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -5677,8 +5741,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5720,9 +5788,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -5764,8 +5829,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5809,9 +5878,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5851,8 +5917,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5896,9 +5966,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -5938,8 +6005,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -5981,9 +6052,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -6034,8 +6102,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6079,9 +6151,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6107,8 +6176,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6147,9 +6220,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -6191,8 +6261,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6234,9 +6308,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -6278,8 +6349,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6323,9 +6398,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6365,8 +6437,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6411,9 +6487,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6453,8 +6526,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6498,9 +6575,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6526,8 +6600,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6566,9 +6644,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -6610,8 +6685,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6655,9 +6734,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6697,8 +6773,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6742,9 +6822,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6770,8 +6847,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6812,9 +6893,6 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6840,8 +6918,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6885,9 +6967,6 @@
             "id_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -6913,8 +6992,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -6953,9 +7036,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -7006,8 +7086,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7049,9 +7133,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -7093,8 +7174,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7136,9 +7221,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -7180,8 +7262,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7223,9 +7309,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -7267,8 +7350,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7312,9 +7399,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7354,8 +7438,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7400,9 +7488,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7428,8 +7513,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7468,9 +7557,6 @@
               }
             },
             "id_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -7512,8 +7598,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7557,9 +7647,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7599,8 +7686,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7644,9 +7735,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7686,8 +7774,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7731,9 +7823,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7773,8 +7862,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7818,9 +7911,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7860,8 +7950,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7905,9 +7999,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -7947,8 +8038,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -7990,9 +8085,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -8034,8 +8126,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8077,9 +8173,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -8130,8 +8223,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8173,9 +8270,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -8217,8 +8311,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8260,9 +8358,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -8304,8 +8399,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8348,9 +8447,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -8392,8 +8488,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8438,9 +8538,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -8480,8 +8577,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8525,9 +8626,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -8567,8 +8665,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8612,9 +8714,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -8654,8 +8753,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8697,9 +8800,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -8750,8 +8850,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8795,9 +8899,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -8837,8 +8938,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8883,9 +8988,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -8925,8 +9027,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -8968,9 +9074,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -9012,8 +9115,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -9055,9 +9162,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -9108,8 +9212,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -9153,9 +9261,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -9195,8 +9300,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -9241,9 +9350,6 @@
             "verification_reasoning": {
               "type": "string"
             },
-            "exception_reasoning": {
-              "type": "string"
-            },
             "exception_recommendation": {
               "type": "string"
             }
@@ -9283,8 +9389,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -9326,9 +9436,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -9370,8 +9477,12 @@
               ],
               "default": "No"
             },
-            "exception_type": {
-              "$ref": "#/$defs/ExceptionType"
+            "exception_assessments": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExceptionAssessment"
+              },
+              "default": []
             },
             "lineage": {
               "type": "array",
@@ -9413,9 +9524,6 @@
               "type": "string"
             },
             "verification_reasoning": {
-              "type": "string"
-            },
-            "exception_reasoning": {
               "type": "string"
             },
             "exception_recommendation": {
@@ -9460,8 +9568,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -9505,9 +9617,6 @@
       "verification_reasoning": {
         "type": "string"
       },
-      "exception_reasoning": {
-        "type": "string"
-      },
       "exception_recommendation": {
         "type": "string"
       }
@@ -9547,8 +9656,12 @@
         ],
         "default": "No"
       },
-      "exception_type": {
-        "$ref": "#/$defs/ExceptionType"
+      "exception_assessments": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ExceptionAssessment"
+        },
+        "default": []
       },
       "lineage": {
         "type": "array",
@@ -9591,9 +9704,6 @@
         "type": "string"
       },
       "verification_reasoning": {
-        "type": "string"
-      },
-      "exception_reasoning": {
         "type": "string"
       },
       "exception_recommendation": {
@@ -10424,6 +10534,22 @@
         "low"
       ],
       "default": "medium"
+    },
+    "ExceptionAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exception_type": {
+          "$ref": "#/$defs/ExceptionType"
+        },
+        "exception_reasoning": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "exception_type",
+        "exception_reasoning"
+      ]
     }
   },
   "x-entity-type-applicability": {

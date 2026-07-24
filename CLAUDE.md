@@ -498,6 +498,13 @@ run. Expected `agent_runs` columns include `llm_provider`,
 `llm_profile_key`, and `llm_model_id`; `agent_registry` must include
 `model_profile`.
 
+Migration `028_exception_routing_agent.sql` adds grouped
+`exception_assessments`, queue and policy/evidence routing metadata, registers
+the Sonnet-backed dependency-only `exception-routing` agent, and attaches it as
+a post-agent of `dd-all-in-one`. Each assessment pairs exactly one master
+`ExceptionType` value with its reasoning; an attribute has one overall
+recommendation and a workflow exception has one routing queue.
+
 ### 6. Server restart mid-run
 If Railway restarted between when the run was launched and when the frontend polls for status, the orphan detection marks it `failed` with the message `"Server restarted while run was in progress"`. Re-run the agent — this is expected behaviour.
 

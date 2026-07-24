@@ -1,6 +1,6 @@
 {
-  "schemaVersion": "a0c73bc14b619b34",
-  "generatedAt": "2026-07-23T22:18:21.246Z",
+  "schemaVersion": "a4b9d3fecbc992fb",
+  "generatedAt": "2026-07-24T20:34:28.692Z",
   "source": {
     "master": "kyc_master_attribute_schema.json",
     "screening": "screening_results_schema.json"
@@ -8831,22 +8831,28 @@
       ],
       "defaultValue": "No"
     },
-    "exception_type": {
-      "dataType": "string",
-      "control": "select",
-      "valueEnum": "ExceptionType",
-      "options": [
-        "Missing Value",
-        "Invalid Format",
-        "Validation Failed",
-        "Source Conflict",
-        "Requires Manual Review",
-        "Other"
-      ]
-    },
-    "exception_reasoning": {
-      "dataType": "string",
-      "control": "textarea"
+    "exception_assessments": {
+      "dataType": "array",
+      "control": "exception-assessments",
+      "item": {
+        "exception_type": {
+          "dataType": "string",
+          "control": "select",
+          "valueEnum": "ExceptionType",
+          "options": [
+            "Missing Value",
+            "Invalid Format",
+            "Validation Failed",
+            "Source Conflict",
+            "Requires Manual Review",
+            "Other"
+          ]
+        },
+        "exception_reasoning": {
+          "dataType": "string",
+          "control": "textarea"
+        }
+      }
     },
     "exception_recommendation": {
       "dataType": "string",

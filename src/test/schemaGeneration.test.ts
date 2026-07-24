@@ -51,8 +51,13 @@ describe("generated UI schema contract", () => {
   it("generates exception controls and embeds the screening schema", () => {
     expect(exceptionModel).toMatchObject({
       exception_flag: { control: "select", options: ["Yes", "No"] },
-      exception_type: { control: "select", valueEnum: "ExceptionType" },
-      exception_reasoning: { control: "textarea" },
+      exception_assessments: {
+        control: "exception-assessments",
+        item: {
+          exception_type: { control: "select", valueEnum: "ExceptionType" },
+          exception_reasoning: { control: "textarea" },
+        },
+      },
       exception_recommendation: { control: "textarea" },
     });
     expect(screeningSchema.title).toBeTruthy();

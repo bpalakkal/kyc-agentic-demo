@@ -86,8 +86,20 @@ export class ExceptionPublisher {
       severity:            exc.severity ?? null,
       title:               exc.title,
       exception_types:     asStringArray(exc.exceptionType),
+      exception_assessments: Array.isArray(exc.assessments)
+        ? exc.assessments.map(item => ({
+            exception_type: String(item.exceptionType ?? '').trim(),
+            exception_reasoning: String(item.exceptionReasoning ?? '').trim(),
+          })).filter(item => item.exception_type && item.exception_reasoning)
+        : [],
       reasoning:           exc.reasoning ?? [],
-      recommended_actions: exc.recommendedActions ?? [],
+      recommended_actions: exc.recommendation ? [exc.recommendation] : (exc.recommendedActions ?? []),
+      exception_queue:     exc.exceptionQueue ?? 'Analyst',
+      guidance_references: asStringArray(exc.guidanceReferences),
+      evidence_sources:    asStringArray(exc.evidenceSources),
+      routing_confidence:  Number.isFinite(Number(exc.confidence))
+        ? Math.max(0, Math.min(100, Math.round(Number(exc.confidence))))
+        : null,
       entity_attribute_id: exc.entityAttributeId ?? attributeIds.get(exc.attributeName) ?? null,
       entity_person_id:    exc.entityPersonId ?? null,
     }));

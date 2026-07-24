@@ -84,6 +84,21 @@ function asStringArray(value) {
   return values.map(item => String(item ?? '').trim()).filter(Boolean);
 }
 
+function asExceptionAssessments(value, legacyTypes, legacyReasons) {
+  if (Array.isArray(value)) {
+    return value.map(item => ({
+      exception_type: String(item?.exception_type ?? item?.exceptionType ?? '').trim(),
+      exception_reasoning: String(item?.exception_reasoning ?? item?.exceptionReasoning ?? '').trim(),
+    })).filter(item => item.exception_type && item.exception_reasoning);
+  }
+  const types = asStringArray(legacyTypes);
+  const reasons = asStringArray(legacyReasons);
+  return types.map((exception_type, index) => ({
+    exception_type,
+    exception_reasoning: reasons[index] ?? '',
+  }));
+}
+
 /**
  * Given an attribute object from KYC JSON, return a flat record
  * suitable for inserting into entity_attributes.
@@ -104,6 +119,11 @@ function parseAttribute(attrName, attrObj, group) {
     exception_type:      asStringArray(attrObj.exception_type),
     exception_reason:    asStringArray(attrObj.exception_reason ?? attrObj.exception_reasoning),
     exception_recommendation: asStringArray(attrObj.exception_recommendation),
+    exception_assessments: asExceptionAssessments(
+      attrObj.exception_assessments,
+      attrObj.exception_type,
+      attrObj.exception_reason ?? attrObj.exception_reasoning,
+    ),
     lineage:             lineage.length > 0 ? lineage : null,
   };
 }
@@ -198,6 +218,11 @@ async function syncForgeExceptions(kycRef, forgeData) {
       exceptionTypes: asStringArray(val.exception_type ?? 'Missing Value'),
       reasons: asStringArray(val.exception_reason ?? val.exception_reasoning),
       recommendations: asStringArray(val.exception_recommendation),
+      assessments: asExceptionAssessments(
+        val.exception_assessments,
+        val.exception_type ?? 'Missing Value',
+        val.exception_reason ?? val.exception_reasoning,
+      ),
     });
   }
   if (candidates.length === 0) return 0;
@@ -234,6 +259,7 @@ async function syncForgeExceptions(kycRef, forgeData) {
     status:           'open',
     title:            `Data quality — ${c.key.replace(/_/g, ' ')}`,
     exception_types: c.exceptionTypes,
+    exception_assessments: c.assessments,
     reasoning:        c.reasons.length ? c.reasons : [`Entity data flagged: ${c.exceptionTypes.join(', ')}`],
     recommended_actions: c.recommendations,
   }));
@@ -301,7 +327,7 @@ export async function saveSnapshot(kycRef, data, { agentId, runId } = {}) {
  * Optionally filter by group ('core', 'wgq').
  */
 export async function getAttributes(kycRef, { group } = {}) {
-  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, exception_reason, exception_recommendation, lineage';
+  const ATTR_SELECT = 'attribute_name, attribute_group, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, exception_reason, exception_recommendation, exception_assessments, lineage';
 
   // ── Layer 1: latest imported snapshot ──────────────────────────────────────
   let snapshotAttrs = [];
@@ -398,7 +424,7 @@ export async function getAttributes(kycRef, { group } = {}) {
  * Used by the Tracing panel.
  */
 export async function getAttributeTrace(kycRef, attributeName) {
-  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, exception_reason, exception_recommendation, lineage';
+  const TRACE_SELECT = 'attribute_name, display_value, confidence, id_flag, id_source, id_reasoning, verification_flag, verification_source, verification_reasoning, exception_flag, exception_type, exception_reason, exception_recommendation, exception_assessments, lineage';
 
   // Layer 1: latest imported snapshot
   const { data: snap } = await sb
@@ -740,7 +766,7 @@ export async function getAgentRegistry() {
 export async function getAttributesByRunId(kycRef, agentRunId) {
   const { data, error } = await sb
     .from('entity_attributes')
-    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, exception_reason, exception_recommendation, lineage')
+    .select('attribute_name, attribute_group, display_value, confidence, id_flag, id_source, verification_flag, verification_source, exception_flag, exception_type, exception_reason, exception_recommendation, exception_assessments, lineage')
     .eq('kyc_ref', kycRef)
     .eq('agent_run_id', agentRunId)
     .order('attribute_name');
