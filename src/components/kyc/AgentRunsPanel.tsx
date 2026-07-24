@@ -232,7 +232,11 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
                 {sec === "attributes" && (
                   <div className="p-1">
                     {attrs.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground italic px-2 py-3 text-center">This run returned no attribute values.</p>
+                      <p className="text-[10px] text-muted-foreground italic px-2 py-3 text-center">
+                        {run.agent_slug === "document-processing-flow"
+                          ? "Document processing delegates extraction to a document-specific digitizer. Review that child agent run for extracted values."
+                          : "This run returned no new attribute values."}
+                      </p>
                     )}
                     {groups.map(({ source, items }) => (
                       <div key={source} className="border-b border-border/50 last:border-b-0">

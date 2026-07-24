@@ -109,15 +109,24 @@ await page.evaluate((evidence) => {
 }, evidence);
 await page.waitForTimeout(300);
 const image = await page.screenshot({ fullPage: true, type: 'png' });
-console.log('__KYC_SCREENSHOT__' + image.toString('base64'));
+image.toString('base64');
 `;
   const execution = await firecrawlBrowserRequest(`/browser/${encodeURIComponent(sessionId)}/execute`, {
     body: { code, language: 'node', timeout: 90 }, timeout: 105_000,
   });
-  const output = String(execution.stdout ?? execution.result ?? '');
+  if (!execution.success || execution.exitCode !== 0 || execution.killed || execution.error) {
+    throw new Error(`Firecrawl evidence screenshot execution failed: ${execution.error || execution.stderr || `exit ${execution.exitCode}`}`);
+  }
+  const result = String(execution.result ?? '').trim();
+  const stdout = String(execution.stdout ?? '');
   const marker = '__KYC_SCREENSHOT__';
-  const encoded = output.slice(output.lastIndexOf(marker) + marker.length).trim().split(/\s/)[0];
-  if (!output.includes(marker) || !encoded) throw new Error('Firecrawl browser returned no evidence screenshot');
+  // Current Firecrawl browser sessions return the final Node expression in
+  // `result`. Continue accepting the old marker-in-stdout format so sessions
+  // running against an older browser backend still work.
+  const encoded = result || (stdout.includes(marker)
+    ? stdout.slice(stdout.lastIndexOf(marker) + marker.length).trim().split(/\s/)[0]
+    : '');
+  if (!encoded) throw new Error('Firecrawl browser returned no evidence screenshot data');
   const content = Buffer.from(encoded, 'base64');
   if (content.length < 5_000 || content.subarray(1, 4).toString('ascii') !== 'PNG') throw new Error('Evidence screenshot was empty or invalid');
   return {
