@@ -38,6 +38,7 @@ import { enumValues } from "./schema/index.js";
 import { FilePublisher } from "./agents/publishers/FilePublisher.js";
 import { DocumentProcessingRunner } from "./agents/runners/api/DocumentProcessingRunner.js";
 import { trackedAgentRuns as filterTrackedAgentRuns } from "./agents/dashboardTracking.js";
+import { isKnownModelProfile, listModelProfiles, resolveModelProfile } from "./agents/models/bedrock.js";
 
 // Lazy Anthropic client — created on first use so the server starts even when
 // ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
@@ -583,7 +584,15 @@ async function getAgentReadiness(slug, { direct = true } = {}) {
   if (direct && agent.user_triggerable === false) return { ok: false, status: 403, error: `Agent "${slug}" is dependency-only` };
   const missing = (agent.required_env ?? []).filter((key) => !process.env[key]);
   if (missing.length) return { ok: false, status: 503, error: `Agent "${slug}" is unavailable: missing ${missing.join(', ')}` };
+  if (agent.model_profile) {
+    try { resolveModelProfile(agent.model_profile); }
+    catch (error) { return { ok: false, status: 503, error: `Agent "${slug}" is unavailable: ${error.message}` }; }
+  }
   return { ok: true, agent };
+}
+
+function modelOptionsForAgent(agent) {
+  return agent?.model_profile ? { modelProfile: resolveModelProfile(agent.model_profile) } : {};
 }
 
 function registrySlugList(value) {
@@ -729,7 +738,7 @@ async function executeBatchAgent({ agent, kycRef, entityName, initiatedBy }) {
       const { data: child, error } = await sb.from('agent_runs').insert({ kyc_ref: kycRef, agent_slug: item.agent.slug, runner_type: 'api', initiated_by: initiatedBy, status: 'running', parent_run_id: parent.id, run_phase: item.phase }).select().single();
       if (error) throw error;
       try {
-        await runScreening(kycRef, { initiatedBy });
+        await runScreening(kycRef, { initiatedBy, modelProfileKey: item.agent.model_profile });
         await sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString() }).eq('id', child.id);
         return 'data_found';
       } catch (error) {
@@ -737,7 +746,7 @@ async function executeBatchAgent({ agent, kycRef, entityName, initiatedBy }) {
         throw error;
       }
     }
-    const runner = new item.RunnerClass(sb);
+    const runner = new item.RunnerClass(sb, modelOptionsForAgent(item.agent));
     return (await runner.run({ kycRef, entityName, initiatedBy, parentRunId: parent.id, runPhase: item.phase })).outcome;
   };
   try {
@@ -954,7 +963,7 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
             if (childError) throw childError;
             try {
               const { runScreening } = getSb();
-              await runScreening(kycRef, { initiatedBy });
+              await runScreening(kycRef, { initiatedBy, modelProfileKey: item.agent.model_profile });
               await getSb().sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString() }).eq('id', childRun.id);
               steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
               return 'data_found';
@@ -963,7 +972,7 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
               throw screeningError;
             }
           } else {
-            const child = new item.RunnerClass(getSb().sb);
+            const child = new item.RunnerClass(getSb().sb, modelOptionsForAgent(item.agent));
             child._onStep = (message) => steps.push(`${item.agent.display_name} · ${message}`);
             const childResult = await child.run({ kycRef, entityName, initiatedBy, parentRunId: parentRun.id, runPhase: item.phase });
             steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
@@ -1020,7 +1029,7 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
   const initiatedBy = req.user.id;
 
   try {
-    const runner = new RunnerClass(getSb().sb);
+    const runner = new RunnerClass(getSb().sb, modelOptionsForAgent(rootAgent));
     const steps  = [];
 
     // startPreview awaits only the DB row creation, then returns immediately.
@@ -1466,7 +1475,9 @@ app.post('/api/entity/:kycRef/screening/run', requireAuth, async (req, res) => {
     const { runScreening } = getSb();
     const initiatedBy = req.user.email ?? req.user.id;
     const plan = await resolveAgentExecutionPlan('screening');
-    if (plan.length === 1) return res.json(await runScreening(req.params.kycRef, { ...req.body, initiatedBy }));
+    if (plan.length === 1) return res.json(await runScreening(req.params.kycRef, {
+      ...req.body, initiatedBy, modelProfileKey: plan[0].agent.model_profile,
+    }));
 
     const { data: parent, error: parentError } = await getSb().sb.from('agent_runs').insert({
       kyc_ref: req.params.kycRef, agent_slug: 'screening', runner_type: 'api', initiated_by: req.user.id,
@@ -1479,9 +1490,11 @@ app.post('/api/entity/:kycRef/screening/run', requireAuth, async (req, res) => {
       for (const item of plan) {
         steps.push(`${item.phase.toUpperCase()} · Starting ${item.agent.display_name}`);
         if (item.agent.execution_mode === 'screening') {
-          screeningResult = await runScreening(req.params.kycRef, { ...req.body, initiatedBy });
+          screeningResult = await runScreening(req.params.kycRef, {
+            ...req.body, initiatedBy, modelProfileKey: item.agent.model_profile,
+          });
         } else {
-          const child = new item.RunnerClass(getSb().sb);
+          const child = new item.RunnerClass(getSb().sb, modelOptionsForAgent(item.agent));
           child._onStep = (message) => steps.push(`${item.agent.display_name} · ${message}`);
           await child.run({
             kycRef: req.params.kycRef, entityName: req.body?.entityName ?? req.params.kycRef,
@@ -1539,13 +1552,19 @@ function canEditAgentRegistry(user) {
 const EDITABLE_AGENT_FIELDS = new Set([
   'display_name', 'description', 'cip_classification', 'enabled', 'user_triggerable', 'top_level_trigger',
   'execution_mode', 'pre_agents', 'post_agents', 'child_agents', 'child_execution',
-  'failure_policy', 'sort_order',
+  'failure_policy', 'sort_order', 'model_profile',
 ]);
 const CIP_CLASSIFICATIONS = new Set(enumValues('CIPClassification'));
 
 function validateAgentRegistryConfig(agents) {
   const bySlug = new Map(agents.map((agent) => [agent.slug, agent]));
   for (const agent of agents) {
+    if (agent.execution_mode === 'orchestrator' && agent.model_profile) {
+      throw new Error(`Orchestrator "${agent.slug}" cannot select a model; configure its leaf agents`);
+    }
+    if (agent.model_profile && !isKnownModelProfile(agent.model_profile)) {
+      throw new Error(`${agent.slug} has unknown model profile "${agent.model_profile}"`);
+    }
     if (agent.cip_classification && agent.cip_classification !== 'all' && !CIP_CLASSIFICATIONS.has(agent.cip_classification)) {
       throw new Error(`${agent.slug} has invalid CIP classification "${agent.cip_classification}"`);
     }
@@ -1593,6 +1612,10 @@ app.get('/api/agents/access', requireAuth, (req, res) => {
   });
 });
 
+app.get('/api/model-profiles', requireAuth, (_req, res) => {
+  res.json(listModelProfiles());
+});
+
 // POST /api/entity/:kycRef/documents/upload — customer-provided evidence.
 // Body: { files: [{ filename, mimeType, contentBase64 }] }
 app.post('/api/entity/:kycRef/documents/upload', requireAuth, async (req, res) => {
@@ -1621,7 +1644,9 @@ app.post('/api/entity/:kycRef/documents/upload', requireAuth, async (req, res) =
     if (publication.errors.length && publication.stored === 0) throw new Error(publication.errors.join(' | '));
 
     const entity = await getSb().getEntity(kycRef);
-    const runner = new DocumentProcessingRunner(getSb().sb);
+    const documentAgent = (await getSb().getAgentRegistry())
+      .find((agent) => agent.slug === 'document-processing-flow');
+    const runner = new DocumentProcessingRunner(getSb().sb, modelOptionsForAgent(documentAgent));
     void runner.run({
       kycRef, entityName: entity?.entity_name ?? kycRef, initiatedBy: req.user.id,
       runPhase: 'post',
@@ -1644,16 +1669,21 @@ app.get('/api/agents', requireAuth, async (_req, res) => {
     const enriched = await Promise.all(agents.map(async (agent) => {
       const requiredEnv = Array.isArray(agent.required_env) ? agent.required_env : [];
       const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+      let modelError = null;
+      if (agent.model_profile) {
+        try { resolveModelProfile(agent.model_profile); }
+        catch (error) { modelError = error.message; }
+      }
       const runnerRegistered = ['screening', 'orchestrator'].includes(agent.execution_mode)
         ? true
         : !!(await loadRunnerClass(agent.slug));
       return {
         ...agent,
         runner_registered: runnerRegistered,
-        available: agent.enabled && runnerRegistered && missingEnv.length === 0,
+        available: agent.enabled && runnerRegistered && missingEnv.length === 0 && !modelError,
         readiness_error: !runnerRegistered
           ? `No backend runner registered for slug "${agent.slug}"`
-          : (missingEnv.length ? `Missing configuration: ${missingEnv.join(', ')}` : null),
+          : (missingEnv.length ? `Missing configuration: ${missingEnv.join(', ')}` : modelError),
       };
     }));
     const bySlug = new Map(enriched.map((agent) => [agent.slug, agent]));
@@ -1939,7 +1969,8 @@ app.post('/api/entity/:kycRef/dd/run', requireAuth, async (req, res) => {
       const RunnerClass = await loadRunnerClass(slug).catch(() => null);
       if (!RunnerClass) { started.push({ slug, error: 'not found' }); continue; }
 
-      const runner = new RunnerClass(getSb().sb);
+      const agent = (await getSb().getAgentRegistry()).find((entry) => entry.slug === slug);
+      const runner = new RunnerClass(getSb().sb, modelOptionsForAgent(agent));
       const steps  = [];
 
       const { runId, executionPromise } = await runner.startPreview(

@@ -8,7 +8,7 @@
  */
 
 import { ApiRunner } from '../../base/ApiRunner.js';
-import Anthropic      from '@anthropic-ai/sdk';
+import { createBedrockClaudeClient } from '../../models/bedrock.js';
 import { captureSourceScreenshot } from './sourcingArtifacts.js';
 
 const SOURCE     = 'Jersey FSC';
@@ -64,8 +64,7 @@ export class JerseyFSCRunner extends ApiRunner {
 
     this.step(`Searching JFSC registry for "${entityName}"…`);
 
-    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required for the Jersey FSC runner');
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = createBedrockClaudeClient(this.modelProfile?.key ?? 'bedrock-claude-haiku');
 
     const messages = [
       { role: 'user', content: `Find the JFSC registration record for the entity: "${entityName}"` },
@@ -78,7 +77,7 @@ export class JerseyFSCRunner extends ApiRunner {
       iterations++;
 
       const response = await client.messages.create({
-        model:      'claude-sonnet-4-6',
+        model:      client.profile.modelId,
         max_tokens: 4096,
         system:     SYSTEM_PROMPT,
         tools:      TOOLS,

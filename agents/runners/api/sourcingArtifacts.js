@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { createBedrockClaudeClient } from '../../models/bedrock.js';
 
 const FIRECRAWL_BASE = 'https://api.firecrawl.dev/v2';
 
@@ -31,13 +31,12 @@ function documentContentBlock(file) {
   return null;
 }
 
-export async function classifyKycDocument(file) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required for document classification');
+export async function classifyKycDocument(file, { modelProfileKey = 'bedrock-claude-haiku' } = {}) {
   const content = documentContentBlock(file);
   if (!content) return { documentType: 'Unknown', reason: `Unsupported MIME type: ${file.mimeType}`, confidence: 0 };
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = createBedrockClaudeClient(modelProfileKey);
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6', max_tokens: 1024, temperature: 0,
+    model: client.profile.modelId, max_tokens: 1024, temperature: 0,
     system: 'You are the authoritative KYC document classifier. Classify from explicit content only. Assign exactly one allowed type. Use Other when readable content is ambiguous and Unknown only when it cannot be read. Return JSON only.',
     messages: [{ role: 'user', content: [content, { type: 'text', text: `File name: ${file.filename}\nAllowed document_type values:\n${DOCUMENT_TYPES.join('\n')}\nReturn {"document_type":"...","reason":"brief explicit content evidence","confidence":0-100}.` }] }],
   });
@@ -191,14 +190,14 @@ export async function digitizeKycDocument(file, {
   source,
   scalarFields,
   partyRoles = [],
+  modelProfileKey = 'bedrock-claude-haiku',
 }) {
   if (!file?.content?.length) return { attributes: [], persons: [] };
   const content = documentContentBlock(file);
   if (!content) return { attributes: [], persons: [] };
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required for document digitization');
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = createBedrockClaudeClient(modelProfileKey);
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: client.profile.modelId,
     max_tokens: 8192,
     temperature: 0,
     system: `You extract explicit KYC facts from a ${documentType}. Return JSON only. Never infer a missing value. Use null for unavailable fields.`,

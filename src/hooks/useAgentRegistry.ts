@@ -25,9 +25,18 @@ export type RegistryAgent = {
   sort_order?: number;
   execution_mode?: "generic" | "screening" | "orchestrator";
   required_env?: string[];
+  model_profile?: string | null;
   runner_registered?: boolean;
   available?: boolean;
   readiness_error?: string | null;
+};
+
+export type ModelProfile = {
+  key: string;
+  provider: string;
+  display_name: string;
+  model_env: string;
+  available: boolean;
 };
 
 /**
@@ -47,6 +56,19 @@ export function useAgentRegistry() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? `Agent registry HTTP ${response.status}`);
       return Array.isArray(data) ? data : (data.agents ?? []);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useModelProfiles() {
+  return useQuery<ModelProfile[]>({
+    queryKey: ["model-profiles"],
+    queryFn: async () => {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/model-profiles`);
+      const data = await response.json().catch(() => []);
+      if (!response.ok) throw new Error(data.error ?? `Model profiles HTTP ${response.status}`);
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 5 * 60 * 1000,
   });

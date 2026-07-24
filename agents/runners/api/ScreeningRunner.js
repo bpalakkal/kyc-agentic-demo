@@ -10,22 +10,12 @@
  * Never imported directly by route handlers — use runScreening().
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { createBedrockClaudeClient } from '../../models/bedrock.js';
 
 const OPENSANCTIONS_API = 'https://api.opensanctions.org/match/default';
 const SCORE_THRESHOLD   = 0.7;
 
 // ── Lazy Anthropic client ────────────────────────────────────────────────────
-let _anthropic = null;
-function getAnthropic() {
-  if (!_anthropic) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
-    _anthropic = new Anthropic({ apiKey });
-  }
-  return _anthropic;
-}
-
 // ── OpenSanctions query builder ──────────────────────────────────────────────
 
 /**
@@ -166,7 +156,7 @@ async function callOpenSanctions(subjects) {
  * @param {object} match     — single OpenSanctions result
  * @returns {Promise<{ disposition: string, rationale: string }>}
  */
-async function discountWithClaude(subject, match) {
+async function discountWithClaude(subject, match, client) {
   const prompt = `You are a KYC compliance analyst evaluating a potential sanctions/PEP screening match.
 
 Subject being screened:
@@ -189,8 +179,8 @@ Respond ONLY with valid JSON in this exact shape:
 { "disposition": "true_match" | "discounted", "rationale": "<one sentence explanation>" }`;
 
   try {
-    const msg = await getAnthropic().messages.create({
-      model:      'claude-sonnet-4-6',
+    const msg = await client.messages.create({
+      model:      client.profile.modelId,
       max_tokens: 256,
       messages:   [{ role: 'user', content: prompt }],
     });
@@ -214,6 +204,9 @@ Respond ONLY with valid JSON in this exact shape:
 // ── Main runner class ────────────────────────────────────────────────────────
 
 export class ScreeningRunner {
+  constructor({ modelProfileKey = 'bedrock-claude-haiku' } = {}) {
+    this.client = createBedrockClaudeClient(modelProfileKey);
+  }
   /**
    * Run screening for a case. Reads parties from DB, calls OpenSanctions,
    * calls Claude for hits above the score threshold.
@@ -262,7 +255,7 @@ export class ScreeningRunner {
       // Run Claude discounting concurrently for all above-threshold hits
       const matches = await Promise.all(
         aboveThreshold.map(async (hit) => {
-          const { disposition, rationale } = await discountWithClaude(subject, hit);
+          const { disposition, rationale } = await discountWithClaude(subject, hit, this.client);
           return {
             id:               hit.id,
             caption:          hit.caption ?? null,

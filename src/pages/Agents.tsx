@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { RefreshCw, ChevronLeft, ChevronRight, Pencil, ShieldCheck, Search, X, Plus, ArrowUp, ArrowDown } from "lucide-react";
-import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
+import { isAgentAvailable, useAgentRegistry, useModelProfiles, type RegistryAgent } from "@/hooks/useAgentRegistry";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { toast } from "sonner";
@@ -60,6 +60,7 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
   const [draft, setDraft] = useState({ ...agent });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: modelProfiles = [] } = useModelProfiles();
   const set = <K extends keyof RegistryAgent>(key: K, value: RegistryAgent[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const toggleRelation = (field: "pre_agents" | "child_agents" | "post_agents", slug: string) => {
     const values = draft[field] ?? [];
@@ -81,6 +82,7 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
           child_agents: draft.execution_mode === "orchestrator" ? (draft.child_agents ?? []) : [],
           post_agents: draft.post_agents ?? [], child_execution: draft.child_execution ?? "parallel",
           failure_policy: draft.failure_policy ?? "fail_fast", sort_order: draft.sort_order ?? 0,
+          model_profile: draft.execution_mode === "orchestrator" ? null : (draft.model_profile ?? null),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -106,6 +108,21 @@ function EditAgentDialog({ agent, agents, onClose, onSaved }: {
           <label className="space-y-1 text-xs font-semibold">Execution mode
             <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={draft.execution_mode ?? "generic"} onChange={(e) => set("execution_mode", e.target.value as RegistryAgent["execution_mode"])}>
               <option value="generic">Generic leaf</option><option value="screening">Screening leaf</option><option value="orchestrator">Orchestrator</option>
+            </select>
+          </label>
+          <label className="space-y-1 text-xs font-semibold">Model profile
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={draft.model_profile ?? "none"}
+              disabled={draft.execution_mode === "orchestrator"}
+              onChange={(e) => set("model_profile", e.target.value === "none" ? null : e.target.value)}
+            >
+              <option value="none">{draft.execution_mode === "orchestrator" ? "Configured by child agents" : "No LLM"}</option>
+              {modelProfiles.map((profile) => (
+                <option key={profile.key} value={profile.key}>
+                  {profile.display_name}{profile.available ? "" : " (not ready)"}
+                </option>
+              ))}
             </select>
           </label>
           <div className="grid grid-cols-3 gap-2 rounded-xl border p-3 text-xs">

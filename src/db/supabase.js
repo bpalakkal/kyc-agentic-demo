@@ -851,9 +851,9 @@ async function _applyDispositions(kycRef, runRow) {
  * @param {{ initiatedBy?: string }} opts
  * @returns {Promise<object>}  screening result with dispositions overlaid
  */
-export async function runScreening(kycRef, { initiatedBy } = {}) {
+export async function runScreening(kycRef, { initiatedBy, modelProfileKey } = {}) {
   const { ScreeningRunner } = await import('../../agents/runners/api/ScreeningRunner.js');
-  const runner = new ScreeningRunner();
+  const runner = new ScreeningRunner({ modelProfileKey });
   const newResults = await runner.screen(kycRef);
 
   // Fetch the entity for metadata fields

@@ -22,9 +22,10 @@ import { PersonPublisher    } from '../publishers/PersonPublisher.js';
 
 export class ApiRunner {
   /** @param {import('@supabase/supabase-js').SupabaseClient} sb */
-  constructor(sb) {
+  constructor(sb, options = {}) {
     if (!sb) throw new Error('ApiRunner requires a Supabase client (sb)');
     this.sb = sb;
+    this.modelProfile = options.modelProfile ?? null;
     this._onStep = null;
   }
 
@@ -151,6 +152,7 @@ export class ApiRunner {
   // ── Private helpers ─────────────────────────────────────────────────────────
 
   async _createRun(kycRef, initiatedBy, parentRunId, runPhase = 'main') {
+    const model = this.modelProfile ?? null;
     const { data, error } = await this.sb
       .from('agent_runs')
       .insert({
@@ -161,6 +163,11 @@ export class ApiRunner {
         status:       'running',
         parent_run_id: parentRunId ?? null,
         run_phase:     runPhase,
+        ...(model ? {
+          llm_provider: model.provider,
+          llm_model_id: model.modelId,
+          llm_profile_key: model.key,
+        } : {}),
       })
       .select()
       .single();

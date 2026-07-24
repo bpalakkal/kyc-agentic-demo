@@ -10,8 +10,8 @@ const PARTY_ROLES = Object.entries(schemaMeta.attributes)
   .map(([, meta]) => meta.party);
 
 export class DocumentDigitizationRunner extends ApiRunner {
-  constructor(sb, { slug, documentType, file }) {
-    super(sb);
+  constructor(sb, { slug, documentType, file, modelProfile }) {
+    super(sb, { modelProfile });
     this.config = { slug, documentType, file };
   }
   get slug() { return this.config.slug; }
@@ -24,6 +24,7 @@ export class DocumentDigitizationRunner extends ApiRunner {
     const digitized = await digitizeKycDocument(file, {
       documentType, source: `Customer/source document: ${file.title || file.filename}`,
       scalarFields: SCALAR_FIELDS, partyRoles: PARTY_ROLES,
+      modelProfileKey: this.modelProfile?.key,
     });
     const existing = await this._existingAttributeNames(kycRef);
     const seen = new Set(existing);

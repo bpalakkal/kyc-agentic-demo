@@ -18,10 +18,9 @@ import { dirname, join }                         from 'path';
 import { ApiRunner }                             from '../../base/ApiRunner.js';
 import { buildEntityDataJson }                   from '../../dd/entityData.js';
 import { getAttributes, getPersons, getEntity }  from '../../../src/db/supabase.js';
-import Anthropic                                 from '@anthropic-ai/sdk';
+import { createBedrockClaudeClient }             from '../../models/bedrock.js';
 import ddRegistry                                from '../../../schema/dd-registry.json' with { type: 'json' };
 
-const MODEL      = 'claude-sonnet-4-6';
 const __dirname  = dirname(fileURLToPath(import.meta.url));
 const POLICY_DIR = join(__dirname, '../../policy/registered_investment_advisor');
 const READER_MD  = join(__dirname, '../../policy/dd-guidance-reader.md');
@@ -288,7 +287,6 @@ class BaseDdRunner extends ApiRunner {
     const { kycRef } = ctx;
     const startedAt = Date.now();
 
-    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is required for due-diligence runners');
     this.step('Fetching attributes and person records from database…');
     const [allAttrs, allPersons, entity] = await Promise.all([
       getAttributes(kycRef),
@@ -303,7 +301,7 @@ class BaseDdRunner extends ApiRunner {
     });
 
     this.step('Applying DD guidance policy…');
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const anthropic = createBedrockClaudeClient(this.modelProfile?.key ?? 'bedrock-claude-sonnet');
     const { attributes, exceptions } = await this._runClaude(entityData, anthropic, kycRef, ctx.entityName);
 
     this.step(`${attributes.length} attribute(s), ${exceptions.length} exception(s) — ready for review`);
@@ -318,7 +316,7 @@ class BaseDdRunner extends ApiRunner {
       metadata: {
         completedAt:      new Date().toISOString(),
         durationMs:       Date.now() - startedAt,
-        sourcesConsulted: [`Claude ${MODEL} — ${this._slug}`],
+        sourcesConsulted: [`Claude ${anthropic.profile.modelId} via Amazon Bedrock — ${this._slug}`],
       },
     };
   }
@@ -360,8 +358,8 @@ class BaseDdRunner extends ApiRunner {
 // ── Individual DD runner ───────────────────────────────────────────────────────
 
 class IndividualDdRunner extends BaseDdRunner {
-  constructor(sb, slug) {
-    super(sb);
+  constructor(sb, slug, options = {}) {
+    super(sb, options);
     this._slug   = slug;
     this._regKey = slugToKey(slug);
   }
@@ -418,7 +416,7 @@ class IndividualDdRunner extends BaseDdRunner {
     const userPrompt  = buildUserPrompt({ label, policyText, slimmed, governedNames, partyRole });
 
     const response = await anthropic.messages.create({
-      model:      MODEL,
+      model:      anthropic.profile.modelId,
       max_tokens: 4096,
       system:     readerSkill,
       messages:   [{ role: 'user', content: userPrompt }],
@@ -499,8 +497,8 @@ class IndividualDdRunner extends BaseDdRunner {
 // ── All-in-one DD runner ───────────────────────────────────────────────────────
 
 class AllInOneRunner extends BaseDdRunner {
-  constructor(sb) {
-    super(sb);
+  constructor(sb, options = {}) {
+    super(sb, options);
     this._slug = 'dd-all-in-one';
   }
 
@@ -539,7 +537,7 @@ Return a single consolidated JSON matching Forge output contract:
 Valid JSON only — no markdown, no preamble.`;
 
     const response = await anthropic.messages.create({
-      model:      MODEL,
+      model:      anthropic.profile.modelId,
       max_tokens: 8192,
       system:     readerSkill,
       messages:   [{ role: 'user', content: userPrompt }],
@@ -593,13 +591,13 @@ Valid JSON only — no markdown, no preamble.`;
 
 export function makeDdRunner(slug) {
   return class extends IndividualDdRunner {
-    constructor(sb) { super(sb, slug); }
+    constructor(sb, options = {}) { super(sb, slug, options); }
   };
 }
 
 export function makeAllInOneRunner() {
   return class extends AllInOneRunner {
-    constructor(sb) { super(sb); }
+    constructor(sb, options = {}) { super(sb, options); }
   };
 }
 

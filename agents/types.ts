@@ -117,4 +117,5 @@ export interface AgentRegistryEntry {
   description: string;
   runnerType: RunnerType;
   outputType: AgentRunOutput['outputType'];
+  modelProfile?: 'bedrock-claude-haiku' | 'bedrock-claude-sonnet' | 'bedrock-claude-opus' | null;
 }

@@ -35,13 +35,15 @@ export class DocumentProcessingRunner extends ApiRunner {
           this.step(`Skipped duplicate ${record.filename}`);
           continue;
         }
-        const classification = await classifyKycDocument(file);
+        const classification = await classifyKycDocument(file, { modelProfileKey: this.modelProfile?.key });
         await this.sb.from('case_files').update({
           content_sha256: hash, document_type: classification.documentType,
           classification_reason: classification.reason, classified_at: new Date().toISOString(), processing_error: null,
         }).eq('id', record.id);
         const digitizer = await this._resolveDigitizer(classification.documentType);
-        const child = new DocumentDigitizationRunner(this.sb, { ...digitizer, file: { ...file, id: record.id } });
+        const child = new DocumentDigitizationRunner(this.sb, {
+          ...digitizer, file: { ...file, id: record.id }, modelProfile: digitizer.modelProfile,
+        });
         child._onStep = message => this.step(`${digitizer.slug}: ${message}`);
         const childResult = await child.run({
           kycRef, entityName, initiatedBy, parentRunId: currentRunId, runPhase: 'main',
@@ -84,11 +86,16 @@ export class DocumentProcessingRunner extends ApiRunner {
   async _resolveDigitizer(documentType) {
     const preferredSlug = digitizerSlugForType(documentType);
     const { data, error } = await this.sb.from('agent_registry')
-      .select('slug,document_type').eq('slug', preferredSlug).eq('agent_kind', 'document_digitizer')
+      .select('slug,document_type,model_profile').eq('slug', preferredSlug).eq('agent_kind', 'document_digitizer')
       .eq('enabled', true).eq('user_triggerable', false).maybeSingle();
     if (error) throw error;
     if (!data) throw new Error(`No enabled dependency-only digitizer is registered for ${documentType}`);
-    return { slug: data.slug, documentType };
+    const { resolveModelProfile } = await import('../../models/bedrock.js');
+    return {
+      slug: data.slug,
+      documentType,
+      modelProfile: data.model_profile ? resolveModelProfile(data.model_profile) : this.modelProfile,
+    };
   }
 
   _output(kycRef, startedAt, processedIds, outcome, failures = []) {
