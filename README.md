@@ -63,14 +63,29 @@ npm run start
 
 `npm run start` launches Vite on port 8080 and Express on port 3001.
 
-Before first use, run every SQL file in `scripts/migrations/` in numeric order through migration 028, then initialize storage and seed data if needed:
+For the shared-project demo environment, add `SUPABASE_DB_URL`, `SUPABASE_URL`,
+and `SUPABASE_SERVICE_KEY` to `.env`. Set `SUPABASE_DB_SCHEMA=kyc_demo` and
+`SUPABASE_STORAGE_BUCKET=kyc-demo-files`, then bootstrap the isolated schema
+and private Storage with one command:
 
 ```bash
-node scripts/setup-storage.js
-node scripts/seed-supabase.js
+npm run supabase:setup -- --confirm-demo
 ```
 
-Migration `007_kyc_ref_from_ids.sql` truncates existing entity case data. Review it before applying it to any populated environment. Migration `009_person_overrides_and_runs_columns.sql` is required by the current agent commit flow.
+The bootstrapper records applied files in `kyc_demo.app_schema_migrations`, so reruns
+apply only new migrations. Migration `007_kyc_ref_from_ids.sql` truncates case
+data; the command permits it automatically only when the target has no entities.
+For an intentionally destructive rebuild of a populated demo, add
+`--allow-destructive`.
+
+The older `scripts/setup-storage.js` remains available for Storage-only setup.
+Run a demo-data seeder separately after the schema is ready.
+
+In Supabase Dashboard, add `kyc_demo` to **API Settings → Exposed schemas**
+before starting the demo Railway service. The existing application continues
+to use `public` because `SUPABASE_DB_SCHEMA` defaults to `public`.
+
+Migration `009_person_overrides_and_runs_columns.sql` is required by the current agent commit flow.
 Migration `027_agent_model_profiles.sql` is required for model-backed agents, and
 `028_exception_routing_agent.sql` adds the post-DD exception-routing agent.
 
@@ -82,6 +97,7 @@ Migration `027_agent_model_profiles.sql` is required for model-backed agents, an
 | `npm run dev` | Run the Vite frontend only |
 | `npm run server` | Run the Express backend only |
 | `npm run schema:update` | Validate canonical schemas and regenerate runtime metadata/types |
+| `npm run supabase:setup -- --confirm-demo` | Apply pending migrations and create private Storage |
 | `npm run generate` | Regenerate entity fixtures and schema metadata |
 | `npm run build` | Run the prebuild generators and build the production frontend |
 | `npm test` | Run Vitest |
@@ -177,6 +193,9 @@ Copy `.env.example` for the complete template. Important variables include:
 ```text
 SUPABASE_URL
 SUPABASE_SERVICE_KEY
+SUPABASE_DB_URL
+SUPABASE_DB_SCHEMA
+SUPABASE_STORAGE_BUCKET
 VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 VITE_AGENT_API_BASE

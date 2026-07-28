@@ -7,7 +7,7 @@
 
 import { createHash } from 'node:crypto';
 
-const BUCKET = 'kyc-files';
+const BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'kyc-files';
 
 export class FilePublisher {
   /** @param {import('@supabase/supabase-js').SupabaseClient} sb */

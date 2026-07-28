@@ -38,7 +38,9 @@ if (kycRefs.length === 0) {
   process.exit(1);
 }
 
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  db: { schema: process.env.SUPABASE_DB_SCHEMA?.trim() || 'public' },
+});
 
 async function resetEntity(kycRef) {
   console.log(`\nResetting ${kycRef}…`);

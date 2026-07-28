@@ -46,9 +46,10 @@ if (sourceIndex >= 0 && !process.argv[sourceIndex + 1]) {
 }
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  db: { schema: process.env.SUPABASE_DB_SCHEMA?.trim() || 'public' },
   auth: { persistSession: false, autoRefreshToken: false },
 });
-const BUCKET = 'kyc-files';
+const BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'kyc-files';
 const normalizeName = value => value.trim().replace(/\s+/g, ' ').toLocaleUpperCase('en-US');
 const caseNumber = label => Number(label.match(/\d+/)?.[0] ?? Number.MAX_SAFE_INTEGER);
 

@@ -7,12 +7,17 @@ import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 
 const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+export const SUPABASE_DB_SCHEMA = process.env.SUPABASE_DB_SCHEMA?.trim() || 'public';
+export const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'kyc-files';
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set');
 }
 
 export const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  db: {
+    schema: SUPABASE_DB_SCHEMA,
+  },
   realtime: {
     transport: ws,
   },
@@ -801,7 +806,7 @@ export async function getEntityFiles(kycRef, { category } = {}) {
  */
 export async function getSignedFileUrl(storagePath, { expiresIn = 3600 } = {}) {
   const { data, error } = await sb.storage
-    .from('kyc-files')
+    .from(SUPABASE_STORAGE_BUCKET)
     .createSignedUrl(storagePath, expiresIn);
   if (error) throw error;
   return data.signedUrl;
@@ -819,7 +824,7 @@ export async function deleteFile(fileId) {
   if (fetchErr) throw fetchErr;
 
   const { error: storageErr } = await sb.storage
-    .from('kyc-files')
+    .from(SUPABASE_STORAGE_BUCKET)
     .remove([file.storage_path]);
   if (storageErr) throw storageErr;
 

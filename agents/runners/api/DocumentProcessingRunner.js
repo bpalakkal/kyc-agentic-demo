@@ -4,6 +4,8 @@ import { classifyKycDocument } from './sourcingArtifacts.js';
 import { DocumentDigitizationRunner } from './DocumentDigitizationRunner.js';
 import { digitizerSlugForType } from './documentDigitizers.js';
 
+const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'kyc-files';
+
 export class DocumentProcessingRunner extends ApiRunner {
   get slug() { return 'document-processing-flow'; }
   get outputType() { return 'both'; }
@@ -71,7 +73,7 @@ export class DocumentProcessingRunner extends ApiRunner {
   }
 
   async _download(record) {
-    const { data, error } = await this.sb.storage.from('kyc-files').download(record.storage_path);
+    const { data, error } = await this.sb.storage.from(STORAGE_BUCKET).download(record.storage_path);
     if (error) throw error;
     return { filename: record.filename, title: record.title, mimeType: record.mime_type, sourceUrl: record.source_url, content: Buffer.from(await data.arrayBuffer()) };
   }

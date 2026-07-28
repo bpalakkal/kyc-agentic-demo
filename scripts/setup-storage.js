@@ -40,9 +40,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  db: { schema: process.env.SUPABASE_DB_SCHEMA?.trim() || 'public' },
+});
 
-const BUCKET_NAME = 'kyc-files';
+const BUCKET_NAME = process.env.SUPABASE_STORAGE_BUCKET?.trim() || 'kyc-files';
 
 async function main() {
   console.log(`[setup-storage] Connecting to ${SUPABASE_URL}`);

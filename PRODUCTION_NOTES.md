@@ -254,6 +254,8 @@ showcase entity after use with
 |---|---|---|
 | `SUPABASE_URL` | Railway/local | Backend Supabase URL |
 | `SUPABASE_SERVICE_KEY` | Railway/local | Backend service-role access |
+| `SUPABASE_DB_SCHEMA` | Railway/local | PostgreSQL schema; defaults to `public` |
+| `SUPABASE_STORAGE_BUCKET` | Railway/local | Private evidence bucket; defaults to `kyc-files` |
 | `VITE_SUPABASE_URL` | GitHub Actions/local | Frontend Supabase URL |
 | `VITE_SUPABASE_ANON_KEY` | GitHub Actions/local | Frontend authentication |
 | `VITE_AGENT_API_BASE` | GitHub Actions/local | Express API base URL |
