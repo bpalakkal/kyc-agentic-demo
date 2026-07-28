@@ -14,14 +14,14 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle, Database, ClipboardCheck, ShieldCheck } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
 import { EMPTY_WORK_QUEUE_FILTERS, filterWorkQueueRows, type WorkQueueFilters } from "@/lib/workQueueFilters";
-import { isAgentAvailable, useAgentRegistry } from "@/hooks/useAgentRegistry";
+import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
 
 // ─── API types ────────────────────────────────────────────────────────────────
 
@@ -167,7 +167,7 @@ function buildDisplay(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const COLS = "grid-cols-[40px_minmax(220px,1.6fr)_180px_110px_minmax(180px,1.4fr)_110px_100px_110px_70px_140px_140px]";
+const COLS = "grid-cols-[40px_minmax(210px,1.5fr)_150px_100px_90px_100px_65px_125px_minmax(280px,1.5fr)]";
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {
@@ -199,12 +199,16 @@ const EntityRow = ({
   onToggle,
   indent = false,
   batchStatus,
+  agentActions,
+  onTriggerAgent,
 }: {
   r: Row;
   selected: boolean;
   onToggle: (id: string, checked: boolean) => void;
   indent?: boolean;
   batchStatus?: BatchItem;
+  agentActions: Array<{ category: "sourcing" | "due_diligence" | "screening"; label: string; agent?: RegistryAgent; icon: typeof Database }>;
+  onTriggerAgent: (agent: RegistryAgent, row: Row) => void;
 }) => (
   <div
     className={cn(
@@ -237,8 +241,6 @@ const EntityRow = ({
       <Chip variant={r.overdue ? "high" : "medium"} className="font-medium">{r.due}</Chip>
     </span>
     <span className="text-[13px] text-muted-foreground">{r.confidence}</span>
-    <span className="text-[13px] text-muted-foreground truncate">{r.customerType}</span>
-    <span className="text-[13px] text-muted-foreground">{r.jurisdiction}</span>
     <span className="text-[13px]">{r.priority}</span>
     <span className={cn(
       "text-[13px] font-medium",
@@ -248,12 +250,33 @@ const EntityRow = ({
     )}>{r.risk}</span>
     <span className="text-[13px]">{r.exc}</span>
     <span className={cn("text-[13px] font-medium", statusColor(r.status))}>{r.status}</span>
-    <span className="text-[13px] text-muted-foreground">
-      {batchStatus ? (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {agentActions.map(({ category, label, agent, icon: Icon }) => {
+        const available = Boolean(agent && isAgentAvailable(agent) && !r.locked);
+        return (
+          <button
+            key={category}
+            type="button"
+            disabled={!available}
+            title={available ? `Run ${agent!.display_name} for ${r.name}` : agent?.readiness_error ?? `No ${label.toLowerCase()} trigger is configured for this jurisdiction`}
+            onClick={(event) => { event.stopPropagation(); if (agent) onTriggerAgent(agent, r); }}
+            className={cn(
+              "inline-flex h-7 min-w-0 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition-colors",
+              category === "sourcing" && "border-primary/25 bg-primary/5 text-primary hover:bg-primary/10",
+              category === "due_diligence" && "border-warning/30 bg-warning-soft text-warning-foreground hover:brightness-95",
+              category === "screening" && "border-success/25 bg-success-soft text-success hover:brightness-95",
+              !available && "cursor-not-allowed opacity-40",
+            )}
+          >
+            <Icon className="size-3 shrink-0" /><span className="truncate">{label}</span>
+          </button>
+        );
+      })}
+      {batchStatus && (
         <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize", batchStatus.status === "complete" ? "border-success/30 bg-success-soft text-success" : batchStatus.status === "failed" ? "border-alert/30 bg-alert-soft text-alert" : batchStatus.status === "running" ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground")} title={batchStatus.error ?? batchStatus.eligibility_reason ?? undefined}>
           {batchStatus.status === "running" && <Loader2 className="size-2.5 animate-spin" />}{batchStatus.status}
         </span>
-      ) : r.action}
+      )}
     </span>
   </div>
 );
@@ -276,6 +299,7 @@ const WorkQueue = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { data: registry = [] } = useAgentRegistry();
+  const registeredTopAgents = registry.filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger);
   const topAgents = registry.filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger && isAgentAvailable(agent));
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const [agentSlug, setAgentSlug] = useState("");
@@ -328,6 +352,30 @@ const WorkQueue = () => {
     .map((r) => ({ name: r.name, kyc: r.kyc ?? r.id, drg: drgByKyc[r.id] ?? undefined }));
   const selectedCount = selectedEntities.length;
   const batchItemsByKyc = useMemo(() => new Map((batch?.items ?? []).map((item) => [item.kyc_ref, item])), [batch]);
+  const topAgentForRow = (category: "sourcing" | "due_diligence" | "screening", row: Row) => {
+    const candidates = registeredTopAgents.filter((agent) => agent.category === category);
+    if (category !== "sourcing") return candidates[0];
+    const jurisdiction = row.jurisdiction.toLowerCase();
+    if (/united kingdom|england|scotland|wales|jersey|guernsey|\buk\b/.test(jurisdiction)) {
+      return candidates.find((agent) => agent.jurisdiction?.toLowerCase() === "uk");
+    }
+    if (/united states|usa|u\.s\.|puerto rico|\bus\b/.test(jurisdiction)) {
+      return candidates.find((agent) => agent.jurisdiction?.toLowerCase() === "us");
+    }
+    return candidates.find((agent) => !agent.jurisdiction || /global|all/i.test(agent.jurisdiction));
+  };
+  const agentActionsForRow = (row: Row) => [
+    { category: "sourcing" as const, label: "Source", agent: topAgentForRow("sourcing", row), icon: Database },
+    { category: "due_diligence" as const, label: "DD", agent: topAgentForRow("due_diligence", row), icon: ClipboardCheck },
+    { category: "screening" as const, label: "Screen", agent: topAgentForRow("screening", row), icon: ShieldCheck },
+  ];
+  const triggerRowAgent = (agent: RegistryAgent, row: Row) => {
+    setSelected({ [row.id]: true });
+    setAgentSlug(agent.slug);
+    setPreflight(null);
+    setBatchError(null);
+    setAgentDialogOpen(true);
+  };
 
   useEffect(() => {
     if (!agentDialogOpen || agentSlug || !topAgents.length) return;
@@ -512,13 +560,11 @@ const WorkQueue = () => {
           <span>Entity Name ⇅</span>
           <span>Due Date ↑</span>
           <span>Confidence ⇅</span>
-          <span>Customer Type</span>
-          <span>Jurisdiction</span>
           <span>Priority</span>
           <span>Risk ⇅</span>
           <span># Exc ⇅</span>
           <span>Status ⇅</span>
-          <span>Action ⇅</span>
+          <span>Agent Actions</span>
         </div>
 
         {/* Loading state */}
@@ -574,6 +620,8 @@ const WorkQueue = () => {
                   onToggle={handleToggle}
                   indent
                   batchStatus={batchItemsByKyc.get(r.kyc ?? r.id)}
+                  agentActions={agentActionsForRow(r)}
+                  onTriggerAgent={triggerRowAgent}
                 />
               ))}
             </div>
@@ -597,6 +645,8 @@ const WorkQueue = () => {
                 selected={!!selected[r.id]}
                 onToggle={handleToggle}
                 batchStatus={batchItemsByKyc.get(r.kyc ?? r.id)}
+                agentActions={agentActionsForRow(r)}
+                onTriggerAgent={triggerRowAgent}
               />
             ))}
           </>

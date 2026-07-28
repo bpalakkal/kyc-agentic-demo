@@ -27,6 +27,7 @@ type AgentRun = {
   outcome?: "data_found" | "no_data" | "manual_review" | null;
   outcome_reason?: string | null;
   error?: string | null;
+  parent_run_id?: string | null;
   run_phase?: "orchestrator" | "pre" | "main" | "post";
   completed_at?: string | null;
   started_at?: string | null;
@@ -74,6 +75,7 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [openRun, setOpenRun] = useState<Record<string, boolean>>({});
+  const [openGroup, setOpenGroup] = useState<Record<string, boolean>>({});
   const [section, setSection] = useState<Record<string, "thinking" | "attributes" | null>>({});
   const { data: registry = [] } = useAgentRegistry();
 
@@ -108,38 +110,42 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
     return () => window.clearInterval(timer);
   }, [kycRef]);
 
-  // Latest terminal run per leaf agent. Older orchestrated runs may predate
-  // persisted raw_output/steps, but their status and timestamp still matter.
-  const latest = useMemo(() => {
-    const m = new Map<string, AgentRun>();
+  const runGroups = useMemo(() => {
+    const parents = new Map(runs.filter((run) => run.run_phase === "orchestrator").map((run) => [run.id, run]));
+    const grouped = new Map<string, { id: string; parent?: AgentRun; runs: AgentRun[]; timestamp: string }>();
     for (const run of runs) {
-      if (run.run_phase === "orchestrator") continue;
-      if (!["complete", "pending_review", "failed"].includes(run.status)) continue;
-      const prev = m.get(run.agent_slug);
-      const t = run.completed_at ?? run.started_at ?? "";
-      const pt = prev ? (prev.completed_at ?? prev.started_at ?? "") : "";
-      if (!prev || t > pt) m.set(run.agent_slug, run);
+      if (run.run_phase === "orchestrator" || !["complete", "pending_review", "failed"].includes(run.status)) continue;
+      const id = run.parent_run_id || `standalone-${run.id}`;
+      const timestamp = run.completed_at ?? run.started_at ?? "";
+      const group = grouped.get(id) ?? { id, parent: run.parent_run_id ? parents.get(run.parent_run_id) : undefined, runs: [], timestamp };
+      group.runs.push(run);
+      if (timestamp > group.timestamp) group.timestamp = timestamp;
+      grouped.set(id, group);
     }
-    return [...m.values()].sort((a, b) =>
-      (b.completed_at ?? b.started_at ?? "").localeCompare(a.completed_at ?? a.started_at ?? ""));
+    return [...grouped.values()]
+      .map((group) => ({ ...group, runs: group.runs.sort((a, b) => (a.started_at ?? "").localeCompare(b.started_at ?? "")) }))
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   }, [runs]);
+  const visibleRunCount = runGroups.reduce((count, group) => count + group.runs.length, 0);
 
   useEffect(() => {
     if (!focusAgentSlug) return;
-    const match = latest.find((run) => run.agent_slug === focusAgentSlug);
-    if (!match) return;
+    const group = runGroups.find((candidate) => candidate.runs.some((run) => run.agent_slug === focusAgentSlug));
+    const match = group?.runs.find((run) => run.agent_slug === focusAgentSlug);
+    if (!match || !group) return;
+    setOpenGroup((prev) => ({ ...prev, [group.id]: true }));
     setOpenRun((prev) => ({ ...prev, [match.id]: true }));
     setSection((prev) => ({ ...prev, [match.id]: "attributes" }));
     requestAnimationFrame(() => {
       document.querySelector(`[data-agent-run-slug="${CSS.escape(focusAgentSlug)}"]`)
         ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
-  }, [focusAgentSlug, latest]);
+  }, [focusAgentSlug, runGroups]);
 
   const toolbar = (
     <div className="sticky top-0 z-10 mb-3 flex items-center justify-between rounded-xl border border-border/70 bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
       <div>
-        <p className="text-[11px] font-semibold">{latest.length} latest agent run{latest.length === 1 ? "" : "s"}</p>
+        <p className="text-[11px] font-semibold">{runGroups.length} execution batch{runGroups.length === 1 ? "" : "es"} · {visibleRunCount} agent run{visibleRunCount === 1 ? "" : "s"}</p>
         <p className="text-[9px] text-muted-foreground">
           {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Not refreshed yet"}
         </p>
@@ -166,7 +172,7 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
   if (loadError) {
     return <div>{toolbar}<div className="rounded-xl border border-alert/25 bg-alert-soft px-4 py-5 text-center text-xs text-alert">{loadError}</div></div>;
   }
-  if (latest.length === 0) {
+  if (runGroups.length === 0) {
     return (
       <div>{toolbar}<div className="flex flex-col items-center gap-2 text-muted-foreground py-10 text-center px-4">
         <Inbox className="size-6 opacity-40" />
@@ -179,7 +185,27 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
   return (
     <div className="space-y-2 overflow-y-auto">
       {toolbar}
-      {latest.map((run) => {
+      {runGroups.map((group, groupIndex) => {
+        const groupIsOpen = group.id in openGroup ? openGroup[group.id] : groupIndex === 0;
+        const groupLabel = group.parent
+          ? displayName(group.parent.agent_slug)
+          : displayName(group.runs[0].agent_slug);
+        return (
+          <section key={group.id} className="overflow-hidden rounded-xl border border-border/80 bg-secondary/15">
+            <button
+              type="button"
+              onClick={() => setOpenGroup((previous) => ({ ...previous, [group.id]: !groupIsOpen }))}
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-secondary/40"
+            >
+              <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", !groupIsOpen && "-rotate-90")} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[11px] font-bold text-foreground">{groupLabel}</span>
+                <span className="block text-[9px] text-muted-foreground">{fmtTime(group.timestamp)} · {group.runs.length} agent{group.runs.length === 1 ? "" : "s"}</span>
+              </span>
+              {groupIndex > 0 && <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">Historical</span>}
+            </button>
+            {groupIsOpen && <div className="space-y-2 border-t border-border/70 p-2">
+              {group.runs.map((run) => {
         const attrs = (run.raw_output?.attributes ?? []).filter((a) => attrName(a) && attrGroup(a) !== "wgq");
         const groups = groupBySource(attrs);
         const steps = run.steps ?? [];
@@ -273,6 +299,10 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
               </div>
             )}
           </div>
+        );
+              })}
+            </div>}
+          </section>
         );
       })}
     </div>
