@@ -36,7 +36,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, useCal
 import {
   Bot, Sparkles, ChevronDown, ChevronUp, X, Loader2, CheckCircle2, Play, Search,
   ShieldCheck, FileCheck2, Database, Mail, Scale, UserCheck, Globe, Brain, Zap, Minus, Building2,
-  Network, Landmark, FileText, BarChart2, ExternalLink,
+  Network, Landmark, FileText, BarChart2, ExternalLink, LockKeyhole, TriangleAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
@@ -1035,14 +1035,17 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
 
   const categoryBlocked = (category?: string) =>
     (category === "sourcing" && (sequenceState?.due_diligence || selectionHasDd)) ||
-    (category === "due_diligence" && (sequenceState?.sourcing || sequenceState?.pending_attribute_review || selectionHasSourcing));
+    (category === "due_diligence" && (sequenceState?.sourcing || selectionHasSourcing));
 
   const categoryBlockedReason = (category?: string) => {
     if (category === "sourcing" && (sequenceState?.due_diligence || selectionHasDd)) return "Sourcing cannot be combined with active or selected due diligence";
-    if (category === "due_diligence" && sequenceState?.pending_attribute_review) return `${sequenceState.pending_attribute_count} sourced attributes require analyst review`;
     if (category === "due_diligence" && (sequenceState?.sourcing || selectionHasSourcing)) return "Due diligence cannot be combined with active or selected sourcing";
     return undefined;
   };
+  const categoryWarningReason = (category?: string) =>
+    category === "due_diligence" && sequenceState?.pending_attribute_review
+      ? `${sequenceState.pending_attribute_count} sourced attribute${sequenceState.pending_attribute_count === 1 ? "" : "s"} have conflicting values; DD may be run to assess them`
+      : undefined;
 
   // Reset selection whenever the bundle changes (e.g. route navigation)
   useEffect(() => {
@@ -1058,8 +1061,11 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
   };
 
   const runRecommended = () => runAgents(bundle.agents, bundle.label);
+  const selectedHasBlockedAgent = [...selected].some((id) =>
+    categoryBlocked(registryBySlug.get(id)?.category)
+  );
   const runCustom = () => {
-    if (selected.size === 0) return;
+    if (selected.size === 0 || selectedHasBlockedAgent) return;
     runAgents(Array.from(selected), `Custom Run (${selected.size} agents)`);
     setOpen(false);
   };
@@ -1085,10 +1091,18 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
           <button
             onClick={runRecommended}
             disabled={!firstTrigger || entityBusy || !isAgentAvailable(firstTrigger) || categoryBlocked(firstTrigger.category)}
-            title={firstTrigger ? categoryBlockedReason(firstTrigger.category) : undefined}
+            title={firstTrigger
+              ? categoryBlockedReason(firstTrigger.category) ?? categoryWarningReason(firstTrigger.category)
+              : undefined}
             className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-95"
           >
-            {entityBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />} Run Recommended
+            {entityBusy
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : firstTrigger && categoryBlocked(firstTrigger.category)
+                ? <LockKeyhole className="size-3.5" />
+                : firstTrigger && categoryWarningReason(firstTrigger.category)
+                  ? <TriangleAlert className="size-3.5" />
+                : <Zap className="size-3.5" />} Run Recommended
           </button>
           <div ref={triggerMenuRef} className="relative">
             <button
@@ -1135,13 +1149,14 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                         const isSel = selected.has(id);
                         const isLive = isAgentAvailable(registeredAgent);
                         const isBlocked = Boolean(categoryBlocked(registeredAgent.category));
+                        const warning = categoryWarningReason(registeredAgent.category);
                         const isRec = bundle.agents.includes(id);
                         return (
                           <button
                             key={id}
                             onClick={() => isLive && !isBlocked && toggle(id)}
                             disabled={!isLive || isBlocked}
-                            title={categoryBlockedReason(registeredAgent.category) ?? registeredAgent.readiness_error ?? undefined}
+                            title={categoryBlockedReason(registeredAgent.category) ?? warning ?? registeredAgent.readiness_error ?? undefined}
                             className={cn(
                               "w-full text-left px-3 py-2 flex items-start gap-2.5 transition-colors",
                               isLive && !isBlocked ? "hover:bg-secondary/60" : "opacity-40 cursor-not-allowed"
@@ -1165,6 +1180,9 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                                 {isRec && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide">Rec</span>}
                                 {isLive && <span className="text-[9px] px-1 rounded bg-success-soft text-success border border-success-soft-border uppercase tracking-wide flex items-center gap-0.5"><span className="size-1 rounded-full bg-success inline-block" />Live</span>}
                                 {!isLive && <span className="text-[9px] text-muted-foreground/50">Soon</span>}
+                                {isLive && !isBlocked && warning && (
+                                  <span className="text-[9px] px-1 rounded bg-warning-soft text-warning border border-warning-soft-border uppercase tracking-wide">Conflicts</span>
+                                )}
                               </div>
                               <p className="text-[11px] text-muted-foreground leading-snug">{registeredAgent.description}</p>
                               {isLive && !entityContext?.name && (
@@ -1181,7 +1199,8 @@ export const AgentRecommendationStrip = ({ route }: { route: string }) => {
                   <span className="text-[11px] text-muted-foreground">{selected.size} selected</span>
                   <button
                     onClick={runCustom}
-                    disabled={selected.size === 0}
+                    disabled={selected.size === 0 || selectedHasBlockedAgent}
+                    title={selectedHasBlockedAgent ? "One or more selected agents are blocked for this entity" : undefined}
                     className="text-xs px-3 py-1.5 rounded-full bg-primary text-primary-foreground flex items-center gap-1.5 hover:opacity-95 disabled:opacity-40"
                   >
                     <Play className="size-3" /> Trigger Selected

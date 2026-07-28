@@ -12,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Zap, Database, ClipboardList, ShieldCheck, Loader2 } from "lucide-react";
+import { ChevronDown, Zap, Database, ClipboardList, ShieldCheck, Loader2, LockKeyhole, TriangleAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAgents } from "@/components/AgentSystem";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
@@ -21,14 +21,21 @@ import { useAgentSequenceState } from "@/hooks/useAgentSequenceState";
 
 const AGENT_API_BASE = import.meta.env.VITE_AGENT_API_BASE ?? "http://localhost:3001";
 
-function TriggerButton({ icon: Icon, label, children, disabled = false, disabledReason }: {
-  icon: typeof Zap; label: string; children: React.ReactNode; disabled?: boolean; disabledReason?: string;
+function TriggerButton({ icon: Icon, label, children, disabled = false, busy = false, disabledReason, warningReason }: {
+  icon: typeof Zap; label: string; children: React.ReactNode; disabled?: boolean; busy?: boolean;
+  disabledReason?: string; warningReason?: string;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button disabled={disabled} title={disabled ? (disabledReason ?? "An agent is already running for this entity") : undefined} className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border disabled:cursor-not-allowed disabled:opacity-50">
-          {disabled ? <Loader2 className="size-3 animate-spin" /> : <Icon className="size-3" />}
+        <button disabled={disabled} title={disabled ? (disabledReason ?? "An agent is already running for this entity") : warningReason} className="text-[11px] px-3 py-1.5 rounded-md bg-secondary text-foreground font-semibold flex items-center gap-1.5 hover:bg-secondary/80 transition-colors border border-border disabled:cursor-not-allowed disabled:opacity-50">
+          {busy
+            ? <Loader2 className="size-3 animate-spin" />
+            : disabled
+              ? <LockKeyhole className="size-3" />
+              : warningReason
+                ? <TriangleAlert className="size-3 text-warning" />
+              : <Icon className="size-3" />}
           {label} <ChevronDown className="size-3 opacity-60" />
         </button>
       </DropdownMenuTrigger>
@@ -40,13 +47,15 @@ function TriggerButton({ icon: Icon, label, children, disabled = false, disabled
 }
 
 function CategorySection({
-  icon, label, agents, disabled, disabledReason,
+  icon, label, agents, disabled, busy, disabledReason, warningReason,
 }: {
   icon: typeof Database;
   label: string;
   agents: RegistryAgent[];
   disabled: boolean;
+  busy?: boolean;
   disabledReason?: string;
+  warningReason?: string;
 }) {
   const { runAgents } = useAgents();
   const triggerAll = agents.find((a) => a.trigger_all);
@@ -55,8 +64,17 @@ function CategorySection({
   if (agents.length === 0) return null;
 
   return (
-    <TriggerButton icon={icon} label={label} disabled={disabled} disabledReason={disabledReason}>
+    <TriggerButton icon={icon} label={label} disabled={disabled} busy={busy}
+      disabledReason={disabledReason} warningReason={warningReason}>
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
+      {warningReason && (
+        <>
+          <div className="px-2 py-1.5 text-[10px] leading-snug text-warning">
+            {warningReason}. DD may be run to assess these conflicts.
+          </div>
+          <DropdownMenuSeparator />
+        </>
+      )}
       {triggerAll && (
         <DropdownMenuItem
           disabled={!isAgentAvailable(triggerAll)}
@@ -124,15 +142,19 @@ export function AgentTriggers({ caseKyc, entityName: _entityName }: { caseKyc: s
     <div className="flex items-center gap-2">
       <CategorySection icon={Database} label="Sourcing" agents={sourcing}
         disabled={entityBusy || sequenceState?.due_diligence === true}
+        busy={entityBusy || sequenceState?.due_diligence === true}
         disabledReason={sequenceState?.due_diligence ? "Due diligence is running or awaiting review for this entity" : undefined} />
       <CategorySection icon={ClipboardList} label="Due Diligence" agents={dueDiligence}
-        disabled={entityBusy || sequenceState?.sourcing === true || sequenceState?.pending_attribute_review === true}
+        disabled={entityBusy || sequenceState?.sourcing === true}
+        busy={entityBusy || sequenceState?.sourcing === true}
         disabledReason={sequenceState?.sourcing
           ? "Sourcing is running or awaiting review for this entity"
-          : sequenceState?.pending_attribute_review
-            ? `${sequenceState.pending_attribute_count} sourced attribute${sequenceState.pending_attribute_count === 1 ? "" : "s"} require analyst review`
-            : undefined} />
-      <CategorySection icon={ShieldCheck}   label="Screening"       agents={screening} disabled={entityBusy} />
+          : undefined}
+        warningReason={sequenceState?.pending_attribute_review
+          ? `${sequenceState.pending_attribute_count} sourced attribute${sequenceState.pending_attribute_count === 1 ? "" : "s"} have conflicting values`
+          : undefined} />
+      <CategorySection icon={ShieldCheck} label="Screening" agents={screening}
+        disabled={entityBusy} busy={entityBusy} />
     </div>
   );
 }

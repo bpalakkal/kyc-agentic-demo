@@ -190,8 +190,9 @@ operation rather than a separately persisted agent.
 Work Queue batches may invoke registered `top_level_trigger` agents across at
 most 25 eligible cases, with durable progress in `agent_run_batches` and
 `agent_run_batch_items`. Backend concurrency is limited to three cases.
-Sourcing and DD cannot overlap on the same entity, and DD cannot start while
-sourced attributes require review.
+Sourcing and DD cannot overlap on the same entity. Conflicting sourced
+attributes produce a warning but do not block DD; DD may be used to assess and
+resolve those conflicts. Animated busy indicators are reserved for active runs.
 
 ### Agent Register administration
 The Agents page supports client-side registry search and edits registry configuration through `PATCH /api/agents/:slug`; the browser never writes registry rows directly. The server validates references, enabled dependencies, runner/environment readiness, top-level trigger rules, and cycles, then records old/new configurations in `agent_registry_audit`. Set `AGENT_REGISTRY_ADMIN_EMAILS` to a comma-separated Railway allowlist. Supabase users with admin role metadata are always allowed; when no allowlist exists, authenticated users retain edit access for backward compatibility.

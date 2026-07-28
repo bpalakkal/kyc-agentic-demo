@@ -678,9 +678,6 @@ async function sequenceConflict(kycRef, requestedCategory) {
   if (!SEQUENCE_SENSITIVE_CATEGORIES.has(requestedCategory)) return null;
   const state = await getEntitySequenceState(kycRef);
   const conflicting = requestedCategory === 'sourcing' ? 'due_diligence' : 'sourcing';
-  if (requestedCategory === 'due_diligence' && state.pending_attribute_review) {
-    return `Due diligence cannot start while ${state.pending_attribute_count} sourced attribute${state.pending_attribute_count === 1 ? '' : 's'} require analyst review.`;
-  }
   return state[conflicting]
     ? `${requestedCategory === 'sourcing' ? 'Sourcing' : 'Due diligence'} cannot start while ${conflicting === 'sourcing' ? 'sourcing' : 'due diligence'} is running or awaiting review for this entity.`
     : null;
