@@ -64,7 +64,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter basename="/kyc-agentic">
+        <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
             <AppRoutes />
           </AuthProvider>

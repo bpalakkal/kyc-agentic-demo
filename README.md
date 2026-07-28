@@ -9,7 +9,8 @@ React/Vite SPA
   -> Express API on Railway
      -> Supabase PostgreSQL, Auth, and private Storage
      -> direct registry and market-data REST APIs
-     -> Anthropic Claude
+     -> Amazon Bedrock (registered agents)
+     -> Anthropic Claude API (assistant chat)
      -> OpenSanctions
      -> Neo4j (optional)
 ```
@@ -23,7 +24,8 @@ There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves
 | Backend | Express 5, Node.js ESM, Railway |
 | Data and auth | Supabase PostgreSQL, Auth, private Storage |
 | Graph | Neo4j with Cytoscape visualization |
-| AI | Anthropic Claude `claude-sonnet-4-6` |
+| Agent AI | Amazon Bedrock with registry-selected Claude Haiku, Sonnet, or Opus profiles |
+| Assistant AI | Anthropic Claude API |
 | Screening | OpenSanctions REST API |
 
 ## Features
@@ -35,6 +37,10 @@ There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves
 - Beneficial-owner, officer, director, and signatory party tables
 - Direct UK, US, and global sourcing agents
 - Attribute-specific and all-in-one due-diligence agents
+- Registry-driven pre/main/post orchestration with parallel or sequential children
+- Customer-document upload, classification, and document-specific digitization
+- Durable multi-case Work Queue batches with cancellation and retry
+- Policy-aware exception assessment and routing to Compliance, Analyst, Client, or CRM
 - Sanctions and PEP screening with analyst dispositions
 - Private evidence-file storage and signed document URLs
 - Optional Neo4j ownership graph
@@ -57,7 +63,7 @@ npm run start
 
 `npm run start` launches Vite on port 8080 and Express on port 3001.
 
-Before first use, run every SQL file in `scripts/migrations/` in numeric order through migration 026, then initialize storage and seed data if needed:
+Before first use, run every SQL file in `scripts/migrations/` in numeric order through migration 028, then initialize storage and seed data if needed:
 
 ```bash
 node scripts/setup-storage.js
@@ -65,6 +71,8 @@ node scripts/seed-supabase.js
 ```
 
 Migration `007_kyc_ref_from_ids.sql` truncates existing entity case data. Review it before applying it to any populated environment. Migration `009_person_overrides_and_runs_columns.sql` is required by the current agent commit flow.
+Migration `027_agent_model_profiles.sql` is required for model-backed agents, and
+`028_exception_routing_agent.sql` adds the post-DD exception-routing agent.
 
 ## Commands
 
@@ -73,20 +81,28 @@ Migration `007_kyc_ref_from_ids.sql` truncates existing entity case data. Review
 | `npm run start` | Run Vite and Express together |
 | `npm run dev` | Run the Vite frontend only |
 | `npm run server` | Run the Express backend only |
+| `npm run schema:update` | Validate canonical schemas and regenerate runtime metadata/types |
 | `npm run generate` | Regenerate entity fixtures and schema metadata |
-| `npm run build` | Generate metadata and build the production frontend |
+| `npm run build` | Run the prebuild generators and build the production frontend |
 | `npm test` | Run Vitest |
 | `npm run lint` | Run ESLint |
 
 ## Agent model
 
-The Supabase `agent_registry` golden source exposes three groups:
+The Supabase `agent_registry` is the execution authority for sourcing, due
+diligence, screening, document processing, digitization, exception routing,
+and virtual orchestrators:
 
-- Sourcing: Companies House, FCA, JFSC, SEC EDGAR, IAPD, NYSE, GLEIF, and UK/US aggregate flows
+- Sourcing: Companies House, FCA, JFSC, SEC EDGAR, IAPD, NYSE, NFA, Delaware, Puerto Rico, GLEIF, and UK/US aggregate flows
 - Due diligence: `dd-all-in-one` plus 18 policy-driven attribute runners
 - Screening: OpenSanctions matching with Claude-assisted discounting
+- Documents: a processing wrapper plus document-specific digitizers
+- Exception routing: the dependency-only `exception-routing` post-DD agent
 
 `GET /api/agents` reads the persisted registry and adds runtime readiness based on runner wiring and required environment variables. Unavailable agents remain visible in inventory but cannot be triggered.
+Virtual orchestrators resolve registry-owned pre-agents, child agents, and
+post-agents recursively, reject invalid dependencies or cycles, and honor
+their configured execution and failure policies.
 
 Sourcing and DD runners extend `ApiRunner`. The frontend starts a run, polls its steps and status, and automatically commits all output when the backend reaches `pending_review`:
 
@@ -104,7 +120,7 @@ The active application does not present an analyst diff modal. `AttributeDiffMod
 4. Return the `AgentRunOutput` contract.
 5. Export the runner from `agents/runners/api/index.js`.
 6. Add it to `loadRunnerClass()` in `server.js`.
-7. Add the corresponding frontend configuration or registry behavior.
+7. Add or migrate the corresponding `agent_registry` row and readiness metadata.
 
 Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. Pure REST runners use confidence `100`; LLM runners use the model-provided 0–100 score.
 
@@ -115,6 +131,8 @@ Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. P
 - `entity_persons` stores party records and per-person JSON attributes.
 - `exceptions` stores review exceptions and their resolutions.
 - `agent_runs` stores runner status, business outcome (`data_found`, `no_data`, or `manual_review`), steps, output, errors, and sources. `failed` means execution failed; a valid zero-result search is `complete` with `no_data`; an authoritative interactive-only registry is `complete` with `manual_review` and its official link.
+- `agent_run_batches` and `agent_run_batch_items` store durable Work Queue multi-case runs.
+- `customer_documents` supports uploaded-document classification and digitization state.
 - The Delaware runner uses a disposable Firecrawl browser session and requires `FIRECRAWL_API_KEY`; valid empty registry results are `no_data`, while browser/API failures are `failed`.
 - `agent_registry` is the authority for every visible and executable agent. It defines pre/post dependencies and virtual orchestrator membership, parallel/sequential execution, and failure policy. UK/US sourcing and DD All-in-One are registry-defined orchestrators; DD All-in-One runs the 18 focused DD agents independently.
 - The Agents page provides audited registry administration. Configure `AGENT_REGISTRY_ADMIN_EMAILS` in Railway as a comma-separated allowlist; Supabase users with `app_metadata.role = admin` are also authorized.
@@ -124,6 +142,9 @@ Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. P
 - `case_files` points to private objects in the `kyc-files` Storage bucket.
 - `case_tab_reviews` stores each analyst's per-case Documents and Agent Runs review cursors. Unread badges persist across sessions and clear when the corresponding tab is opened.
 - Screening tables store party matches and analyst dispositions.
+- Exception assessments pair each canonical exception type with its reasoning;
+  workflow exceptions also retain routing, evidence, guidance, confidence, and
+  resolution history.
 
 Legacy snapshot tables and columns remain for backward-compatible data ingestion. Current no-Forge runners write through `agent_run_id` and do not require Forge snapshots.
 
@@ -160,9 +181,16 @@ VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 VITE_AGENT_API_BASE
 ANTHROPIC_API_KEY
+AWS_BEARER_TOKEN_BEDROCK
+AWS_REGION
+BEDROCK_CLAUDE_HAIKU_MODEL_ID
+BEDROCK_CLAUDE_SONNET_MODEL_ID
+BEDROCK_CLAUDE_OPUS_MODEL_ID
 COMPANIES_HOUSE_API_KEY
 FCA_AUTH_EMAIL
 FCA_API_KEY
+SEC_API_KEY
+FIRECRAWL_API_KEY
 OPENSANCTIONS_API_KEY
 NEO4J_URI
 NEO4J_USER
@@ -170,9 +198,13 @@ NEO4J_PASSWORD
 ZOOM_ACCOUNT_ID
 ZOOM_CLIENT_ID
 ZOOM_CLIENT_SECRET
+AGENT_REGISTRY_ADMIN_EMAILS
 ```
 
 Frontend `VITE_*` values are injected at build time. In production, configure them as GitHub Actions secrets. Backend secrets belong in Railway Variables.
+`ANTHROPIC_API_KEY` is used by assistant chat; registered model-backed agents
+use the controlled Bedrock profiles. Orchestrators do not select a model—their
+leaf agents do.
 
 ## Repository map
 
@@ -182,7 +214,8 @@ agents/                    direct REST and Claude agent ecosystem
   dd/                      DD planning and entity-data preparation
   policy/                  shared and per-attribute DD policies
   publishers/              attribute, exception, and file persistence
-  runners/api/             sourcing, DD, and screening implementations
+  models/                  controlled Bedrock profile resolution
+  runners/api/             sourcing, DD, documents, routing, and screening
 schema/                    canonical schema and generated accessors
 scripts/migrations/        Supabase migrations
 src/
@@ -196,9 +229,19 @@ server.js                  Express API and runner dispatch
 
 ## Deployment
 
-- Frontend: GitHub Pages under `/kyc-agentic/`, deployed by `.github/workflows/deploy.yml`
+- Frontend: GitHub Pages under `/kyc-agentic-demo/`, deployed by `.github/workflows/deploy.yml`
 - Backend: Railway, started through `Procfile`
 - Database: Supabase migrations are applied in numeric order
 - `VITE_AGENT_API_BASE`: GitHub Actions secret pointing to the Railway service
 
-See `PRODUCTION_NOTES.md` for the production handoff, operational checks, and troubleshooting guide. See `agents.md` for the detailed implementation contract.
+## Verification
+
+The current checkout passes:
+
+- `node --check server.js`
+- `node ./node_modules/typescript/bin/tsc --noEmit`
+- `npm test` — 11 files, 39 tests
+
+See `PRODUCTION_NOTES.md` for the production handoff, operational checks, and
+troubleshooting guide. See `agents.md` for the detailed implementation
+contract.

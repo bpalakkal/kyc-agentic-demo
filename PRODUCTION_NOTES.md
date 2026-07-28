@@ -7,7 +7,7 @@ KYC Sentinel is a no-Forge KYC compliance application. Financial-crime analysts 
 The application does not call Forge or an AWS ELB agent runtime. Agents execute in the Express service through direct third-party REST APIs or Claude on Amazon Bedrock.
 
 ```text
-Browser (GitHub Pages, /kyc-agentic/)
+Browser (GitHub Pages, /kyc-agentic-demo/)
   |
   | HTTPS + Supabase bearer token
   v
@@ -156,7 +156,7 @@ The workflow requires these GitHub Actions secrets:
 
 `VITE_AGENT_API_BASE` is a build-time frontend value. Set it in GitHub Actions, not only in Railway.
 
-The current Vite and router base is `/kyc-agentic/`.
+The current Vite and router base is `/kyc-agentic-demo/`.
 
 ### Backend
 
