@@ -194,6 +194,7 @@ Run migrations in `scripts/migrations` in numeric order:
 026_normalized_exception_assessments.sql
 027_agent_model_profiles.sql
 028_exception_routing_agent.sql
+029_anthropic_model_profiles.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.
@@ -219,11 +220,14 @@ analysis. It routes genuine findings to Compliance, Analyst, Client, or CRM;
 No decisions are retained in the raw run output for audit but do not create
 review-queue records.
 
-Apply migration `027` before deploying the Bedrock-enabled backend. It assigns
+Apply migration `027` before deploying the model-enabled backend. It assigns
 Haiku to LLM-assisted sourcing, document-processing, and screening agents;
 assigns Sonnet to DD leaf agents; and leaves REST-only agents without a model.
 Virtual orchestrators do not select a model because their children own that
 configuration.
+
+Migration `029` adds matching direct Anthropic API profiles and the audited,
+atomic provider-switch function used by the Agent Inventory admin control.
 
 One-time environment setup:
 
@@ -259,7 +263,10 @@ showcase entity after use with
 | `VITE_SUPABASE_URL` | GitHub Actions/local | Frontend Supabase URL |
 | `VITE_SUPABASE_ANON_KEY` | GitHub Actions/local | Frontend authentication |
 | `VITE_AGENT_API_BASE` | GitHub Actions/local | Express API base URL |
-| `ANTHROPIC_API_KEY` | Railway/local | Assistant chat only |
+| `ANTHROPIC_API_KEY` | Railway/local | Assistant chat and direct Anthropic agent authentication |
+| `ANTHROPIC_CLAUDE_HAIKU_MODEL_ID` | Railway/local | Direct Anthropic Haiku model ID |
+| `ANTHROPIC_CLAUDE_SONNET_MODEL_ID` | Railway/local | Direct Anthropic Sonnet model ID |
+| `ANTHROPIC_CLAUDE_OPUS_MODEL_ID` | Railway/local | Direct Anthropic Opus model ID |
 | `AWS_BEARER_TOKEN_BEDROCK` | Railway/local | Amazon Bedrock agent authentication |
 | `AWS_REGION` | Railway/local | Bedrock execution region |
 | `BEDROCK_CLAUDE_HAIKU_MODEL_ID` | Railway/local | Haiku model or inference-profile ID |
@@ -277,8 +284,9 @@ showcase entity after use with
 | `PORT` | Railway/local | Express port; defaults to 3001 |
 
 There is no `AWS_AGENT_BASE` or Forge credential in the current architecture.
-Bedrock is called directly from the Express service using the region, bearer
-token, and model IDs stored in Railway.
+Bedrock and Anthropic are called directly from the Express service using
+credentials and controlled model IDs stored in Railway. Configure both sets to
+keep both choices available in the Agent Inventory.
 
 ## Operations and troubleshooting
 

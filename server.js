@@ -38,7 +38,7 @@ import { enumValues } from "./schema/index.js";
 import { FilePublisher } from "./agents/publishers/FilePublisher.js";
 import { DocumentProcessingRunner } from "./agents/runners/api/DocumentProcessingRunner.js";
 import { trackedAgentRuns as filterTrackedAgentRuns } from "./agents/dashboardTracking.js";
-import { isKnownModelProfile, listModelProfiles, resolveModelProfile } from "./agents/models/bedrock.js";
+import { isKnownModelProfile, listModelProfiles, modelProfileForProvider, resolveModelProfile } from "./agents/models/claude.js";
 
 // Lazy Anthropic client — created on first use so the server starts even when
 // ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
@@ -1612,6 +1612,38 @@ app.get('/api/agents/access', requireAuth, (req, res) => {
 
 app.get('/api/model-profiles', requireAuth, (_req, res) => {
   res.json(listModelProfiles());
+});
+
+// Atomically move every model-backed leaf agent to its equivalent Claude tier
+// on the selected provider. The database function also writes the audit rows.
+app.patch('/api/agents/model-provider', requireAuth, async (req, res) => {
+  if (!canEditAgentRegistry(req.user)) return res.status(403).json({ error: 'Agent Register administrator access required' });
+  const provider = req.body?.provider;
+  if (!['aws-bedrock', 'anthropic'].includes(provider)) {
+    return res.status(400).json({ error: 'provider must be "aws-bedrock" or "anthropic"' });
+  }
+  try {
+    const { sb, getAgentRegistry } = getSb();
+    const agents = await getAgentRegistry();
+    const targets = agents
+      .filter((agent) => agent.execution_mode !== 'orchestrator' && agent.model_profile)
+      .map((agent) => modelProfileForProvider(agent.model_profile, provider));
+    for (const profileKey of new Set(targets)) resolveModelProfile(profileKey);
+
+    const { data, error } = await sb.rpc('switch_agent_model_provider', {
+      p_provider: provider,
+      p_changed_by: req.user.id,
+    });
+    if (error) {
+      const migrationHint = error.code === 'PGRST202' || /switch_agent_model_provider/i.test(error.message ?? '')
+        ? ' Apply scripts/migrations/029_anthropic_model_profiles.sql first.'
+        : '';
+      throw new Error(`${error.message}.${migrationHint}`);
+    }
+    res.json({ provider, updated: Number(data ?? 0) });
+  } catch (err) {
+    res.status(409).json({ error: err.message });
+  }
 });
 
 // POST /api/entity/:kycRef/documents/upload — customer-provided evidence.

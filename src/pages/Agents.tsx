@@ -25,9 +25,12 @@ type PageSize = 10 | 20 | 50 | "all";
 const PAGE_SIZE_OPTIONS: PageSize[] = [10, 20, 50, "all"];
 const CIP_CLASSIFICATIONS = enumValues("CIPClassification");
 const MODEL_PROFILE_LABELS: Record<string, string> = {
-  "bedrock-claude-haiku": "Claude Haiku",
-  "bedrock-claude-sonnet": "Claude Sonnet",
-  "bedrock-claude-opus": "Claude Opus",
+  "bedrock-claude-haiku": "Haiku · Bedrock",
+  "bedrock-claude-sonnet": "Sonnet · Bedrock",
+  "bedrock-claude-opus": "Opus · Bedrock",
+  "anthropic-claude-haiku": "Haiku · Anthropic",
+  "anthropic-claude-sonnet": "Sonnet · Anthropic",
+  "anthropic-claude-opus": "Opus · Anthropic",
 };
 
 function modelProfileLabel(agent: RegistryAgent) {
@@ -217,6 +220,7 @@ function CreateOrchestratorDialog({ agents, onClose, onSaved }: {
 
 export default function Agents() {
   const { data: agents = [], isLoading, isError, error, refetch, isFetching } = useAgentRegistry();
+  const { data: modelProfiles = [] } = useModelProfiles();
 
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<PageSize>(10);
@@ -224,6 +228,7 @@ export default function Agents() {
   const [creating, setCreating] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
+  const [switchingProvider, setSwitchingProvider] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const checkAccess = async () => {
     try {
@@ -261,6 +266,34 @@ export default function Agents() {
   const start = filteredAgents.length === 0 ? 0 : pageSize === "all" ? 1 : safePage * pageSize + 1;
   const end   = pageSize === "all" ? filteredAgents.length : Math.min((safePage + 1) * pageSize, filteredAgents.length);
   const readyCount = agents.filter(isAgentAvailable).length;
+  const modelBackedAgents = agents.filter((agent) => agent.execution_mode !== "orchestrator" && agent.model_profile);
+  const activeProviders = new Set(modelBackedAgents.map((agent) =>
+    agent.model_profile?.startsWith("anthropic-") ? "anthropic" : "aws-bedrock"));
+  const activeProvider = activeProviders.size === 1 ? [...activeProviders][0] : null;
+  const requiredTiers = new Set(modelBackedAgents.map((agent) => agent.model_profile?.split("-").at(-1)));
+  const providerReady = (provider: string) => [...requiredTiers].every((tier) =>
+    modelProfiles.some((profile) => profile.provider === provider && profile.tier === tier && profile.available));
+  const switchProvider = async (provider: "aws-bedrock" | "anthropic") => {
+    if (provider === activeProvider || switchingProvider) return;
+    const label = provider === "anthropic" ? "Anthropic API" : "Amazon Bedrock";
+    if (!window.confirm(`Switch every model-backed agent to ${label}? This change will be audited.`)) return;
+    setSwitchingProvider(provider);
+    try {
+      const response = await apiFetch(`${AGENT_API_BASE}/api/agents/model-provider`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? `Provider switch failed (HTTP ${response.status})`);
+      await refetch();
+      toast.success(`Model provider changed to ${label} for ${body.updated ?? 0} agents`);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Unable to switch model provider");
+    } finally {
+      setSwitchingProvider(null);
+    }
+  };
 
   return (
     <div className="page-shell space-y-5">
@@ -273,6 +306,27 @@ export default function Agents() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && modelBackedAgents.length > 0 && (
+            <div className="flex items-center rounded-md border bg-background p-0.5" aria-label="Claude model provider">
+              {([
+                ["aws-bedrock", "Bedrock"],
+                ["anthropic", "Anthropic"],
+              ] as const).map(([provider, label]) => (
+                <Button
+                  key={provider}
+                  size="sm"
+                  variant={activeProvider === provider ? "default" : "ghost"}
+                  className="h-7 px-2.5 text-xs"
+                  disabled={Boolean(switchingProvider) || !providerReady(provider)}
+                  title={providerReady(provider) ? `Use ${label}` : `${label} environment variables are not configured`}
+                  onClick={() => void switchProvider(provider)}
+                >
+                  {switchingProvider === provider && <RefreshCw className="mr-1 size-3 animate-spin" />}
+                  {label}
+                </Button>
+              ))}
+            </div>
+          )}
           {canEdit && <Button size="sm" onClick={() => setCreating(true)}><Plus className="mr-1.5 size-4" />New Orchestrator</Button>}
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}><RefreshCw className={`size-4 mr-1.5 ${isFetching ? "animate-spin" : ""}`} />Refresh</Button>
         </div>

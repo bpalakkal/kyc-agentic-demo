@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ApiRunner } from '../../base/ApiRunner.js';
-import { createBedrockClaudeClient } from '../../models/bedrock.js';
+import { createClaudeClient } from '../../models/claude.js';
 import { getAttributes, getEntity } from '../../../src/db/supabase.js';
 import schemaMeta from '../../../schema/schema-meta.js';
 import ddRegistry from '../../../schema/dd-registry.json' with { type: 'json' };
@@ -169,7 +169,7 @@ export class ExceptionRoutingRunner extends ApiRunner {
       verification_reasoning: row.verification_reasoning,
       lineage: row.lineage,
     }));
-    const client = createBedrockClaudeClient(this.modelProfile?.key ?? 'bedrock-claude-sonnet');
+    const client = createClaudeClient(this.modelProfile?.key ?? 'bedrock-claude-sonnet');
     this.step(`Applying deterministic checks (${deterministic.length} candidate finding(s)) and Sonnet policy analysis…`);
     const response = await client.messages.create({
       model: client.profile.modelId,

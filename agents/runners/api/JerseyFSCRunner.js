@@ -8,7 +8,7 @@
  */
 
 import { ApiRunner } from '../../base/ApiRunner.js';
-import { createBedrockClaudeClient } from '../../models/bedrock.js';
+import { createClaudeClient } from '../../models/claude.js';
 import { captureSourceScreenshot } from './sourcingArtifacts.js';
 
 const SOURCE     = 'Jersey FSC';
@@ -64,7 +64,7 @@ export class JerseyFSCRunner extends ApiRunner {
 
     this.step(`Searching JFSC registry for "${entityName}"…`);
 
-    const client = createBedrockClaudeClient(this.modelProfile?.key ?? 'bedrock-claude-haiku');
+    const client = createClaudeClient(this.modelProfile?.key ?? 'bedrock-claude-haiku');
 
     const messages = [
       { role: 'user', content: `Find the JFSC registration record for the entity: "${entityName}"` },

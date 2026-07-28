@@ -1,4 +1,4 @@
-import { createBedrockClaudeClient } from '../../models/bedrock.js';
+import { createClaudeClient } from '../../models/claude.js';
 
 const FIRECRAWL_BASE = 'https://api.firecrawl.dev/v2';
 
@@ -34,7 +34,7 @@ function documentContentBlock(file) {
 export async function classifyKycDocument(file, { modelProfileKey = 'bedrock-claude-haiku' } = {}) {
   const content = documentContentBlock(file);
   if (!content) return { documentType: 'Unknown', reason: `Unsupported MIME type: ${file.mimeType}`, confidence: 0 };
-  const client = createBedrockClaudeClient(modelProfileKey);
+  const client = createClaudeClient(modelProfileKey);
   const response = await client.messages.create({
     model: client.profile.modelId, max_tokens: 1024, temperature: 0,
     system: 'You are the authoritative KYC document classifier. Classify from explicit content only. Assign exactly one allowed type. Use Other when readable content is ambiguous and Unknown only when it cannot be read. Return JSON only.',
@@ -204,7 +204,7 @@ export async function digitizeKycDocument(file, {
   if (!file?.content?.length) return { attributes: [], persons: [] };
   const content = documentContentBlock(file);
   if (!content) return { attributes: [], persons: [] };
-  const client = createBedrockClaudeClient(modelProfileKey);
+  const client = createClaudeClient(modelProfileKey);
   const response = await client.messages.create({
     model: client.profile.modelId,
     max_tokens: 8192,

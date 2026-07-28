@@ -9,7 +9,7 @@ React/Vite SPA
   -> Express API on Railway
      -> Supabase PostgreSQL, Auth, and private Storage
      -> direct registry and market-data REST APIs
-     -> Amazon Bedrock (registered agents)
+     -> Amazon Bedrock or Anthropic API (registered agents)
      -> Anthropic Claude API (assistant chat)
      -> OpenSanctions
      -> Neo4j (optional)
@@ -24,7 +24,7 @@ There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves
 | Backend | Express 5, Node.js ESM, Railway |
 | Data and auth | Supabase PostgreSQL, Auth, private Storage |
 | Graph | Neo4j with Cytoscape visualization |
-| Agent AI | Amazon Bedrock with registry-selected Claude Haiku, Sonnet, or Opus profiles |
+| Agent AI | Admin-selectable Amazon Bedrock or Anthropic API with controlled Claude Haiku, Sonnet, or Opus profiles |
 | Assistant AI | Anthropic Claude API |
 | Screening | OpenSanctions REST API |
 
@@ -200,6 +200,9 @@ VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 VITE_AGENT_API_BASE
 ANTHROPIC_API_KEY
+ANTHROPIC_CLAUDE_HAIKU_MODEL_ID
+ANTHROPIC_CLAUDE_SONNET_MODEL_ID
+ANTHROPIC_CLAUDE_OPUS_MODEL_ID
 AWS_BEARER_TOKEN_BEDROCK
 AWS_REGION
 BEDROCK_CLAUDE_HAIKU_MODEL_ID
@@ -221,9 +224,11 @@ AGENT_REGISTRY_ADMIN_EMAILS
 ```
 
 Frontend `VITE_*` values are injected at build time. In production, configure them as GitHub Actions secrets. Backend secrets belong in Railway Variables.
-`ANTHROPIC_API_KEY` is used by assistant chat; registered model-backed agents
-use the controlled Bedrock profiles. Orchestrators do not select a model—their
-leaf agents do.
+The Agent Inventory admin control can atomically switch every model-backed leaf
+agent between equivalent Amazon Bedrock and Anthropic API profiles. The target
+provider must be configured in Railway first; every change is written to the
+Agent Register audit log. Orchestrators do not select a model—their leaf agents
+do. Apply migration `029_anthropic_model_profiles.sql` before using the switch.
 
 ## Repository map
 
@@ -233,7 +238,7 @@ agents/                    direct REST and Claude agent ecosystem
   dd/                      DD planning and entity-data preparation
   policy/                  shared and per-attribute DD policies
   publishers/              attribute, exception, and file persistence
-  models/                  controlled Bedrock profile resolution
+  models/                  controlled Bedrock and Anthropic profile resolution
   runners/api/             sourcing, DD, documents, routing, and screening
 schema/                    canonical schema and generated accessors
 scripts/migrations/        Supabase migrations

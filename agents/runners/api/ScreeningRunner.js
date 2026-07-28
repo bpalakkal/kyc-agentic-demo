@@ -10,7 +10,7 @@
  * Never imported directly by route handlers — use runScreening().
  */
 
-import { createBedrockClaudeClient } from '../../models/bedrock.js';
+import { createClaudeClient } from '../../models/claude.js';
 
 const OPENSANCTIONS_API = 'https://api.opensanctions.org/match/default';
 const SCORE_THRESHOLD   = 0.7;
@@ -205,7 +205,7 @@ Respond ONLY with valid JSON in this exact shape:
 
 export class ScreeningRunner {
   constructor({ modelProfileKey = 'bedrock-claude-haiku' } = {}) {
-    this.client = createBedrockClaudeClient(modelProfileKey);
+    this.client = createClaudeClient(modelProfileKey);
   }
   /**
    * Run screening for a case. Reads parties from DB, calls OpenSanctions,

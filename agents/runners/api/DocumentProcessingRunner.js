@@ -92,7 +92,7 @@ export class DocumentProcessingRunner extends ApiRunner {
       .eq('enabled', true).eq('user_triggerable', false).maybeSingle();
     if (error) throw error;
     if (!data) throw new Error(`No enabled dependency-only digitizer is registered for ${documentType}`);
-    const { resolveModelProfile } = await import('../../models/bedrock.js');
+    const { resolveModelProfile } = await import('../../models/claude.js');
     return {
       slug: data.slug,
       documentType,

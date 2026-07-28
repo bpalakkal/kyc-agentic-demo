@@ -34,6 +34,7 @@ export type RegistryAgent = {
 export type ModelProfile = {
   key: string;
   provider: string;
+  tier: string;
   display_name: string;
   model_env: string;
   available: boolean;
