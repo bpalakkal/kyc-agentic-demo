@@ -97,6 +97,8 @@ export async function captureBrowserSessionScreenshot(sessionId, {
   };
   const code = `
 const evidence = ${JSON.stringify(summary)};
+page.setDefaultTimeout(15000);
+await page.setViewportSize({ width: 1440, height: 1000 });
 await page.evaluate((evidence) => {
   document.getElementById('__kyc_evidence_banner__')?.remove();
   const banner = document.createElement('section');
@@ -108,11 +110,12 @@ await page.evaluate((evidence) => {
   document.body.prepend(banner);
 }, evidence);
 await page.waitForTimeout(300);
-const image = await page.screenshot({ fullPage: true, type: 'png' });
+await page.evaluate(() => window.scrollTo(0, 0));
+const image = await page.screenshot({ fullPage: false, type: 'png', animations: 'disabled', timeout: 30000 });
 image.toString('base64');
 `;
   const execution = await firecrawlBrowserRequest(`/browser/${encodeURIComponent(sessionId)}/execute`, {
-    body: { code, language: 'node', timeout: 90 }, timeout: 105_000,
+    body: { code, language: 'node', timeout: 45 }, timeout: 60_000,
   });
   if (!execution.success || execution.exitCode !== 0 || execution.killed || execution.error) {
     throw new Error(`Firecrawl evidence screenshot execution failed: ${execution.error || execution.stderr || `exit ${execution.exitCode}`}`);
@@ -137,7 +140,7 @@ image.toString('base64');
 }
 
 export async function captureSourceScreenshot(url, options = {}) {
-  const session = await firecrawlBrowserRequest('/browser', { body: { ttl: 150, activityTtl: 150, streamWebView: false } });
+  const session = await firecrawlBrowserRequest('/browser', { body: { ttl: 300, activityTtl: 300, streamWebView: false } });
   if (!session.id) throw new Error('Firecrawl did not create an evidence browser session');
   try {
     await firecrawlBrowserRequest(`/browser/${encodeURIComponent(session.id)}/execute`, {

@@ -177,7 +177,7 @@ export class DelawareRunner extends ApiRunner {
     this.step('Starting a disposable Firecrawl browser for Delaware…');
     let sessionId;
     try {
-      const session = await firecrawlRequest('/browser', { body: { ttl: 150, activityTtl: 150, streamWebView: false } });
+      const session = await firecrawlRequest('/browser', { body: { ttl: 300, activityTtl: 300, streamWebView: false } });
       if (!session.success || !session.id) throw new Error('Firecrawl did not create a browser session');
       sessionId = session.id;
 
