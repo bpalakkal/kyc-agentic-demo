@@ -85,6 +85,21 @@ describe('US sourcing provider contracts', () => {
     expect(output.attributes?.find((attr) => attr.attributeName === 'registration_number')?.displayValue).toBe('1234');
   });
 
+  it('does not substring-match an unrelated short EDGAR company name', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({
+      0: { cik_str: 1018963, ticker: 'ATI', title: 'ATI INC' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const output = await new SECEDGARRunner({}).execute({
+      kycRef: 'CASE_1',
+      entityName: 'FIRST ADVISORS NATIONAL, LLC',
+    });
+
+    expect(output.metadata.outcome).toBe('no_data');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the official NYSE browser source and retains its screenshot', async () => {
     const output = await new NYSERunner({}).execute({ kycRef: 'CASE_1', entityName: 'Example Holdings Inc.' });
     expect(output.attributes?.find((attr) => attr.attributeName === 'listing_status')?.displayValue).toBe('Listed');

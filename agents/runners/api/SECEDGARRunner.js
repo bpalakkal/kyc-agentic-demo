@@ -30,8 +30,11 @@ export class SECEDGARRunner extends ApiRunner {
     const searchData = await searchRes.json();
     const normalized = normalizeName(entityName);
     const companies = Object.values(searchData ?? {});
-    const hit = companies.find((company) => normalizeName(company.title) === normalized)
-      ?? companies.find((company) => normalizeName(company.title).includes(normalized) || normalized.includes(normalizeName(company.title)));
+    // Accept only one normalized exact legal-name match. The former substring
+    // fallback could match short ticker names inside unrelated words (for
+    // example, "ATI" inside "NATIONAL") and contaminate the entire KYC case.
+    const exactMatches = companies.filter((company) => normalizeName(company.title) === normalized);
+    const hit = exactMatches.length === 1 ? exactMatches[0] : null;
 
     if (!hit?.cik_str) {
       this.step(`No EDGAR filer found for "${entityName}"`);
