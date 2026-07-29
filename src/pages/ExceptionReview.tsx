@@ -288,6 +288,8 @@ const ExceptionReview = () => {
     if (dbExceptions.length > 0) return dbExceptions;
     return selectedEntities.map(buildStubException);
   }, [dbExceptions, selectedEntities]);
+  const countableExceptions = effectiveExceptions.filter((exception) => !exception.id.startsWith("stub-"));
+  const exceptionCount = countableExceptions.length;
   const initialActiveId = effectiveExceptions[0]?.id;
 
   const [activeId, setActiveId] = useState(initialActiveId);
@@ -483,13 +485,18 @@ const ExceptionReview = () => {
     }
   }, [isRunning, runs, currentLabel, selectedResolution, active]);
 
-  const addressedCount = Object.keys(resolvedMap).filter((id) => effectiveExceptions.find((e) => e.id === id)).length;
-  const headerMeta = buildHeaderMeta(addressedCount, effectiveExceptions.length);
+  const addressedCount = countableExceptions.filter(
+    (exception) => exception.status === "Addressed" || Boolean(resolvedMap[exception.id]),
+  ).length;
+  const pendingSubmissionCount = Object.keys(resolvedMap).filter(
+    (id) => countableExceptions.some((exception) => exception.id === id),
+  ).length;
+  const headerMeta = buildHeaderMeta(addressedCount, exceptionCount);
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
   const handleSubmit = async () => {
-    if (submitLoading || addressedCount === 0) return;
+    if (submitLoading || pendingSubmissionCount === 0) return;
     setSubmitLoading(true);
     const resolved = Object.entries(resolvedMap)
       .filter(([id]) => id.startsWith("db-"))
@@ -764,20 +771,20 @@ const ExceptionReview = () => {
               <span className="w-px h-6 bg-border" />
               <button
                 onClick={handleSubmit}
-                disabled={submitLoading || addressedCount === 0}
+                disabled={submitLoading || pendingSubmissionCount === 0}
                 className={cn(
                   "text-sm px-4 py-2 flex items-center gap-2 transition-opacity",
                   submitDone
                     ? "bg-success text-white"
-                    : addressedCount === 0
+                    : pendingSubmissionCount === 0
                     ? "bg-muted text-muted-foreground cursor-not-allowed"
                     : "bg-primary text-primary-foreground hover:opacity-95",
                 )}
               >
                 {submitLoading ? <Loader2 className="size-4 animate-spin" /> : submitDone ? <CheckCircle2 className="size-4" /> : <Send className="size-4" />}
                 {submitDone ? "Submitted" : "Submit"}
-                {addressedCount > 0 && !submitDone && (
-                  <span className="bg-white/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{addressedCount}</span>
+                {pendingSubmissionCount > 0 && !submitDone && (
+                  <span className="bg-white/20 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{pendingSubmissionCount}</span>
                 )}
               </button>
             </div>
@@ -812,12 +819,11 @@ const ExceptionReview = () => {
           >
             <ShieldAlert className="size-4" />
             Exception View
-            {(() => {
-              const n = effectiveExceptions.filter(e => e.status === "Pending").length;
-              return n > 0 ? (
-                <span className="bg-alert-soft text-alert text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-alert-soft-border">{n}</span>
-              ) : null;
-            })()}
+            {exceptionCount > 0 && (
+              <span className="bg-alert-soft text-alert text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-alert-soft-border">
+                {exceptionCount}
+              </span>
+            )}
           </button>
           <button
             onClick={() => { setAttrViewMode("attributes"); setRightPaneOpen(false); }}
@@ -861,7 +867,7 @@ const ExceptionReview = () => {
         <aside className="border-r border-border pr-6">
           <div className="flex items-center gap-2 mb-3">
             <Settings2 className="size-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({effectiveExceptions.length})</span>
+            <span className="text-[11px] font-medium uppercase tracking-wide">Exceptions ({exceptionCount})</span>
           </div>
           <ul className="space-y-2">
             {effectiveExceptions.map((e) => {
