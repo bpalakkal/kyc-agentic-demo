@@ -806,21 +806,41 @@ const ExceptionReview = () => {
           </div>
         </div>
         {caseProgress && (
-          <div className="mt-4 border-t border-border/70 pt-3">
-            <div className="mb-1.5 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Case effort completed</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {caseProgress.completed} of {caseProgress.total} actions ·
-                  {" "}{caseProgress.collection.completed}/{caseProgress.collection.total} collected ·
-                  {" "}{caseProgress.identification.completed}/{caseProgress.identification.total} identified ·
-                  {" "}{caseProgress.verification.completed}/{caseProgress.verification.total} verified
-                </p>
+          <div className="mt-4 rounded-xl border border-primary/20 bg-card/90 p-3.5 shadow-sm">
+            <div className="mb-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                  <CheckCircle2 className="size-4" />
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-foreground">Case effort completed</p>
+                  <p className="text-[11px] text-muted-foreground">{caseProgress.completed} of {caseProgress.total} required actions complete</p>
+                </div>
               </div>
-              <span className="text-sm font-bold tabular-nums text-primary">{caseProgress.percent}%</span>
+              <span className="text-2xl font-bold leading-none tabular-nums text-primary">{caseProgress.percent}%</span>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuenow={caseProgress.percent} aria-valuemin={0} aria-valuemax={100}>
-              <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${caseProgress.percent}%` }} />
+            <div className="h-3 overflow-hidden rounded-full border border-primary/10 bg-secondary shadow-inner" role="progressbar" aria-label="Case effort completed" aria-valuenow={caseProgress.percent} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full rounded-full bg-gradient-to-r from-primary/80 to-primary transition-[width] duration-500" style={{ width: `${caseProgress.percent}%` }} />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {([
+                ["Collected", caseProgress.collection],
+                ["Identified", caseProgress.identification],
+                ["Verified", caseProgress.verification],
+              ] as const).map(([label, metric]) => {
+                const complete = metric.total ? Math.round((metric.completed / metric.total) * 100) : 0;
+                return (
+                  <div key={label} className="rounded-lg border border-border/80 bg-secondary/35 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+                      <span className="text-[11px] font-bold tabular-nums text-foreground">{metric.completed}/{metric.total}</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-background">
+                      <div className="h-full rounded-full bg-primary/70" style={{ width: `${complete}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
