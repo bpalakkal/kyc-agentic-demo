@@ -208,7 +208,12 @@ async function seedRichStage(drgId, entity, config) {
       exception_reason: flagged ? flagged.reasoning : [],
       exception_recommendation: flagged
         ? flagged.recommended_actions.map(action => action.description) : [],
-      lineage: lineage(value, source, config.age),
+      lineage: flagged?.comparison
+        ? [
+            ...lineage(flagged.comparison.source_a_value, flagged.comparison.source_a, config.age + 1),
+            ...lineage(flagged.comparison.source_b_value, flagged.comparison.source_b, config.age),
+          ]
+        : lineage(value, source, config.age),
     };
   });
   const { data: inserted } = await checked(
@@ -242,7 +247,15 @@ async function seedRichStage(drgId, entity, config) {
       exception_reasoning: item.reasoning[index] ?? item.reasoning[0] ?? item.title,
     })),
     recommended_actions: item.recommended_actions,
-    sources: { source_a: 'Authoritative source', source_b: 'Customer evidence' },
+    sources: item.comparison ? {
+      source_a: item.comparison.source_a,
+      source_b: item.comparison.source_b,
+      rows: [{
+        field: item.attribute_name,
+        source_a: item.comparison.source_a_value,
+        source_b: item.comparison.source_b_value,
+      }],
+    } : { source_a: 'Authoritative source', source_b: 'Customer evidence' },
     entity_attribute_id: attributeId(item.attribute_name),
     attribute_name: item.attribute_name,
   })));
@@ -329,12 +342,25 @@ async function seedDdComplete(drgId) {
   sow.exception_type = ['Requires Manual Review'];
   sow.exception_reason = ['Audited evidence is one reporting period old and requires analyst acceptance.'];
   sow.exception_recommendation = ['Accept with documented rationale or request current financials.'];
+  sow.lineage = [
+    ...lineage('Accumulated investment-management earnings', 'Prior-period Audited Financial Report', 7),
+    ...lineage('Current-period evidence not provided', 'Current KYC Review', 2),
+  ];
   const taxId = attributes.find(row => row.attribute_name === 'tax_identification_number');
   taxId.verification_flag = false;
   taxId.exception_flag = true;
   taxId.exception_type = ['Document Currency'];
   taxId.exception_reason = ['The IRS confirmation letter is outside the preferred evidence window.'];
   taxId.exception_recommendation = ['Request a current IRS confirmation or approve the existing evidence.'];
+  taxId.lineage = [
+    ...lineage('84-7291056', 'IRS Confirmation Letter (2023)', 8),
+    ...lineage('84-7291056', 'SEC Form ADV', 4),
+  ];
+  const entityNameAttr = attributes.find(row => row.attribute_name === 'entity_name');
+  entityNameAttr.lineage = [
+    ...lineage('Aurelius Harbor Investment Management, L.L.C.', 'Delaware Division of Corporations', 7),
+    ...lineage(entity.entity_name, 'SEC IAPD', 4),
+  ];
   const { data: inserted } = await checked(
     sb.from('entity_attributes').insert(attributes).select('id,attribute_name'), 'Insert DD attributes',
   );
@@ -365,7 +391,10 @@ async function seedDdComplete(drgId) {
       exception_types: ['Requires Manual Review'],
       reasoning: ['Audited financial evidence predates the current review period.'],
       recommended_actions: [{ option: 1, title: 'Accept evidence', description: 'Document why the prior-period audit remains reliable.' }],
-      sources: { source_a: 'Audited Financial Report', source_b: 'KYC policy' },
+      sources: {
+        source_a: 'Prior-period Audited Financial Report', source_b: 'Current KYC Review',
+        rows: [{ field: 'source_of_wealth', source_a: 'Accumulated investment-management earnings', source_b: 'Current-period evidence not provided' }],
+      },
       entity_attribute_id: sowId,
     },
     {
@@ -376,7 +405,10 @@ async function seedDdComplete(drgId) {
       exception_types: ['Document Currency'],
       reasoning: ['The IRS confirmation letter is valid but older than the policy preference.'],
       recommended_actions: [{ option: 1, title: 'Approve evidence', description: 'Accept the letter with a documented currency rationale.' }],
-      sources: { source_a: 'IRS Letter', source_b: 'KYC policy' },
+      sources: {
+        source_a: 'IRS Confirmation Letter (2023)', source_b: 'SEC Form ADV',
+        rows: [{ field: 'tax_identification_number', source_a: '84-7291056', source_b: '84-7291056 (unverified)' }],
+      },
       entity_attribute_id: taxIdId,
     },
     {
@@ -387,7 +419,10 @@ async function seedDdComplete(drgId) {
       exception_types: ['Formatting Difference'],
       reasoning: ['The registry and IAPD records use equivalent LLC suffix formatting.'],
       recommended_actions: [{ option: 1, title: 'Accept match', description: 'Retain the resolved formatting disposition.' }],
-      sources: { source_a: 'SEC IAPD', source_b: 'Delaware registry' },
+      sources: {
+        source_a: 'Delaware Division of Corporations', source_b: 'SEC IAPD',
+        rows: [{ field: 'entity_name', source_a: 'Aurelius Harbor Investment Management, L.L.C.', source_b: entity.entity_name }],
+      },
       entity_attribute_id: nameId,
     },
   ]);
@@ -427,9 +462,39 @@ async function seedSourced(drgId) {
       { role: 'corporate_officer', full_name: 'Mei Tan', ownership_pct: null, nationality: 'Singapore' },
     ],
     exceptions: [
-      { attribute_name: 'legal_registered_address', severity: 'medium', title: 'Registered address purpose requires confirmation', exception_types: ['Address Purpose Ambiguity'], reasoning: ['The registry lists a registered-agent address while Form ADV lists the operating office, so the address purpose requires analyst confirmation.'], recommended_actions: [{ option: 1, title: 'Confirm address', description: 'Confirm registered and operating address purposes.' }] },
-      { attribute_name: 'source_of_wealth', severity: 'medium', title: 'Source of wealth not independently corroborated', exception_types: ['Insufficient Corroboration'], reasoning: ['The source-of-wealth description is supported only by customer-provided evidence and has not been independently corroborated.'], recommended_actions: [{ option: 1, title: 'Request financials', description: 'Obtain audited financial statements.' }] },
-      { attribute_name: 'entity_name', severity: 'low', title: 'Legal-name punctuation difference resolved', exception_types: ['Formatting Difference'], reasoning: ['The legal-name variance is limited to punctuation, and matching registration identifiers confirm that both records refer to the same entity.'], recommended_actions: [{ option: 1, title: 'Accept match', description: 'Accept punctuation-only variance.' }] },
+      {
+        attribute_name: 'legal_registered_address', severity: 'medium',
+        title: 'Registered address purpose requires confirmation',
+        exception_types: ['Address Purpose Ambiguity'],
+        reasoning: ['The registry lists a registered-agent address while Form ADV lists the operating office, so the address purpose requires analyst confirmation.'],
+        recommended_actions: [{ option: 1, title: 'Confirm address', description: 'Confirm registered and operating address purposes.' }],
+        comparison: {
+          source_a: 'Delaware Division of Corporations', source_a_value: '1209 Orange Street, Wilmington, DE 19801',
+          source_b: 'SEC Form ADV', source_b_value: '1700 Lincoln Street, Denver, CO 80203',
+        },
+      },
+      {
+        attribute_name: 'source_of_wealth', severity: 'medium',
+        title: 'Source of wealth not independently corroborated',
+        exception_types: ['Insufficient Corroboration'],
+        reasoning: ['The source-of-wealth description is supported only by customer-provided evidence and has not been independently corroborated.'],
+        recommended_actions: [{ option: 1, title: 'Request financials', description: 'Obtain audited financial statements.' }],
+        comparison: {
+          source_a: 'Customer KYC Questionnaire', source_a_value: 'Retained earnings from investment-management operations',
+          source_b: 'Audited Financial Statements', source_b_value: 'Not provided',
+        },
+      },
+      {
+        attribute_name: 'entity_name', severity: 'low',
+        title: 'Legal-name punctuation difference resolved',
+        exception_types: ['Formatting Difference'],
+        reasoning: ['The legal-name variance is limited to punctuation, and matching registration identifiers confirm that both records refer to the same entity.'],
+        recommended_actions: [{ option: 1, title: 'Accept match', description: 'Accept punctuation-only variance.' }],
+        comparison: {
+          source_a: 'Delaware Division of Corporations', source_a_value: 'Blue Mesa Capital Advisers, L.P.',
+          source_b: 'SEC IAPD', source_b_value: 'Blue Mesa Capital Advisers LP',
+        },
+      },
     ],
     files: [
       ['public/sample-docs/fca-register-marshall-wace.pdf', 'form-adv.pdf', 'SEC Form ADV', 'SEC Form ADV', 'digitize-sec-form-adv'],
@@ -466,9 +531,30 @@ async function seedIntake(drgId) {
       { role: 'authorized_signatory', full_name: 'Aisha Rahman', ownership_pct: null, nationality: 'United States' },
     ],
     exceptions: [
-      { attribute_name: 'evidence_of_existence', severity: 'high', title: 'Formation evidence awaiting authoritative validation', exception_types: ['Unverified Evidence'], reasoning: ['Customer document has not been matched to the state registry.'], recommended_actions: [{ option: 1, title: 'Run sourcing', description: 'Validate against the New York corporate registry.' }] },
-      { attribute_name: 'source_of_funds', severity: 'medium', title: 'Source-of-funds evidence incomplete', exception_types: ['Missing Supporting Evidence'], reasoning: ['Narrative is present but bank evidence is pending.'], recommended_actions: [{ option: 1, title: 'Request evidence', description: 'Obtain supporting bank or audited financial evidence.' }] },
-      { attribute_name: 'entity_name', severity: 'low', title: 'Customer-provided legal name captured', exception_types: ['Pending Validation'], reasoning: ['Name is populated but sourcing has not confirmed it.'], recommended_actions: [{ option: 1, title: 'Validate name', description: 'Confirm legal name through authoritative sourcing.' }] },
+      {
+        attribute_name: 'evidence_of_existence', severity: 'high',
+        title: 'Formation evidence awaiting authoritative validation',
+        exception_types: ['Unverified Evidence'],
+        reasoning: ['The customer supplied a formation certificate, but no authoritative registry result is available to validate its status.'],
+        recommended_actions: [{ option: 1, title: 'Run sourcing', description: 'Validate against the New York corporate registry.' }],
+        comparison: { source_a: 'Customer Formation Certificate', source_a_value: 'Certificate of Formation — Active', source_b: 'New York Corporate Registry', source_b_value: 'Not yet sourced' },
+      },
+      {
+        attribute_name: 'source_of_funds', severity: 'medium',
+        title: 'Source-of-funds evidence incomplete',
+        exception_types: ['Missing Supporting Evidence'],
+        reasoning: ['The onboarding narrative identifies advisory fees, but no bank or audited financial evidence has been supplied.'],
+        recommended_actions: [{ option: 1, title: 'Request evidence', description: 'Obtain supporting bank or audited financial evidence.' }],
+        comparison: { source_a: 'Customer KYC Questionnaire', source_a_value: 'Investment-management and advisory fees', source_b: 'Bank or Audited Evidence', source_b_value: 'Not provided' },
+      },
+      {
+        attribute_name: 'entity_name', severity: 'low',
+        title: 'Customer-provided legal name captured',
+        exception_types: ['Pending Validation'],
+        reasoning: ['The legal name is populated from onboarding data but has not yet been confirmed by an authoritative registry source.'],
+        recommended_actions: [{ option: 1, title: 'Validate name', description: 'Confirm legal name through authoritative sourcing.' }],
+        comparison: { source_a: 'Client Onboarding Form', source_a_value: 'Cedar Lantern Advisory Group LLC', source_b: 'Authoritative Corporate Registry', source_b_value: 'Not yet sourced' },
+      },
     ],
     files: [
       ['public/sample-docs/fca-register-marshall-wace.pdf', 'draft-form-adv.pdf', 'Draft SEC Form ADV', 'SEC Form ADV', 'digitize-sec-form-adv'],
