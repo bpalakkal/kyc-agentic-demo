@@ -3,6 +3,7 @@ import {
   listModelProfiles,
   modelProfileForProvider,
   resolveModelProfile,
+  sanitizeAnthropicRequest,
 } from "../../agents/models/claude.js";
 
 const managedEnvironment = [
@@ -51,5 +52,18 @@ describe("Claude model profiles", () => {
     delete process.env.ANTHROPIC_CLAUDE_HAIKU_MODEL_ID;
     expect(() => resolveModelProfile("anthropic-claude-haiku"))
       .toThrow(/ANTHROPIC_API_KEY/);
+  });
+
+  it("removes deprecated temperature settings from Anthropic requests", () => {
+    expect(sanitizeAnthropicRequest({
+      model: "runner-selected-model",
+      max_tokens: 1024,
+      temperature: 0,
+      messages: [{ role: "user", content: "test" }],
+    }, "claude-sonnet-4-6")).toEqual({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: "test" }],
+    });
   });
 });

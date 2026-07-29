@@ -112,10 +112,20 @@ function createAnthropicClient(profile) {
     profile,
     messages: {
       create(request) {
-        return sdk.messages.create({ ...request, model: profile.modelId });
+        return sdk.messages.create(sanitizeAnthropicRequest(request, profile.modelId));
       },
     },
   };
+}
+
+/**
+ * Current Anthropic model IDs can reject `temperature` as deprecated while
+ * Bedrock profiles still accept it. Strip the option only at this transport
+ * boundary so runner prompts remain provider-neutral.
+ */
+export function sanitizeAnthropicRequest(request, modelId) {
+  const { temperature: _deprecatedTemperature, model: _requestedModel, ...input } = request;
+  return { ...input, model: modelId };
 }
 
 export function createClaudeClient(profileKey) {
