@@ -57,6 +57,7 @@ import { canonicalAttrKey, lineageConflict } from "@/lib/attrLabel";
 import { attributeChecks, attributeUi, entityLevelCoreAttrs, partyColumns, optionalCoreAttrs, visibleParties } from "@/lib/schemaAttrs";
 import Screening from "@/pages/Screening";
 import { AgentTriggers } from "@/components/kyc/AgentTriggers";
+import { calculateCaseProgress, type CaseProgress } from "@/lib/caseProgress";
 
 
 
@@ -493,6 +494,21 @@ const ExceptionReview = () => {
     (id) => countableExceptions.some((exception) => exception.id === id),
   ).length;
   const headerMeta = buildHeaderMeta(addressedCount, exceptionCount);
+  const [caseProgress, setCaseProgress] = useState<CaseProgress | null>(null);
+
+  useEffect(() => {
+    if (!active?.kyc) return;
+    let cancelled = false;
+    Promise.all([
+      apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(active.kyc)}/attributes`).then((response) => response.ok ? response.json() : []),
+      apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(active.kyc)}/persons`).then((response) => response.ok ? response.json() : {}),
+    ]).then(([attributes, persons]) => {
+      if (!cancelled) setCaseProgress(calculateCaseProgress(attributes, persons));
+    }).catch(() => {
+      if (!cancelled) setCaseProgress(null);
+    });
+    return () => { cancelled = true; };
+  }, [active?.kyc, isRunning]);
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
@@ -789,6 +805,25 @@ const ExceptionReview = () => {
             </div>
           </div>
         </div>
+        {caseProgress && (
+          <div className="mt-4 border-t border-border/70 pt-3">
+            <div className="mb-1.5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Case effort completed</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {caseProgress.completed} of {caseProgress.total} actions ·
+                  {" "}{caseProgress.collection.completed}/{caseProgress.collection.total} collected ·
+                  {" "}{caseProgress.identification.completed}/{caseProgress.identification.total} identified ·
+                  {" "}{caseProgress.verification.completed}/{caseProgress.verification.total} verified
+                </p>
+              </div>
+              <span className="text-sm font-bold tabular-nums text-primary">{caseProgress.percent}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-secondary" role="progressbar" aria-valuenow={caseProgress.percent} aria-valuemin={0} aria-valuemax={100}>
+              <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${caseProgress.percent}%` }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Selected entities */}
@@ -886,7 +921,7 @@ const ExceptionReview = () => {
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-[13px] font-semibold leading-tight">{e.title}</span>
+                      <span className="min-w-0 flex-1 whitespace-normal break-words text-[13px] font-semibold leading-tight">{e.title}</span>
                       {isResolved ? (
                         <CheckCircle2 className="size-4 text-success shrink-0" />
                       ) : (() => {
@@ -920,13 +955,13 @@ const ExceptionReview = () => {
                           event.stopPropagation();
                           navigateToAttribute(e);
                         }}
-                        className="mt-0.5 text-left text-[10px] text-primary uppercase tracking-wide hover:underline underline-offset-2"
+                        className="mt-0.5 max-w-full whitespace-normal break-words text-left text-[10px] text-primary uppercase tracking-wide hover:underline underline-offset-2"
                         title={`Open ${e.category} in Attribute View`}
                       >
                         {e.category}
                       </button>
                     ) : (
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{e.category}</p>
+                      <p className="mt-0.5 max-w-full whitespace-normal break-words text-[10px] uppercase tracking-wide text-muted-foreground">{e.category}</p>
                     )}
                     <p className="text-[11px] mt-1 flex items-center gap-1">
                       <span className={cn("size-1.5 rounded-full", isResolved ? "bg-success" : "bg-warning animate-pulse-dot")} />
@@ -1016,11 +1051,11 @@ const ExceptionReview = () => {
                   <div className="rounded-lg border border-border overflow-hidden">
                     <div className="grid grid-cols-[160px_1fr_1fr] text-[10px] font-medium uppercase tracking-wide bg-secondary/60">
                       <div className="px-3 py-2 text-muted-foreground">Field</div>
-                      <div className="px-3 py-2 border-l border-border">
+                      <div className="min-w-0 break-words px-3 py-2 border-l border-border">
                         <span className="text-muted-foreground">Source A · </span>
                         <span className="text-foreground normal-case font-semibold tracking-normal">{cmp.aLabel}</span>
                       </div>
-                      <div className="px-3 py-2 border-l border-border">
+                      <div className="min-w-0 break-words px-3 py-2 border-l border-border">
                         <span className="text-muted-foreground">Source B · </span>
                         <span className="text-foreground normal-case font-semibold tracking-normal">{cmp.bLabel}</span>
                       </div>
@@ -1033,12 +1068,12 @@ const ExceptionReview = () => {
                           r.conflict && "bg-warning-soft/40"
                         )}
                       >
-                        <div className="px-3 py-2 text-muted-foreground flex items-center gap-1.5">
+                        <div className="min-w-0 px-3 py-2 text-muted-foreground flex items-start gap-1.5 whitespace-normal break-words">
                           {r.conflict && <AlertTriangle className="size-3 text-warning shrink-0" />}
-                          <span>{r.field}</span>
+                          <span className="min-w-0 whitespace-normal break-words">{r.field}</span>
                         </div>
-                        <div className={cn("px-3 py-2 border-l border-border", r.conflict && "font-bold text-foreground")}>{r.a}</div>
-                        <div className={cn("px-3 py-2 border-l border-border", r.conflict && "font-bold text-foreground")}>{r.b}</div>
+                        <div className={cn("min-w-0 break-words px-3 py-2 border-l border-border", r.conflict && "font-bold text-foreground")}>{r.a}</div>
+                        <div className={cn("min-w-0 break-words px-3 py-2 border-l border-border", r.conflict && "font-bold text-foreground")}>{r.b}</div>
                       </div>
                     ))}
                   </div>

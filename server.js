@@ -33,24 +33,11 @@ import cors from "cors";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import Anthropic from "@anthropic-ai/sdk";
 import { enumValues } from "./schema/index.js";
 import { FilePublisher } from "./agents/publishers/FilePublisher.js";
 import { DocumentProcessingRunner } from "./agents/runners/api/DocumentProcessingRunner.js";
 import { trackedAgentRuns as filterTrackedAgentRuns } from "./agents/dashboardTracking.js";
-import { isKnownModelProfile, listModelProfiles, modelProfileForProvider, resolveModelProfile } from "./agents/models/claude.js";
-
-// Lazy Anthropic client — created on first use so the server starts even when
-// ANTHROPIC_API_KEY is absent, and so Railway env vars are guaranteed loaded.
-let _anthropic = null;
-function getAnthropic() {
-  if (!_anthropic) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set. Add it in the Railway Variables dashboard.");
-    _anthropic = new Anthropic({ apiKey });
-  }
-  return _anthropic;
-}
+import { createClaudeClient, isKnownModelProfile, listModelProfiles, modelProfileForProvider, resolveModelProfile } from "./agents/models/claude.js";
 
 // ISO timestamp for structured startup logs.
 const ts = () => new Date().toISOString();
@@ -1416,6 +1403,8 @@ Always use tools to retrieve live data before answering. Then respond with analy
   const anthropicMessages = messages.map(m => ({ role: m.role, content: m.text }));
 
   try {
+    const chatProfileKey = await resolveChatModelProfileKey();
+    const chatClient = createClaudeClient(chatProfileKey);
     let continueLoop = true;
     let toolCallIterations = 0;
     let currentMessages = [...anthropicMessages];
@@ -1425,45 +1414,20 @@ Always use tools to retrieve live data before answering. Then respond with analy
         send({ type: "error", message: "Tool call loop limit reached" });
         break;
       }
-      const stream = await getAnthropic().messages.stream({
-        model:      "claude-sonnet-4-6",
+      const response = await chatClient.messages.create({
+        model:      chatClient.profile.modelId,
         max_tokens: 4096,
         system:     systemPrompt,
         tools:      KYC_TOOLS,
         messages:   currentMessages,
       });
 
-      const assistantContent = [];
-      let currentTool = null;
-      let inputBuffer  = "";
-
-      for await (const event of stream) {
-        if (event.type === "content_block_start") {
-          if (event.content_block.type === "text") {
-            assistantContent.push({ type: "text", text: "" });
-          } else if (event.content_block.type === "tool_use") {
-            currentTool = { type: "tool_use", id: event.content_block.id, name: event.content_block.name, input: {} };
-            inputBuffer = "";
-            assistantContent.push(currentTool);
-          }
-        } else if (event.type === "content_block_delta") {
-          if (event.delta.type === "text_delta") {
-            const last = assistantContent[assistantContent.length - 1];
-            if (last?.type === "text") last.text += event.delta.text;
-            send({ type: "text", content: event.delta.text });
-          } else if (event.delta.type === "input_json_delta") {
-            inputBuffer += event.delta.partial_json;
-          }
-        } else if (event.type === "content_block_stop" && currentTool) {
-          try { currentTool.input = JSON.parse(inputBuffer); } catch { /* partial */ }
-          currentTool = null;
-          inputBuffer = "";
-        }
+      const assistantContent = Array.isArray(response.content) ? response.content : [];
+      for (const block of assistantContent) {
+        if (block.type === "text" && block.text) send({ type: "text", content: block.text });
       }
 
-      const finalMsg = await stream.finalMessage();
-
-      if (finalMsg.stop_reason === "tool_use") {
+      if (response.stop_reason === "tool_use") {
         currentMessages.push({ role: "assistant", content: assistantContent });
 
         const toolResults = [];
@@ -1576,6 +1540,23 @@ function canEditAgentRegistry(user) {
   if (user?.app_metadata?.role === 'admin' || user?.user_metadata?.role === 'admin') return true;
   if (configuredEmails.length) return configuredEmails.includes((user?.email ?? '').toLowerCase());
   return true;
+}
+
+async function resolveChatModelProfileKey() {
+  const agents = await getSb().getAgentRegistry();
+  const profiles = agents
+    .filter((agent) => agent.enabled && agent.execution_mode !== 'orchestrator' && agent.model_profile)
+    .map((agent) => agent.model_profile);
+  if (!profiles.length) throw new Error('No enabled agent model profile is configured for chat');
+  const providerCounts = new Map();
+  for (const profile of profiles) {
+    const provider = profile.startsWith('anthropic-') ? 'anthropic' : 'bedrock';
+    providerCounts.set(provider, (providerCounts.get(provider) ?? 0) + 1);
+  }
+  const activeProvider = [...providerCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  return profiles.find((profile) => profile.startsWith(`${activeProvider}-`) && profile.endsWith('-sonnet'))
+    ?? profiles.find((profile) => profile.startsWith(`${activeProvider}-`))
+    ?? profiles[0];
 }
 
 const EDITABLE_AGENT_FIELDS = new Set([
