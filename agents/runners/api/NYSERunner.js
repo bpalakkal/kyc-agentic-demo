@@ -12,7 +12,7 @@ export class NYSERunner extends ApiRunner {
     const startedAt = Date.now();
     const url = `${SOURCE_URL}?filter=${encodeURIComponent(entityName)}`;
     this.step(`Searching the official NYSE listings directory for "${entityName}"...`);
-    const { json } = await scrapeBrowserEvidence(url, {
+    const { json, screenshot } = await scrapeBrowserEvidence(url, {
       prompt: `Inspect only the official NYSE listing results and matched issuer page. Find an exact legal-name match for "${entityName}" after ignoring punctuation and ordinary legal suffixes. Do not infer or use outside knowledge. Return found=false for a partial or ambiguous match.`,
       schema: { type: 'object', properties: {
         found: { type: 'boolean' }, entity_name: { type: 'string' }, trading_names: { type: 'string' },
@@ -23,8 +23,11 @@ export class NYSERunner extends ApiRunner {
     });
     const exact = json.found && normalizeName(json.entity_name) === normalizeName(entityName);
     if (!exact) {
-      const evidence = await captureSourceScreenshot(url, { filename: `nyse-listing-${kycRef}.png`, entityName, sourceName: SOURCE, outcome: 'no_data', outcomeReason: 'No unambiguous exact NYSE listing match' });
-      return this._result(kycRef, startedAt, [], [], evidence, 'no_data', 'No unambiguous exact NYSE listing match', url);
+      // scrapeBrowserEvidence already captured the official result page. Reusing
+      // it avoids opening a second Firecrawl browser merely to produce a no-data
+      // artifact; a timeout in that redundant evidence step used to turn a valid
+      // no-match into a failed NYSE run.
+      return this._result(kycRef, startedAt, [], [], screenshot, 'no_data', 'No unambiguous exact NYSE listing match', url);
     }
 
     const sourceUrl = json.source_url || url;

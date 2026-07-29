@@ -751,8 +751,14 @@ export async function updateAgentRun(runId, { status, externalRunId, outputType,
   return data;
 }
 
-/** Return the most recent agent runs for an entity (default: last 20). */
-export async function getAgentRuns(kycRef, { limit = 20 } = {}) {
+/**
+ * Return recent agent runs for an entity.
+ *
+ * A full refresh currently creates roughly 30 parent/child rows. The previous
+ * default of 20 silently removed early parallel children from Agent Runs even
+ * though their attributes remained visible in the merged Attributes tab.
+ */
+export async function getAgentRuns(kycRef, { limit = 200 } = {}) {
   const { data, error } = await sb
     .from('agent_runs')
     .select('*')

@@ -25,10 +25,12 @@ import { SECEDGARRunner } from '../../agents/runners/api/SECEDGARRunner.js';
 import { NYSERunner } from '../../agents/runners/api/NYSERunner.js';
 import { DelawareRunner, NFARunner, PuertoRicoRunner } from '../../agents/runners/api/USRegistryResearchRunners.js';
 import { AttributePublisher } from '../../agents/publishers/AttributePublisher.js';
+import { captureSourceScreenshot, scrapeBrowserEvidence } from '../../agents/runners/api/sourcingArtifacts.js';
 
 const jsonResponse = (body: unknown) => ({ ok: true, json: async () => body }) as Response;
 
 beforeEach(() => {
+  vi.clearAllMocks();
   Object.defineProperty(AbortSignal, 'timeout', { configurable: true, value: vi.fn(() => undefined) });
 });
 
@@ -105,6 +107,18 @@ describe('US sourcing provider contracts', () => {
     expect(output.attributes?.find((attr) => attr.attributeName === 'listing_status')?.displayValue).toBe('Listed');
     expect(output.attributes?.find((attr) => attr.attributeName === 'listed_exchange')?.displayValue).toBe('NYSE');
     expect(output.files).toHaveLength(1);
+  });
+
+  it('reuses the NYSE search screenshot for a confirmed no-match', async () => {
+    vi.mocked(scrapeBrowserEvidence).mockResolvedValueOnce({
+      json: { found: false },
+      data: { found: false },
+      screenshot: { filename: 'nyse.png', mimeType: 'image/png', content: Buffer.from('screenshot') },
+    } as any);
+    const output = await new NYSERunner({}).execute({ kycRef: 'CASE_1', entityName: 'Missing Holdings LLC' });
+    expect(output.metadata.outcome).toBe('no_data');
+    expect(output.files).toHaveLength(1);
+    expect(captureSourceScreenshot).not.toHaveBeenCalled();
   });
 
   it('queries NFA BASIC directly and distinguishes a confirmed no-match', async () => {
