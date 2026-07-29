@@ -11,6 +11,8 @@
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} sb  Service-key client
  */
+import { withKeyedLock } from '../utils/keyedLock.js';
+
 export class ExceptionPublisher {
   /** @param {import('@supabase/supabase-js').SupabaseClient} sb */
   constructor(sb) {
@@ -29,6 +31,7 @@ export class ExceptionPublisher {
    */
   async publish(kycRef, agentRunId, agentSlug, exceptions) {
     if (!exceptions?.length) return 0;
+    return withKeyedLock(`exceptions:${kycRef}`, async () => {
 
     const sourceType = `agent:${agentSlug}`;
     const attrNames  = exceptions.map(e => e.attributeName);
@@ -105,7 +108,7 @@ export class ExceptionPublisher {
     }));
 
     let insertError;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       const { error } = await this.sb.from('exceptions').insert(rows);
       if (!error) { insertError = null; break; }
       insertError = error;
@@ -118,5 +121,6 @@ export class ExceptionPublisher {
     }
     if (insertError) throw Object.assign(insertError, { context: 'ExceptionPublisher.publish' });
     return rows.length;
+    });
   }
 }
