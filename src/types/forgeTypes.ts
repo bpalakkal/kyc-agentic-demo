@@ -19,6 +19,8 @@ export type ForgeLineageEntry = {
   value: unknown;
   source?: string;
   context?: string;
+  document?: string;
+  document_type?: string;
   confidence_score: number;
   timestamp: string;
 };

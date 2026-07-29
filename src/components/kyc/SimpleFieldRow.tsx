@@ -409,9 +409,20 @@ export const InlineTraceDrawer = ({
     if (!kycRef) return;
     setDocOpening(file);
     try {
-      const r = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/artifact?file=${encodeURIComponent(file)}`);
-      if (!r.ok) return;
-      setDocView({ file, blobUrl: URL.createObjectURL(await r.blob()) });
+      const filesResponse = await apiFetch(`${AGENT_API_BASE}/api/entity/${encodeURIComponent(kycRef)}/files`);
+      if (!filesResponse.ok) return;
+      const files = await filesResponse.json() as { id: string; filename: string; storage_path?: string }[];
+      const matched = files.find(item =>
+        item.filename === file || item.storage_path === file || item.storage_path?.endsWith(`/${file}`),
+      );
+      if (!matched) return;
+      const urlResponse = await apiFetch(`${AGENT_API_BASE}/api/file/${encodeURIComponent(matched.id)}/url`);
+      if (!urlResponse.ok) return;
+      const signed = await urlResponse.json() as { url?: string };
+      if (!signed.url) return;
+      const documentResponse = await fetch(signed.url);
+      if (!documentResponse.ok) return;
+      setDocView({ file, blobUrl: URL.createObjectURL(await documentResponse.blob()) });
     } catch { /* ignore */ } finally { setDocOpening(null); }
   };
   const closeDoc = () => { if (docView) URL.revokeObjectURL(docView.blobUrl); setDocView(null); };

@@ -210,7 +210,14 @@ async function seedRichStage(drgId, entity, config) {
         ? flagged.recommended_actions.map(action => action.description) : [],
       lineage: flagged?.comparison
         ? [
-            ...lineage(flagged.comparison.source_a_value, flagged.comparison.source_a, config.age + 1),
+            ...lineage(flagged.comparison.source_a_value, flagged.comparison.source_a, config.age + 1)
+              .map(entry => ({
+                ...entry,
+                ...(flagged.comparison.document ? {
+                  document: flagged.comparison.document,
+                  document_type: flagged.comparison.document_type ?? 'Source document',
+                } : {}),
+              })),
             ...lineage(flagged.comparison.source_b_value, flagged.comparison.source_b, config.age),
           ]
         : lineage(value, source, config.age),
@@ -553,14 +560,18 @@ async function seedIntake(drgId) {
         exception_types: ['Pending Validation'],
         reasoning: ['The legal name is populated from onboarding data but has not yet been confirmed by an authoritative registry source.'],
         recommended_actions: [{ option: 1, title: 'Validate name', description: 'Confirm legal name through authoritative sourcing.' }],
-        comparison: { source_a: 'Client Onboarding Form', source_a_value: 'Cedar Lantern Advisory Group LLC', source_b: 'Authoritative Corporate Registry', source_b_value: 'Not yet sourced' },
+        comparison: {
+          source_a: 'Client Onboarding Form', source_a_value: 'Cedar Lantern Advisory Group LLC',
+          source_b: 'Authoritative Corporate Registry', source_b_value: 'Not yet sourced',
+          document: 'client-onboarding-form.pdf', document_type: 'Client Onboarding Form',
+        },
       },
     ],
     files: [
       ['public/sample-docs/fca-register-marshall-wace.pdf', 'draft-form-adv.pdf', 'Draft SEC Form ADV', 'SEC Form ADV', 'digitize-sec-form-adv'],
       ['public/sample-docs/cs01-brevan-howard.pdf', 'formation-certificate.pdf', 'Formation Certificate', 'Certificate of Incorporation', 'digitize-certificate-of-incorporation'],
       ['public/sample-docs/passport-alan-howard.pdf', 'passport-sofia-alvarez.pdf', 'Passport — Sofia Alvarez', 'Passport', 'document-processing-flow'],
-      ['public/sample-docs/crm-snapshot-mw.pdf', 'onboarding-profile.pdf', 'Customer Onboarding Profile', 'Other', 'crm-intake'],
+      ['public/sample-docs/cedar-lantern-client-onboarding.pdf', 'client-onboarding-form.pdf', 'Cedar Lantern Client Onboarding Form', 'Other', 'crm-intake'],
     ],
   });
 }
