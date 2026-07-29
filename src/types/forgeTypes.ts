@@ -5,8 +5,10 @@ export type ForgeAttrRow = {
   confidence: number | null;
   id_flag: boolean;
   id_source: string | null;
+  id_reasoning?: string | null;
   verification_flag: boolean;
   verification_source: string[] | null;
+  verification_reasoning?: string | null;
   exception_flag: boolean;
   exception_type: string[] | null;
   exception_reason?: string[] | null;
@@ -21,6 +23,7 @@ export type ForgeLineageEntry = {
   context?: string;
   document?: string;
   document_type?: string;
+  note?: string;
   confidence_score: number;
   timestamp: string;
 };

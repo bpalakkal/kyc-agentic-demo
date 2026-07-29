@@ -191,6 +191,7 @@ async function seedRichStage(drgId, entity, config) {
   const values = fullAttributeValues(entity, config.attributeOverrides);
   const rows = values.map(([name, value], index) => {
     const flagged = config.exceptions.find(item => item.attribute_name === name);
+    const reasoning = config.reasoning?.[name];
     const verified = config.verified;
     const source = index % 3 === 0 ? 'SEC IAPD' : index % 3 === 1
       ? 'State corporate registry' : 'Customer evidence';
@@ -199,10 +200,13 @@ async function seedRichStage(drgId, entity, config) {
       agent_run_id: runIds.get(config.attributeRun),
       attribute_name: name, attribute_group: 'core', display_value: value,
       source, confidence: config.confidence, id_flag: true, id_source: source,
-      id_reasoning: `Identified from ${source}.`,
+      id_reasoning: reasoning?.identification ?? `Identified from ${source}.`,
       verification_flag: flagged ? false : verified,
       verification_source: flagged ? [] : [source],
-      verification_reasoning: flagged ? null : `Verified against ${source}.`,
+      verification_reasoning: reasoning?.verification
+        ?? (flagged
+          ? `Verification remains pending because ${flagged.reasoning[0]}`
+          : `Verified against ${source}.`),
       exception_flag: Boolean(flagged),
       exception_type: flagged ? flagged.exception_types : [],
       exception_reason: flagged ? flagged.reasoning : [],
@@ -523,6 +527,20 @@ async function seedIntake(drgId) {
       principal_place_of_business: '445 Park Avenue, New York, NY 10022',
       regulator_registration_number: '801-131977', government_identification: 'CRD 329177',
       website_address: 'https://cedarlantern.example',
+    },
+    reasoning: {
+      entity_name: {
+        identification: 'The Client Intake Mapping Agent extracted the legal name “Cedar Lantern Advisory Group LLC” from the signed onboarding form and mapped it to the canonical entity-name field.',
+        verification: 'The name is internally consistent across the onboarding form and case record, but authoritative registry sourcing has not yet been run, so independent verification remains pending.',
+      },
+      evidence_of_existence: {
+        identification: 'The Document Processing Agent classified the uploaded formation certificate and identified it as evidence that the entity was formed in New York.',
+        verification: 'The document appears complete, but its active status has not yet been corroborated against the New York corporate registry.',
+      },
+      source_of_funds: {
+        identification: 'The Client Intake Mapping Agent identified investment-management and advisory fees as the stated source of funds in the onboarding form.',
+        verification: 'The business narrative is plausible, but no bank statement or audited financial evidence was supplied to independently corroborate it.',
+      },
     },
     runs: [
       ['crm-intake', 'attributes', 5, ['Client onboarding'], ['Imported onboarding profile', 'Mapped all available KYC fields']],

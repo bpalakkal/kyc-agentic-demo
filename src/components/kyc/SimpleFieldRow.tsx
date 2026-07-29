@@ -471,6 +471,26 @@ export const InlineTraceDrawer = ({
 
   // Audit log is always empty — real audit history comes from the DB lineage / Forge trace.
   const auditLog: AuditEntry[] = [];
+  const storedReasoning = forgeAttr ? [
+    forgeAttr.id_reasoning && {
+      agent: "Client Intake Mapping Agent",
+      action: "Identified the attribute",
+      thought: forgeAttr.id_reasoning,
+      source: forgeAttr.id_source ?? "Client onboarding data",
+    },
+    forgeAttr.verification_reasoning && {
+      agent: "Evidence Validation Agent",
+      action: forgeAttr.verification_flag ? "Verified the attribute" : "Assessed verification readiness",
+      thought: forgeAttr.verification_reasoning,
+      source: forgeAttr.verification_source?.join(", ") || "KYC verification policy",
+    },
+    forgeAttr.exception_reason?.[0] && {
+      agent: "Exception Assessment Agent",
+      action: "Evaluated the evidence gap",
+      thought: forgeAttr.exception_reason[0],
+      source: forgeAttr.lineage?.map(entry => entry.source).filter(Boolean).join(" vs ") || "Available evidence",
+    },
+  ].filter((step): step is { agent: string; action: string; thought: string; source: string } => Boolean(step)) : [];
 
   return (
     <div className="flex flex-col">
@@ -613,6 +633,34 @@ export const InlineTraceDrawer = ({
                       <p className="text-[11px] font-semibold">{a.name} <span className="text-muted-foreground font-normal">→ {a.action}</span></p>
                       <p className="text-[10px] text-muted-foreground italic mt-0.5 leading-snug">"{a.thought}"</p>
                       <p className="text-[9px] text-primary mt-1 flex items-center gap-1"><Database className="size-2.5" />{a.source}</p>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            ) : storedReasoning.length > 0 ? (
+              <>
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5 flex items-center gap-1">
+                    <ShieldCheck className="size-3 text-primary" /> Conclusion
+                  </p>
+                  <p className="text-[11px] leading-snug text-foreground">
+                    {forgeAttr?.verification_flag
+                      ? "The attribute was identified and verified using the available evidence."
+                      : forgeAttr?.exception_flag
+                        ? "The attribute was identified, but verification remains pending because the available sources require review."
+                        : "The attribute was identified from onboarding evidence and is awaiting independent verification."}
+                  </p>
+                </div>
+                <ol className="space-y-3">
+                  {storedReasoning.map((step, index) => (
+                    <li key={`${step.agent}-${index}`} className="relative pl-7">
+                      <span className="absolute left-0 top-0.5 size-5 rounded-full bg-primary/10 text-primary grid place-items-center text-[9px] font-bold">
+                        {index + 1}
+                      </span>
+                      {index < storedReasoning.length - 1 && <span className="absolute left-[9px] top-6 bottom-[-12px] w-px bg-border" />}
+                      <p className="text-[11px] font-semibold">{step.agent} <span className="text-muted-foreground font-normal">→ {step.action}</span></p>
+                      <p className="text-[10px] text-muted-foreground italic mt-0.5 leading-snug">"{step.thought}"</p>
+                      <p className="text-[9px] text-primary mt-1 flex items-center gap-1"><Database className="size-2.5" />{step.source}</p>
                     </li>
                   ))}
                 </ol>
