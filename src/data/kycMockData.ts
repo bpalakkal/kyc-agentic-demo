@@ -93,7 +93,7 @@ export const COMPLETENESS_STYLE: Record<EntityAttr["status"], string> = {
 export const DOC_KIND_META: Record<AttrDocKind, { label: string; tone: string }> = {
   filing:     { label: "Filing",         tone: "bg-info-soft text-primary border-primary/30" },
   screenshot: { label: "Screenshot",     tone: "bg-secondary text-foreground border-border" },
-  register:   { label: "Register Entry", tone: "bg-warning-soft text-[hsl(30_70%_40%)] border-warning-soft-border" },
+  register:   { label: "Register Entry", tone: "bg-warning-soft text-warning border-warning-soft-border" },
   passport:   { label: "Identity Doc",   tone: "bg-success-soft text-success border-success-soft-border" },
   letter:     { label: "Letter",         tone: "bg-info-soft text-primary border-primary/30" },
 };

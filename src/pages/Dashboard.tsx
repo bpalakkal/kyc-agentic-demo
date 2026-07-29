@@ -9,21 +9,9 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntities, type ApiEntity } from "@/hooks/useEntities";
 
-type ApiEntity = {
-  kyc_ref: string;
-  entity_name: string;
-  entity_type: string | null;
-  jurisdiction: string | null;
-  risk_rating: "High" | "Medium" | "Low" | null;
-  priority: "High" | "Medium" | "Low";
-  status: string;
-  due_date: string | null;
-  open_exceptions_count: number;
-  drgs: { name: string } | null;
-};
-
-type PendingBucket = "ops" | "client" | "fcc" | "business";
+type CaseView = "all" | "in_progress" | "pending_feedback" | "escalated";
 
 type PriorityCase = {
   priority: "High" | "Medium" | "Low";
@@ -31,14 +19,14 @@ type PriorityCase = {
   entity: string;
   due: string;
   dueToday: boolean;
-  bucket: PendingBucket;
+  status: string;
   exceptions: number;
 };
 
-function getPendingBucket(e: ApiEntity): PendingBucket {
-  const n = parseInt(e.kyc_ref.replace(/\D/g, ""), 10) || 0;
-  const buckets: PendingBucket[] = ["ops", "client", "fcc", "business"];
-  return buckets[n % 4];
+function matchesView(status: string, view: CaseView): boolean {
+  if (view === "all") return status !== "complete";
+  if (view === "in_progress") return status !== "complete" && status !== "not_started";
+  return status === view;
 }
 
 function toPriorityCase(e: ApiEntity): PriorityCase {
@@ -59,7 +47,7 @@ function toPriorityCase(e: ApiEntity): PriorityCase {
     entity: e.entity_name,
     due,
     dueToday,
-    bucket: getPendingBucket(e),
+    status: e.status,
     exceptions: e.open_exceptions_count,
   };
 }
@@ -92,14 +80,14 @@ const COLLAB_META: Record<CollabType, { icon: typeof Bot; tone: string }> = {
   action:   { icon: CheckCircle2,  tone: "bg-secondary text-foreground" },
 };
 
-const PENDING_VIEWS: { key: PendingBucket; label: string }[] = [
-  { key: "ops",      label: "Pending Ops" },
-  { key: "client",   label: "Pending Client" },
-  { key: "fcc",      label: "Pending FCC" },
-  { key: "business", label: "Pending Business" },
+const CASE_VIEWS: { key: CaseView; label: string }[] = [
+  { key: "all", label: "All Open" },
+  { key: "in_progress", label: "In Progress" },
+  { key: "pending_feedback", label: "Pending Feedback" },
+  { key: "escalated", label: "Escalated" },
 ];
 
-const NAVY = "hsl(220, 56%, 22%)";
+const BAR_COLOR = "hsl(var(--primary))";
 
 const EMPTY_INSIGHTS: DashboardInsights = {
   frequentAgentRuns: [], exceptionSummary: [], recentActivity: [],
@@ -121,18 +109,16 @@ const Dashboard = () => {
     ?? "there";
   const navigate = useNavigate();
 
-  const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
+  const { data: apiEntities = [] } = useEntities();
   const [insights, setInsights] = useState<DashboardInsights>(EMPTY_INSIGHTS);
   const [insightsError, setInsightsError] = useState(false);
-  const [pendingView, setPendingView] = useState<PendingBucket>("ops");
+  const [caseView, setCaseView] = useState<CaseView>("all");
   const [selectedPeriod, setSelectedPeriod] = useState<"month" | "week">("month");
 
   useEffect(() => {
     Promise.all([
-      apiFetch(`${AGENT_API_BASE}/api/entities`),
       apiFetch(`${AGENT_API_BASE}/api/dashboard/insights`),
-    ]).then(async ([entitiesResponse, insightsResponse]) => {
-      if (entitiesResponse.ok) setApiEntities(await entitiesResponse.json() as ApiEntity[]);
+    ]).then(async ([insightsResponse]) => {
       if (insightsResponse.ok) {
         setInsights(await insightsResponse.json() as DashboardInsights);
         setInsightsError(false);
@@ -180,16 +166,21 @@ const Dashboard = () => {
       return d > periodEnd && d <= threeOut;
     }).length;
 
-    const completed  = apiEntities.filter(e => e.status === "complete").length;
-    const inProgress = apiEntities.filter(e => e.status !== "complete" && e.status !== "not_started").length;
+    const dueThisPeriod = apiEntities.filter(e => {
+      if (!e.due_date) return false;
+      const d = new Date(e.due_date);
+      return d >= periodStart && d <= periodEnd;
+    });
+    const completed = dueThisPeriod.filter(e => e.status === "complete").length;
+    const inProgress = dueThisPeriod.filter(e => e.status !== "complete" && e.status !== "not_started").length;
     const completionPct = dueThisMonth > 0 ? Math.round((completed / dueThisMonth) * 100) : 0;
 
     return { dueThisMonth, overdue, dueNext3M, completed, inProgress, completionPct };
   }, [apiEntities, selectedPeriod]);
 
   const visibleCases = useMemo(
-    () => priorityCases.filter(c => c.bucket === pendingView),
-    [priorityCases, pendingView]
+    () => priorityCases.filter(c => matchesView(c.status, caseView)),
+    [priorityCases, caseView]
   );
 
   const highCount = visibleCases.filter(c => c.priority === "High").length;
@@ -314,11 +305,12 @@ const Dashboard = () => {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <select
-                    value={pendingView}
-                    onChange={e => setPendingView(e.target.value as PendingBucket)}
+                    value={caseView}
+                    onChange={e => setCaseView(e.target.value as CaseView)}
+                    aria-label="Filter cases by status"
                     className="appearance-none bg-card border border-border rounded-md pl-3 pr-8 py-1.5 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 hover:bg-secondary/40 transition-colors"
                   >
-                    {PENDING_VIEWS.map(v => (
+                    {CASE_VIEWS.map(v => (
                       <option key={v.key} value={v.key}>{v.label}</option>
                     ))}
                   </select>
@@ -345,14 +337,14 @@ const Dashboard = () => {
                 <li className="py-10 text-center">
                   <CheckCircle2 className="size-7 text-success/40 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    No cases in {PENDING_VIEWS.find(v => v.key === pendingView)?.label}
+                    No cases in {CASE_VIEWS.find(v => v.key === caseView)?.label}
                   </p>
                 </li>
               )}
               {visibleCases.slice(0, 7).map(c => (
                 <li key={c.id}>
                   <Link
-                    to="/work-queue/review"
+                    to={`/work-queue/review/${encodeURIComponent(c.id)}`}
                     state={{ entities: [{ name: c.entity, kyc: c.id }] }}
                     className="grid grid-cols-[80px_1fr_60px_auto] gap-3 py-2.5 items-center hover:bg-secondary/30 -mx-2 px-2 rounded-md transition-colors"
                   >
@@ -409,7 +401,7 @@ const Dashboard = () => {
                         className="h-full rounded-full transition-all"
                         style={{
                           width: `${(f.runs / Math.max(...insights.frequentAgentRuns.map(run => run.runs), 1)) * 100}%`,
-                          backgroundColor: NAVY,
+                          backgroundColor: BAR_COLOR,
                         }}
                       />
                     </div>
@@ -460,6 +452,13 @@ const Dashboard = () => {
         <aside className="col-span-12 xl:col-span-4">
           <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+            {activityFeed.length === 0 && (
+              <div className="py-10 text-center">
+                <Bot className="size-7 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No recent activity</p>
+                <p className="text-xs text-muted-foreground/70 mt-0.5">Agent runs and exception updates will appear here</p>
+              </div>
+            )}
             <ul className="space-y-1">
               {activityFeed.length === 0 && (
                 <li className="py-10 text-center text-sm text-muted-foreground">No activity recorded yet.</li>
@@ -470,7 +469,7 @@ const Dashboard = () => {
                 return (
                   <li key={item.id}>
                     <Link
-                      to="/work-queue/review"
+                      to={`/work-queue/review/${encodeURIComponent(item.case.kyc)}`}
                       state={{ entities: [item.case] }}
                       className="flex items-start gap-3 -mx-2 px-2 py-2 rounded-md hover:bg-secondary/40 transition-colors"
                     >

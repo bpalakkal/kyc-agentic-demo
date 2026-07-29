@@ -64,15 +64,15 @@ import { cn } from "@/lib/utils";
 
 // ─── Chart colour palette ─────────────────────────────────────────────────────
 const C = {
-  primary: "#1e40af",
-  blue2:   "#7b92c8",
-  grey:    "#a9afbb",
-  success: "#16a34a",
-  alert:   "#dc2626",
-  warning: "#d97706",
-  high:    "#dc2626",
-  medium:  "#d97706",
-  low:     "#16a34a",
+  primary: "hsl(var(--chart-1))",
+  blue2:   "hsl(var(--chart-2))",
+  grey:    "hsl(var(--chart-3))",
+  success: "hsl(var(--success))",
+  alert:   "hsl(var(--alert))",
+  warning: "hsl(var(--warning))",
+  high:    "hsl(var(--risk-high))",
+  medium:  "hsl(var(--risk-medium))",
+  low:     "hsl(var(--risk-low))",
 };
 
 // ─── Mock data ─────────────────────────────────────────────────────────────────
@@ -485,6 +485,13 @@ const Reports = () => {
 
   return (
     <div className="page-shell !max-w-[1320px]">
+      <div role="note" className="mb-5 flex items-start gap-2.5 rounded-lg border border-warning-soft-border bg-warning-soft px-4 py-3">
+        <AlertTriangle className="size-4 text-warning shrink-0 mt-0.5" />
+        <div className="text-[13px]">
+          <p className="font-semibold text-foreground">Illustrative data</p>
+          <p className="text-muted-foreground mt-0.5">This page demonstrates report layouts with sample figures. It is not connected to live case data; do not use these numbers for reporting or decisions.</p>
+        </div>
+      </div>
       {/* Header */}
       <div className="flex items-end justify-between flex-wrap gap-3 mb-5">
         <div>

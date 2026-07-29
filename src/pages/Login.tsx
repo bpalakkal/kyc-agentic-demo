@@ -64,14 +64,14 @@ export default function Login() {
   return (
     <div className="min-h-screen flex">
       {/* Left — brand panel */}
-      <div className="hidden md:flex w-2/5 bg-gradient-to-br from-blue-900 to-indigo-900 flex-col items-center justify-center p-12 gap-6">
+      <div className="hidden md:flex w-2/5 bg-gradient-to-br from-nav to-primary flex-col items-center justify-center p-12 gap-6">
         <div className="flex items-center gap-3">
-          <div className="w-[3px] h-[28px] rounded-full bg-gradient-to-b from-blue-400 to-indigo-400 shrink-0" />
+          <div className="w-[3px] h-[28px] rounded-full bg-gradient-to-b from-nav-foreground/90 to-nav-foreground/40 shrink-0" />
           <div>
-            <div className="text-[22px] font-bold text-white tracking-tight leading-tight">KYC Sentinel</div>
+            <div className="text-[22px] font-bold text-nav-foreground tracking-tight leading-tight">KYC Sentinel</div>
           </div>
         </div>
-        <p className="text-blue-200 text-sm text-center max-w-[220px] leading-relaxed">
+        <p className="text-nav-foreground/75 text-sm text-center max-w-[220px] leading-relaxed">
           Intelligent KYC compliance, powered by AI
         </p>
       </div>
@@ -81,7 +81,7 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile-only brand */}
           <div className="flex items-center gap-2.5 mb-8 md:hidden">
-            <div className="w-[3px] h-[22px] rounded-full bg-gradient-to-b from-blue-500 to-indigo-500 shrink-0" />
+            <div className="w-[3px] h-[22px] rounded-full bg-gradient-to-b from-primary to-primary/50 shrink-0" />
             <div>
               <div className="text-[17px] font-bold text-foreground tracking-tight leading-tight">KYC Sentinel</div>
             </div>

@@ -303,7 +303,7 @@ const AiChatFloating = () => {
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="size-14 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+          className="size-14 rounded-full bg-gradient-to-br from-primary to-info text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label="Open AI Assistant"
         >
           <BotMessageSquare className="size-6" />

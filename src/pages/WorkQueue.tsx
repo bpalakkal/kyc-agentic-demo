@@ -14,29 +14,18 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle, Database, ClipboardCheck, ShieldCheck, RefreshCw } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle, Database, ClipboardCheck, ShieldCheck, RefreshCw, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntities, type ApiEntity } from "@/hooks/useEntities";
 import { EMPTY_WORK_QUEUE_FILTERS, filterWorkQueueRows, type WorkQueueFilters } from "@/lib/workQueueFilters";
 import { isAgentAvailable, useAgentRegistry, type RegistryAgent } from "@/hooks/useAgentRegistry";
+import { sortWorkQueueRows, type WorkQueueSortDir as SortDir, type WorkQueueSortKey as SortKey } from "@/lib/workQueueSort";
 
 // ─── API types ────────────────────────────────────────────────────────────────
-
-type ApiEntity = {
-  kyc_ref: string;
-  entity_name: string;
-  entity_type: string | null;
-  jurisdiction: string | null;
-  risk_rating: "High" | "Medium" | "Low" | null;
-  priority: "High" | "Medium" | "Low";
-  status: string;
-  due_date: string | null;
-  open_exceptions_count: number;
-  drgs: { name: string } | null;
-};
 
 // ─── Row type ─────────────────────────────────────────────────────────────────
 
@@ -48,8 +37,8 @@ type Row = {
   kyc?: string;
   drg?: string;
   due: string;
+  dueTs: number | null;
   overdue?: boolean;
-  confidence: string;
   customerType: string;
   jurisdiction: string;
   priority: "Low" | "Medium" | "High";
@@ -96,6 +85,11 @@ function formatDate(d: string | null): string {
   return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+const REVIEW_TYPE_LABEL: Record<string, string> = {
+  onboarding: "Onboarding",
+  periodic_refresh: "Periodic Refresh",
+};
+
 function toRow(e: ApiEntity): Row {
   const today = new Date();
   const due = e.due_date ? new Date(e.due_date) : null;
@@ -105,15 +99,15 @@ function toRow(e: ApiEntity): Row {
     kyc: e.kyc_ref,
     drg: e.drgs?.name ?? undefined,
     due: formatDate(e.due_date),
+    dueTs: due ? due.getTime() : null,
     overdue: due ? due < today : false,
-    confidence: "High",
     customerType: e.entity_type ?? "—",
     jurisdiction: e.jurisdiction ?? "—",
     priority: e.priority,
     risk: mapRisk(e.risk_rating),
     exc: e.open_exceptions_count,
     status: mapStatus(e.status),
-    action: "Periodic Refresh",
+    action: REVIEW_TYPE_LABEL[e.review_type ?? "periodic_refresh"] ?? "Periodic Refresh",
   };
 }
 
@@ -167,15 +161,33 @@ function buildDisplay(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const COLS = "grid-cols-[40px_minmax(210px,1.5fr)_150px_100px_90px_100px_65px_125px_minmax(360px,1.8fr)]";
+// Confidence was removed because every case displayed a fabricated hardcoded "High".
+const COLS = "grid-cols-[40px_minmax(210px,1.5fr)_150px_90px_100px_65px_125px_minmax(360px,1.8fr)]";
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {
     case "Complete":         return "text-success";
     case "In Progress":      return "text-primary";
-    case "Pending Feedback": return "text-[hsl(30_70%_40%)]";
+    case "Pending Feedback": return "text-warning";
     case "Not Started":      return "text-muted-foreground";
   }
+};
+
+const SortHeader = ({ label, sortKey, sort, onSort }: {
+  label: string;
+  sortKey: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (key: SortKey) => void;
+}) => {
+  const active = sort.key === sortKey;
+  return (
+    <button type="button" onClick={() => onSort(sortKey)}
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+      className="flex items-center gap-1 rounded-sm text-left uppercase tracking-wide hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+      {label}
+      {active ? <ArrowUp className={cn("size-3", sort.dir === "desc" && "rotate-180")} /> : <ChevronsUpDown className="size-3 opacity-40" />}
+    </button>
+  );
 };
 
 const FilterSelect = ({ label, value, options, onChange }: {
@@ -224,6 +236,7 @@ const EntityRow = ({
           type="checkbox"
           checked={selected}
           onChange={(e) => onToggle(r.id, e.target.checked)}
+          aria-label={`Select ${r.name}`}
           className="size-4 accent-primary"
         />
       )}
@@ -240,12 +253,11 @@ const EntityRow = ({
     <span>
       <Chip variant={r.overdue ? "high" : "medium"} className="font-medium">{r.due}</Chip>
     </span>
-    <span className="text-[13px] text-muted-foreground">{r.confidence}</span>
     <span className="text-[13px]">{r.priority}</span>
     <span className={cn(
       "text-[13px] font-medium",
       r.risk === "Elevated" && "text-alert",
-      r.risk === "Moderate" && "text-[hsl(30_70%_40%)]",
+      r.risk === "Moderate" && "text-warning",
       r.risk === "Minimal"  && "text-success"
     )}>{r.risk}</span>
     <span className="text-[13px]">{r.exc}</span>
@@ -296,9 +308,8 @@ const WorkQueue = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const [apiEntities, setApiEntities] = useState<ApiEntity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: apiEntities = [], isLoading: loading, error } = useEntities();
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "due", dir: "asc" });
   const { data: registry = [] } = useAgentRegistry();
   const registeredTopAgents = registry.filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger);
   const topAgents = registry.filter((agent) => agent.enabled !== false && agent.user_triggerable !== false && agent.top_level_trigger && isAgentAvailable(agent));
@@ -309,21 +320,11 @@ const WorkQueue = () => {
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiFetch(`${AGENT_API_BASE}/api/entities`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(`Server returned ${r.status}: ${body?.error ?? 'unknown error'}`);
-        }
-        return r.json() as Promise<ApiEntity[]>;
-      })
-      .then((data) => { setApiEntities(data); setLoading(false); })
-      .catch((err: Error) => { setError(err.message); setLoading(false); });
-  }, []);
-
   const rows = useMemo(() => apiEntities.map(toRow), [apiEntities]);
-  const filteredRows = useMemo(() => filterWorkQueueRows(rows, query, filters), [rows, query, filters]);
+  const filteredRows = useMemo(
+    () => sortWorkQueueRows(filterWorkQueueRows(rows, query, filters), sort.key, sort.dir),
+    [rows, query, filters, sort],
+  );
   const jurisdictions = useMemo(() => [...new Set(rows.map((row) => row.jurisdiction).filter((value) => value !== "—"))].sort(), [rows]);
   const activeFilterCount = Object.values(filters).filter((value) => value !== "all").length;
   const drgByKyc = useMemo(() => {
@@ -444,6 +445,16 @@ const WorkQueue = () => {
 
   const handleToggle = (id: string, checked: boolean) =>
     setSelected((s) => ({ ...s, [id]: checked }));
+  const toggleSort = (key: SortKey) =>
+    setSort((current) => current.key === key
+      ? { key, dir: current.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: "asc" });
+  const toggleGroup = (groupRows: Row[], checked: boolean) =>
+    setSelected((current) => {
+      const next = { ...current };
+      groupRows.forEach((row) => { if (!row.locked) next[row.id] = checked; });
+      return next;
+    });
 
   const tabs: { id: FilterTab; label: string }[] = [
     { id: "all",              label: "All" },
@@ -565,15 +576,14 @@ const WorkQueue = () => {
 
       <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
         {/* Header row */}
-        <div className={`grid ${COLS} gap-2 px-4 py-3 bg-muted/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground`}>
+        <div role="row" className={`grid ${COLS} gap-2 px-4 py-3 bg-muted/60 border-b border-border text-[10px] font-medium uppercase tracking-wide text-muted-foreground`}>
           <span />
-          <span>Entity Name ⇅</span>
-          <span>Due Date ↑</span>
-          <span>Confidence ⇅</span>
+          <SortHeader label="Entity Name" sortKey="name" sort={sort} onSort={toggleSort} />
+          <SortHeader label="Due Date" sortKey="due" sort={sort} onSort={toggleSort} />
           <span>Priority</span>
-          <span>Risk ⇅</span>
-          <span># Exc ⇅</span>
-          <span>Status ⇅</span>
+          <SortHeader label="Risk" sortKey="risk" sort={sort} onSort={toggleSort} />
+          <SortHeader label="# Exc" sortKey="exc" sort={sort} onSort={toggleSort} />
+          <SortHeader label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
           <span>Agent Actions</span>
         </div>
 
@@ -587,7 +597,7 @@ const WorkQueue = () => {
         {/* Error state */}
         {!loading && error && (
           <div className="py-16 text-center text-sm text-alert">
-            Failed to load entities: {error}
+            Failed to load entities: {error.message}
             <br />
             <span className="text-muted-foreground text-xs">Make sure the server is running (<code>npm run server</code>)</span>
           </div>
@@ -596,31 +606,41 @@ const WorkQueue = () => {
         {/* DRG groups */}
         {!loading && !error && groups.map((g) => {
           const open = !!effectiveOpen[g.id];
+          const selectable = g.rows.filter((row) => !row.locked);
+          const allSelected = selectable.length > 0 && selectable.every((row) => selected[row.id]);
+          const someSelected = selectable.some((row) => selected[row.id]);
           return (
             <div key={g.id} className="border-b border-border last:border-0">
-              <button
-                onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !open }))}
+              <div
                 className={cn(
-                  "w-full grid grid-cols-[40px_40px_1fr] items-center gap-2 px-4 py-3 text-left hover:bg-secondary/40 transition-colors",
+                  "w-full grid grid-cols-[40px_40px_1fr] items-center gap-2 px-4 py-3 hover:bg-secondary/40 transition-colors",
                   g.priorityTone === "high"   && "border-l-2 border-l-alert",
                   g.priorityTone === "medium" && "border-l-2 border-l-warning",
                   g.priorityTone === "low"    && "border-l-2 border-l-muted-foreground/30"
                 )}
               >
-                <span className="size-4 rounded border border-border" />
-                <span className="text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(element) => { if (element) element.indeterminate = someSelected && !allSelected; }}
+                  onChange={(event) => toggleGroup(g.rows, event.target.checked)}
+                  disabled={selectable.length === 0}
+                  aria-label={`Select all entities in ${g.name}`}
+                  className="size-4 accent-primary"
+                />
+                <button type="button" onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !open }))} aria-expanded={open} aria-label={`${open ? "Collapse" : "Expand"} ${g.name}`} className="text-muted-foreground rounded-sm focus-visible:ring-2 focus-visible:ring-ring/40">
                   {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                </span>
-                <div className="flex items-center gap-3">
+                </button>
+                <button type="button" onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !open }))} className="flex items-center gap-3 text-left rounded-sm focus-visible:ring-2 focus-visible:ring-ring/40">
                   <span className="text-sm font-semibold">{g.name}</span>
                   <span className={cn(
                     "text-xs",
                     g.priorityTone === "high"   && "text-alert",
-                    g.priorityTone === "medium" && "text-[hsl(30_70%_40%)]",
+                    g.priorityTone === "medium" && "text-warning",
                     g.priorityTone === "low"    && "text-success"
                   )}>{g.priorityNote}</span>
-                </div>
-              </button>
+                </button>
+              </div>
 
               {open && g.rows.map((r) => (
                 <EntityRow

@@ -53,6 +53,7 @@ export default {
           low: "hsl(var(--risk-low))",
           minimal: "hsl(var(--risk-minimal))",
         },
+        zoom: "#2D8CFF",
         chart: {
           1: "hsl(var(--chart-1))",
           2: "hsl(var(--chart-2))",
@@ -65,6 +66,22 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        xs: "0 1px 2px 0 hsl(var(--shadow-color) / 0.06)",
+        sm: "0 1px 3px 0 hsl(var(--shadow-color) / 0.08), 0 1px 2px -1px hsl(var(--shadow-color) / 0.06)",
+        DEFAULT: "0 2px 6px -1px hsl(var(--shadow-color) / 0.09), 0 1px 3px -1px hsl(var(--shadow-color) / 0.06)",
+        md: "0 4px 12px -2px hsl(var(--shadow-color) / 0.10), 0 2px 6px -2px hsl(var(--shadow-color) / 0.07)",
+        lg: "0 12px 32px -8px hsl(var(--shadow-color) / 0.18), 0 4px 12px -4px hsl(var(--shadow-color) / 0.10)",
+        xl: "0 24px 56px -12px hsl(var(--shadow-color) / 0.24), 0 8px 20px -8px hsl(var(--shadow-color) / 0.12)",
+      },
+      fontSize: {
+        caption: ["0.6875rem", { lineHeight: "1.45" }],
+        label: ["0.75rem", { lineHeight: "1.45" }],
+        body: ["0.8125rem", { lineHeight: "1.55" }],
+        title: ["0.9375rem", { lineHeight: "1.4" }],
+        heading: ["1.125rem", { lineHeight: "1.3" }],
+        display: ["1.75rem", { lineHeight: "1.2", letterSpacing: "-0.02em" }],
       },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },

@@ -17,7 +17,7 @@
  * No hardcoded or mock data is used — all real data or empty states.
  */
 
-import { useState, useEffect, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import {
   Info, X, AlertTriangle, FileText, ChevronDown, CheckCircle2,
@@ -34,7 +34,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { GraphView } from "@/components/GraphView";
 import { Input }    from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { ForgeAttrRow, ForgeTraceRow, ForgePersonRow } from "@/types/forgeTypes";
@@ -48,6 +47,8 @@ import {
 import { ForgeLineagePanel } from "@/components/kyc/ForgeLineagePanel";
 import { PersonRoleTable } from "@/components/kyc/PersonRoleTable";
 import { WgqTabContent } from "@/components/kyc/WgqTabContent";
+
+const GraphView = lazy(() => import("@/components/GraphView").then((module) => ({ default: module.GraphView })));
 import { CollabPanel } from "@/components/kyc/CollabPanel";
 import { EntityFiles } from "@/components/kyc/EntityFiles";
 import { AgentRunsPanel } from "@/components/kyc/AgentRunsPanel";
@@ -619,11 +620,9 @@ const ExceptionReview = () => {
   return (
     <>
     {graphOpen && (
-      <GraphView
-        kycId={active.kyc}
-        entityName={active.entity}
-        onClose={() => setGraphOpen(false)}
-      />
+      <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-background/90"><Loader2 className="size-7 animate-spin text-primary" /></div>}>
+        <GraphView kycId={active.kyc} entityName={active.entity} onClose={() => setGraphOpen(false)} />
+      </Suspense>
     )}
     <div className="px-6 py-4 max-w-[1480px] mx-auto">
       {/* Top header — entity ribbon shown in both modes */}
@@ -719,7 +718,7 @@ const ExceptionReview = () => {
                   onClick={() => { setReachOutModal("zoom"); setReachOutOpen(false); }}
                   className="w-full text-left p-3 rounded-md hover:bg-secondary flex gap-3 items-start transition-colors"
                 >
-                  <Video className="size-4 mt-0.5 shrink-0 text-[#2D8CFF]" />
+                  <Video className="size-4 mt-0.5 shrink-0 text-zoom" />
                   <div>
                     <p className="text-sm font-medium">Schedule Zoom Call</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Book a video call with the client to discuss outstanding items.</p>
@@ -1372,7 +1371,7 @@ const ExceptionReview = () => {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Video className="size-4 text-[#2D8CFF]" /> Schedule Zoom Call
+                <Video className="size-4 text-zoom" /> Schedule Zoom Call
               </DialogTitle>
               <DialogDescription>
                 Book a video call with <span className="font-medium text-foreground">{active.entity}</span> to discuss outstanding items
@@ -1403,7 +1402,7 @@ const ExceptionReview = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => window.open(zoomMeeting.join_url, "_blank")}
-                    className="flex-1 text-sm py-2 rounded-full border border-[#2D8CFF] text-[#2D8CFF] hover:bg-[#2D8CFF]/10 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 text-sm py-2 rounded-full border border-zoom text-zoom hover:bg-zoom/10 transition-colors flex items-center justify-center gap-2"
                   >
                     <Video className="size-3.5" /> Join via Browser
                   </button>
@@ -1412,7 +1411,7 @@ const ExceptionReview = () => {
                       const zoommtg = `zoommtg://zoom.us/join?action=join&confno=${zoomMeeting.id}&pwd=${zoomMeeting.password}&zc=0`;
                       window.location.href = zoommtg;
                     }}
-                    className="flex-1 text-sm py-2 rounded-full bg-[#2D8CFF] text-white hover:opacity-95 transition-opacity shadow-sm flex items-center justify-center gap-2"
+                    className="flex-1 text-sm py-2 rounded-full bg-zoom text-white hover:opacity-95 transition-opacity shadow-sm flex items-center justify-center gap-2"
                   >
                     <Video className="size-3.5" /> Open Desktop App
                   </button>
@@ -1486,7 +1485,7 @@ const ExceptionReview = () => {
                       className={cn(
                         "flex-1 text-xs py-1.5 rounded-full border transition-colors",
                         zoomDuration === d
-                          ? "border-[#2D8CFF] bg-[#2D8CFF]/10 text-[#2D8CFF] font-medium"
+                          ? "border-zoom bg-zoom/10 text-zoom font-medium"
                           : "border-border hover:bg-secondary text-muted-foreground"
                       )}
                     >
@@ -1548,7 +1547,7 @@ const ExceptionReview = () => {
                       setZoomLoading(false);
                     }
                   }}
-                  className="text-sm px-5 py-2 rounded-full bg-[#2D8CFF] text-white flex items-center gap-2 hover:opacity-95 disabled:opacity-60 transition-opacity shadow-sm"
+                  className="text-sm px-5 py-2 rounded-full bg-zoom text-white flex items-center gap-2 hover:opacity-95 disabled:opacity-60 transition-opacity shadow-sm"
                 >
                   {zoomLoading ? (
                     <><span className="size-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Creating…</>
@@ -3316,7 +3315,7 @@ const AgentReviewModal = ({ onClose }: { onClose: () => void }) => (
             <span className={cn(
               "px-2 py-0.5 rounded-full border text-[10px] font-medium uppercase",
               r.tone === "alert" && "bg-alert-soft text-alert border-alert-soft-border",
-              r.tone === "warning" && "bg-warning-soft text-[hsl(30_70%_40%)] border-warning-soft-border",
+              r.tone === "warning" && "bg-warning-soft text-warning border-warning-soft-border",
               r.tone === "success" && "bg-success-soft text-success border-success-soft-border"
             )}>{r.label}</span>
             <div className="flex-1 min-w-0">

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,11 +10,11 @@ import AppLayout from "@/components/AppLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import WorkQueue from "./pages/WorkQueue";
-import ExceptionReview from "./pages/ExceptionReview";
-import Screening from "./pages/Screening";
-import Reports from "./pages/Reports";
-import Agents from "./pages/Agents";
-import NotFound from "./pages/NotFound";
+const ExceptionReview = lazy(() => import("./pages/ExceptionReview"));
+const Screening = lazy(() => import("./pages/Screening"));
+const Reports = lazy(() => import("./pages/Reports"));
+const Agents = lazy(() => import("./pages/Agents"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -38,6 +38,7 @@ function AppRoutes() {
   return (
     <>
       <ScrollToTop />
+      <Suspense fallback={<div className="min-h-[40vh] grid place-items-center"><div className="size-6 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>}>
       <Routes>
         <Route
           path="/login"
@@ -54,6 +55,7 @@ function AppRoutes() {
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </>
   );
 }
