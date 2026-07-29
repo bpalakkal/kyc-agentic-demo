@@ -18,12 +18,16 @@ type Match = {
   matched_name?: string[];
   disposition_status?: string;
   analyst_notes?: string;
+  rationale?: string;
 };
 type SubjectResult = {
   party_role: string;
   party_index: number | null;
   party_name: string;
   query_schema?: string;
+  query_properties?: Record<string, string[]>;
+  screening_status?: "completed" | "skipped";
+  skip_reason?: string;
   match_count: number;
   matches: Match[];
 };
@@ -109,8 +113,10 @@ export default function Screening({ kycRef: kycRefProp, embedded }: { kycRef?: s
   };
 
   const results = data?.screening_results ?? [];
-  const totalHits = results.reduce((n, r) => n + (r.match_count || 0), 0);
-  const openHits = results.reduce(
+  const screenedResults = results.filter((r) => r.screening_status !== "skipped");
+  const skippedResults = results.filter((r) => r.screening_status === "skipped");
+  const totalHits = screenedResults.reduce((n, r) => n + (r.match_count || 0), 0);
+  const openHits = screenedResults.reduce(
     (n, r) => n + (r.matches?.filter((m) => (m.disposition_status ?? "open") === "open").length || 0),
     0,
   );
@@ -136,7 +142,8 @@ export default function Screening({ kycRef: kycRefProp, embedded }: { kycRef?: s
 
       {data && (
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-4">
-          <span>{results.length} subject{results.length !== 1 ? "s" : ""}</span>
+          <span>{screenedResults.length} screened</span>
+          {skippedResults.length > 0 && <span>{skippedResults.length} not screened</span>}
           <span>{totalHits} hit{totalHits !== 1 ? "s" : ""}</span>
           <span>{openHits} open</span>
           <span>Last: {new Date(data.screened_at ?? data.screening_timestamp ?? Date.now()).toLocaleString()}</span>
@@ -169,12 +176,19 @@ export default function Screening({ kycRef: kycRefProp, embedded }: { kycRef?: s
               <span
                 className={
                   "ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border " +
-                  (r.match_count > 0 ? "bg-alert-soft text-alert border-alert-soft-border" : "bg-success-soft text-success border-success-soft-border")
+                  (r.screening_status === "skipped"
+                    ? "bg-warning-soft text-warning-foreground border-warning/30"
+                    : r.match_count > 0 ? "bg-alert-soft text-alert border-alert-soft-border" : "bg-success-soft text-success border-success-soft-border")
                 }
               >
-                {r.match_count > 0 ? `${r.match_count} hit${r.match_count !== 1 ? "s" : ""}` : "Clear"}
+                {r.screening_status === "skipped" ? "Not screened" : r.match_count > 0 ? `${r.match_count} hit${r.match_count !== 1 ? "s" : ""}` : "Clear"}
               </span>
             </div>
+            {r.screening_status === "skipped" && (
+              <div className="border-t border-warning/20 bg-warning-soft/40 px-3 py-2.5 text-[11px] text-warning-foreground">
+                {r.skip_reason ?? "Not screened because required identifying information is incomplete."}
+              </div>
+            )}
             {r.matches?.length > 0 && (
               <table className="w-full text-[12px]">
                 <thead>
@@ -207,6 +221,42 @@ export default function Screening({ kycRef: kycRefProp, embedded }: { kycRef?: s
                 </tbody>
               </table>
             )}
+            <details className="border-t border-border/60">
+              <summary className="cursor-pointer px-3 py-2 text-[10px] font-semibold text-primary hover:bg-secondary/30">
+                Screening trace
+              </summary>
+              <div className="space-y-2 bg-secondary/10 px-3 py-3 text-[10px]">
+                <div>
+                  <p className="font-semibold text-foreground">Decision</p>
+                  <p className="text-muted-foreground">
+                    {r.screening_status === "skipped"
+                      ? r.skip_reason
+                      : `Screened as ${r.query_schema ?? "party"}; ${r.match_count} above-threshold match${r.match_count === 1 ? "" : "es"} returned.`}
+                  </p>
+                </div>
+                {r.screening_status !== "skipped" && Object.entries(r.query_properties ?? {}).filter(([, values]) => values?.length).length > 0 && (
+                  <div>
+                    <p className="font-semibold text-foreground">Normalized screening input</p>
+                    <div className="mt-1 grid grid-cols-[110px_1fr] gap-x-2 gap-y-1">
+                      {Object.entries(r.query_properties ?? {}).filter(([, values]) => values?.length).map(([key, values]) => (
+                        <div className="contents" key={key}>
+                          <span className="capitalize text-muted-foreground">{key.replace(/([A-Z])/g, " $1")}</span>
+                          <span className="break-words text-foreground">{values.join(", ")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {r.matches?.map((match) => (
+                  <div key={match.id} className="rounded-md border border-border bg-card px-2.5 py-2">
+                    <p className="font-semibold text-foreground">{match.caption ?? match.id} · {Math.round((match.score ?? 0) * 100)}%</p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      {match.rationale || `Disposition: ${(match.disposition_status ?? "pending review").replace(/_/g, " ")}.`}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </details>
           </div>
         ))}
       </div>

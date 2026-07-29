@@ -26,7 +26,20 @@ const SCORE_THRESHOLD   = 0.7;
  * @param {string} kycRef
  * @param {{ getPersons: Function, getEntity: Function, getAttributes: Function }} db
  */
-async function buildSubjects(kycRef, db) {
+const cleanValue = (value) => {
+  const text = String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+  return !text || /^(n\/?a|none|null|unknown|not available|-)$/i.test(text) ? null : text;
+};
+
+export const normalizeIdentityValue = (value) => String(value ?? '')
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
+  .replace(/\s+/g, ' ');
+
+export async function buildSubjects(kycRef, db) {
   const [personsGrouped, entity, attrs] = await Promise.all([
     db.getPersons(kycRef),
     db.getEntity(kycRef).catch(() => null),
@@ -40,10 +53,13 @@ async function buildSubjects(kycRef, db) {
   const list = (n) => (val(n) ? String(val(n)).split(',').map(s => s.trim()).filter(Boolean) : []);
 
   const subjects = [];
+  const skipped = [];
+  const identityKeys = new Map();
 
   // Entity subject
-  const entityName = val('entity_name') ?? entity?.entity_name ?? null;
+  const entityName = cleanValue(val('entity_name') ?? entity?.entity_name);
   if (entityName) {
+    identityKeys.set(`company::${normalizeIdentityValue(entityName)}`, { party_role: 'entity', party_index: null });
     subjects.push({
       party_role:       'entity',
       party_index:      null,
@@ -62,18 +78,46 @@ async function buildSubjects(kycRef, db) {
   // Person subjects
   for (const [role, persons] of Object.entries(personsGrouped ?? {})) {
     for (const p of (persons ?? [])) {
-      const a    = p.attributes ?? {};
-      const cell = (k) => a[`${role}_${k}`]?.display_value ?? a[k]?.display_value ?? null;
-      const name = p.full_name ?? cell('name');
-      if (!name) continue;
+      const a = p.attributes ?? {};
+      const cell = (k) => cleanValue(a[`${role}_${k}`]?.display_value ?? a[k]?.display_value);
+      const name = cleanValue(p.full_name) ?? cell('name');
+      const birthDate = cell('date_of_birth');
+      const address = cell('address') ?? cell('correspondence_address') ?? cell('principal_place_of_business');
+      const party = {
+        party_role: role,
+        party_index: p.person_index,
+        party_name: name ?? `Unnamed ${String(role).replace(/_/g, ' ')}`,
+      };
+      if (!name) {
+        skipped.push({ ...party, screening_status: 'skipped', skip_reason: 'Not screened: individual name is missing.', match_count: 0, matches: [] });
+        continue;
+      }
+      if (!birthDate && !address) {
+        skipped.push({ ...party, screening_status: 'skipped', skip_reason: 'Not screened: date of birth or address is required to reduce false-positive matches.', match_count: 0, matches: [] });
+        continue;
+      }
+      const identityKey = birthDate
+        ? `person::${normalizeIdentityValue(name)}::dob::${normalizeIdentityValue(birthDate)}`
+        : `person::${normalizeIdentityValue(name)}::address::${normalizeIdentityValue(address)}`;
+      const duplicateOf = identityKeys.get(identityKey);
+      if (duplicateOf) {
+        skipped.push({
+          ...party,
+          screening_status: 'skipped',
+          skip_reason: `Not screened: duplicate of the same normalized individual already included as ${String(duplicateOf.party_role).replace(/_/g, ' ')}${duplicateOf.party_index == null ? '' : ` #${duplicateOf.party_index + 1}`}.`,
+          match_count: 0,
+          matches: [],
+        });
+        continue;
+      }
+      identityKeys.set(identityKey, { party_role: role, party_index: p.person_index });
       subjects.push({
-        party_role:       role,
-        party_index:      p.person_index,
-        party_name:       name,
+        ...party,
         query_schema:     'Person',
         query_properties: {
           name:      [name],
-          birthDate: [cell('date_of_birth')].filter(Boolean),
+          birthDate: [birthDate].filter(Boolean),
+          address:   [address].filter(Boolean),
           nationality: [p.nationality ?? cell('nationality')].filter(Boolean),
           country:   [cell('country_of_residence') ?? cell('country')].filter(Boolean),
         },
@@ -81,7 +125,7 @@ async function buildSubjects(kycRef, db) {
     }
   }
 
-  return subjects;
+  return { subjects, skipped };
 }
 
 // ── OpenSanctions call ───────────────────────────────────────────────────────
@@ -224,10 +268,10 @@ export class ScreeningRunner {
     const db = await import('../../../src/db/supabase.js');
 
     // 1. Build subjects list from DB
-    const subjects = await buildSubjects(kycRef, db);
+    const { subjects, skipped } = await buildSubjects(kycRef, db);
     if (!subjects.length) {
       console.warn(`[ScreeningRunner] No subjects found for ${kycRef} — skipping`);
-      return [];
+      return skipped;
     }
     console.log(`[ScreeningRunner] Screening ${subjects.length} subject(s) for ${kycRef}`);
 
@@ -274,11 +318,14 @@ export class ScreeningRunner {
         party_role:  subject.party_role,
         party_index: subject.party_index,
         party_name:  subject.party_name,
+        query_schema: subject.query_schema,
+        query_properties: subject.query_properties,
+        screening_status: 'completed',
         match_count: matches.length,
         matches,
       });
     }
 
-    return screening_results;
+    return [...screening_results, ...skipped];
   }
 }

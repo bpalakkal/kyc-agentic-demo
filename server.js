@@ -57,22 +57,24 @@ const ts = () => new Date().toISOString();
 
 function screeningRunDetails(result) {
   const subjects = Array.isArray(result?.data?.screening_results) ? result.data.screening_results : [];
-  const matches = subjects.flatMap((subject) => Array.isArray(subject.matches) ? subject.matches : []);
+  const screened = subjects.filter((subject) => subject.screening_status !== 'skipped');
+  const skipped = subjects.length - screened.length;
+  const matches = screened.flatMap((subject) => Array.isArray(subject.matches) ? subject.matches : []);
   const pending = matches.filter((match) => match.disposition_status === 'pending_review').length;
   const discounted = matches.filter((match) => match.disposition_status === 'discounted').length;
   const outcome = matches.length > 0 ? (pending > 0 ? 'manual_review' : 'data_found') : 'no_data';
   return {
     outcome,
-    outcome_reason: `${subjects.length} ${subjects.length === 1 ? 'party' : 'parties'} screened · ${matches.length} potential ${matches.length === 1 ? 'match' : 'matches'} · ${pending} requiring review`,
+    outcome_reason: `${screened.length} ${screened.length === 1 ? 'party' : 'parties'} screened · ${skipped} not screened · ${matches.length} potential ${matches.length === 1 ? 'match' : 'matches'} · ${pending} requiring review`,
     steps: [
-      `Built the screening scope for ${subjects.length} case ${subjects.length === 1 ? 'party' : 'parties'}.`,
+      `Normalized and deduplicated the case parties; ${screened.length} eligible and ${skipped} not screened due to incomplete or duplicate identity data.`,
       'Compared the parties against the configured OpenSanctions datasets using the screening threshold.',
       matches.length
         ? `Evaluated ${matches.length} above-threshold ${matches.length === 1 ? 'match' : 'matches'}; ${discounted} discounted and ${pending} retained for analyst review.`
         : 'No above-threshold potential matches were identified.',
       'Saved party-level screening results and dispositions to the case.',
     ],
-    raw_output: { agentSlug: 'screening', metadata: { subjects: subjects.length, matches: matches.length, pending, discounted } },
+    raw_output: { agentSlug: 'screening', metadata: { subjects: screened.length, skipped, matches: matches.length, pending, discounted } },
   };
 }
 
