@@ -104,6 +104,10 @@ export type SimpleFieldRowProps = {
   pendingProposal?: InlineProposal | null;
   onAcceptProposal?: () => void;
   onRejectProposal?: () => void;
+  /** DOM anchor used for cross-view navigation from an exception. */
+  anchorId?: string;
+  /** Brief visual emphasis after cross-view navigation. */
+  highlighted?: boolean;
 };
 
 export const SimpleFieldRow = ({
@@ -114,6 +118,7 @@ export const SimpleFieldRow = ({
   runAgents, overrideDraft, setOverrideDraft, overrideNote, setOverrideNote, handleSaveOverride,
   optional, checks = { id: true, verification: true }, ui,
   pendingProposal, onAcceptProposal, onRejectProposal,
+  anchorId, highlighted = false,
 }: SimpleFieldRowProps) => {
   const overrideKey = `${entity}::${label}`;
   const override = savedOverrides[overrideKey];
@@ -153,7 +158,14 @@ export const SimpleFieldRow = ({
 
   return (
     <>
-      <div className={cn("p-3 transition-colors", (isOpen || isOverrideOpen) && "col-span-2")}>
+      <div
+        id={anchorId}
+        className={cn(
+          "p-3 transition-colors scroll-mt-24",
+          (isOpen || isOverrideOpen) && "col-span-2",
+          highlighted && "relative z-10 rounded-md ring-2 ring-primary bg-primary/5",
+        )}
+      >
         <div className="flex items-center justify-between mb-1.5">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground leading-none flex items-center gap-1.5">
             {ui?.label ?? prettifyAttrLabel(label)}

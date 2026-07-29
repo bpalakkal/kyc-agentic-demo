@@ -207,6 +207,10 @@ function dbSourcesToCompare(sources: DbExcRow["sources"]): Compare | null {
 }
 
 type ResolvedInfo = { resolutionId: string; resolutionTitle: string; agentLabel: string };
+type AttributeFocusTarget = { entity: string; label: string; requestId: number };
+
+const attributeAnchorId = (entity: string, label: string) =>
+  `attribute-${encodeURIComponent(entity)}-${encodeURIComponent(label)}`;
 
 const ExceptionReview = () => {
   const location = useLocation();
@@ -312,6 +316,7 @@ const ExceptionReview = () => {
     return () => window.removeEventListener("kyc:open-agent-run-results", openResults);
   }, []);
   const [attrViewMode, setAttrViewMode] = useState<"exception" | "attributes" | "screening">("exception");
+  const [attributeFocusTarget, setAttributeFocusTarget] = useState<AttributeFocusTarget | null>(null);
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [escalation, setEscalation] = useState<null | "fcc" | "business">(null);
   const [reachOutOpen, setReachOutOpen] = useState(false);
@@ -346,6 +351,17 @@ const ExceptionReview = () => {
   }, [effectiveExceptions, activeId]);
 
   const active = (effectiveExceptions.find((e) => e.id === activeId) ?? effectiveExceptions[0])!;
+
+  const navigateToAttribute = (exception: Exc) => {
+    if (!exception.attrLabel) return;
+    setAttributeFocusTarget({
+      entity: exception.entity,
+      label: exception.attrLabel,
+      requestId: Date.now(),
+    });
+    setRightPaneOpen(false);
+    setAttrViewMode("attributes");
+  };
 
   const activeDrg = selectedEntities.find((e) => e.kyc === active.kyc)?.drg ?? null;
   const drgEntities = activeDrg
@@ -892,7 +908,21 @@ const ExceptionReview = () => {
                         );
                       })()}
                     </div>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{e.category}</p>
+                    {e.attrLabel ? (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigateToAttribute(e);
+                        }}
+                        className="mt-0.5 text-left text-[10px] text-primary uppercase tracking-wide hover:underline underline-offset-2"
+                        title={`Open ${e.category} in Attribute View`}
+                      >
+                        {e.category}
+                      </button>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{e.category}</p>
+                    )}
                     <p className="text-[11px] mt-1 flex items-center gap-1">
                       <span className={cn("size-1.5 rounded-full", isResolved ? "bg-success" : "bg-warning animate-pulse-dot")} />
                       <span className={cn(isResolved ? "text-success font-medium" : "text-muted-foreground")}>
@@ -1209,6 +1239,7 @@ const ExceptionReview = () => {
               <AttributeFormView
                 selectedEntities={selectedEntities}
                 exceptions={effectiveExceptions}
+                focusTarget={attributeFocusTarget}
               />
             </ErrorBoundary>
           )}
@@ -2262,9 +2293,11 @@ const AttributeTree = ({ selectedEntities, exceptions: excs }: { selectedEntitie
 const AttributeFormView = ({
   selectedEntities,
   exceptions: excs,
+  focusTarget,
 }: {
   selectedEntities: { name: string; kyc: string; drg?: string }[];
   exceptions: Exc[];
+  focusTarget: AttributeFocusTarget | null;
 }) => {
   const [openTraceFor, setOpenTraceFor] = useState<{ label: string; entity: string } | null>(null);
   const [openOverrideFor, setOpenOverrideFor] = useState<{ label: string; entity: string } | null>(null);
@@ -2278,6 +2311,7 @@ const AttributeFormView = ({
   const [forgePersons, setForgePersons] = useState<Record<string, ForgePersonRow[]>>({});
   const [forgeTrace, setForgeTrace] = useState<ForgeTraceRow | null>(null);
   const [attrTab, setAttrTab] = useState<'core' | 'wgq'>('core');
+  const [highlightedAttribute, setHighlightedAttribute] = useState<string | null>(null);
 
   const { runAgents, isRunning } = useAgents();
   // Bumped after analyst saves an override so the attribute view re-fetches from DB.
@@ -2296,6 +2330,28 @@ const AttributeFormView = ({
   const entityKycs = useMemo(() => new Set(selectedEntities.map(e => e.kyc)), [entityKycKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const entityProposals: InlineProposal[] = [];
   const proposalByAttr: Record<string, InlineProposal> = {};
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    const focusKey = `${focusTarget.entity}::${focusTarget.label}`;
+    setAttrTab('core');
+    setOpenCats(current => ({
+      ...current,
+      [`${focusTarget.entity}::${categoryOf(focusTarget.label)}`]: true,
+    }));
+    setOpenTraceFor({ entity: focusTarget.entity, label: focusTarget.label });
+    setHighlightedAttribute(focusKey);
+
+    const scrollTimer = window.setTimeout(() => {
+      document.getElementById(attributeAnchorId(focusTarget.entity, focusTarget.label))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    const highlightTimer = window.setTimeout(() => setHighlightedAttribute(null), 2400);
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [focusTarget?.requestId]);
 
   // Fetch attributes and persons for all selected entities in parallel
   useEffect(() => {
@@ -2555,6 +2611,8 @@ const AttributeFormView = ({
                               <SimpleFieldRow
                                 key={label}
                                 label={label}
+                                anchorId={attributeAnchorId(entity, label)}
+                                highlighted={highlightedAttribute === `${entity}::${label}`}
                                 optional={OPTIONAL_CORE_ATTRS.has(label)}
                                 checks={attributeChecks(label)}
                                 ui={attributeUi(label)}
