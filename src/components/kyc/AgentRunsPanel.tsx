@@ -7,7 +7,7 @@
  *                   (from agent_runs.raw_output, migration 008)
  */
 import { useEffect, useMemo, useState } from "react";
-import { Database, ChevronDown, Clock, Loader2, Inbox, Brain, ListTree, RefreshCw } from "lucide-react";
+import { Database, ChevronDown, Clock, Loader2, Inbox, Brain, ListTree, RefreshCw, CheckCircle2 } from "lucide-react";
 import { apiFetch } from "@/lib/apiFetch";
 import { AGENT_API_BASE } from "@/components/AgentSystem";
 import { useAgentRegistry } from "@/hooks/useAgentRegistry";
@@ -40,6 +40,39 @@ const fmtTime = (t?: string | null) => (t ? new Date(t).toLocaleString() : "");
 const attrName = (a: RawAttr) => a.attributeName ?? a.attribute_name ?? "";
 const attrValue = (a: RawAttr) => a.displayValue ?? a.display_value ?? "";
 const attrGroup = (a: RawAttr) => a.attributeGroup ?? a.attribute_group ?? "core";
+type RunSection = "summary" | "attributes";
+
+function categoryFor(slug: string, category?: string) {
+  if (category) return category;
+  if (slug === "screening" || slug.includes("screening")) return "screening";
+  if (slug === "exception-routing") return "exception_routing";
+  if (slug.startsWith("ria-") || slug.includes("due-diligence")) return "due_diligence";
+  return "sourcing";
+}
+
+function summaryFirst(category: string) {
+  return ["due_diligence", "screening", "exception_routing"].includes(category);
+}
+
+function runSummary(run: AgentRun, category: string, attributeCount: number) {
+  if (run.status === "failed") return run.error || "The agent run failed before it could complete its assessment.";
+  if (run.outcome_reason) return run.outcome_reason;
+  if (category === "screening") return "Screening completed and saved party-level match results and dispositions.";
+  if (category === "due_diligence") return "Due diligence assessed the available evidence and recorded verification decisions, findings, or exceptions.";
+  if (category === "exception_routing") return "Exception routing evaluated the consolidated case evidence and applied routing policy.";
+  if (attributeCount) return `${attributeCount} sourced attribute value${attributeCount === 1 ? " was" : "s were"} returned for review.`;
+  return "The agent completed without returning a new attribute value.";
+}
+
+function emptyAttributesMessage(run: AgentRun, category: string) {
+  if (run.agent_slug === "document-processing-flow") {
+    return "Document processing delegates extraction to a document-specific digitizer. Review that child agent run for extracted values.";
+  }
+  if (category === "screening") return "Screening produces party matches and dispositions rather than KYC attribute values. Review the Run Summary and Screening tab.";
+  if (category === "due_diligence") return "This agent assessed existing evidence and recorded verification decisions or exceptions; a new sourced value was not expected.";
+  if (category === "exception_routing") return "Exception routing produces decisions and assignments rather than new attribute values.";
+  return "This sourcing run returned no new attribute values.";
+}
 
 // Pivot a run's attributes by lineage source: source → [{ name, value it gave }].
 function groupBySource(attrs: RawAttr[]): { source: string; items: { name: string; value: string }[] }[] {
@@ -76,10 +109,11 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
   const [loadError, setLoadError] = useState<string | null>(null);
   const [openRun, setOpenRun] = useState<Record<string, boolean>>({});
   const [openGroup, setOpenGroup] = useState<Record<string, boolean>>({});
-  const [section, setSection] = useState<Record<string, "thinking" | "attributes" | null>>({});
+  const [section, setSection] = useState<Record<string, RunSection | null>>({});
   const { data: registry = [] } = useAgentRegistry();
 
   const displayName = (slug: string) => registry.find((a) => a.slug === slug)?.display_name ?? fmtLabel(slug);
+  const runCategory = (slug: string) => categoryFor(slug, registry.find((a) => a.slug === slug)?.category);
 
   useEffect(() => {
     if (!kycRef) return;
@@ -135,7 +169,9 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
     if (!match || !group) return;
     setOpenGroup((prev) => ({ ...prev, [group.id]: true }));
     setOpenRun((prev) => ({ ...prev, [match.id]: true }));
-    setSection((prev) => ({ ...prev, [match.id]: "attributes" }));
+    const category = runCategory(match.agent_slug);
+    const hasAttributes = (match.raw_output?.attributes ?? []).length > 0;
+    setSection((prev) => ({ ...prev, [match.id]: summaryFirst(category) || !hasAttributes ? "summary" : "attributes" }));
     requestAnimationFrame(() => {
       document.querySelector(`[data-agent-run-slug="${CSS.escape(focusAgentSlug)}"]`)
         ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -210,8 +246,10 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
         const groups = groupBySource(attrs);
         const steps = run.steps ?? [];
         const isOpen = run.id in openRun ? openRun[run.id] : true;
-        const sec = run.id in section ? section[run.id] : "attributes";
-        const toggleSec = (s: "thinking" | "attributes") =>
+        const category = runCategory(run.agent_slug);
+        const prefersSummary = summaryFirst(category);
+        const sec = run.id in section ? section[run.id] : (prefersSummary || attrs.length === 0 ? "summary" : "attributes");
+        const toggleSec = (s: RunSection) =>
           setSection((prev) => ({ ...prev, [run.id]: prev[run.id] === s ? null : s }));
         return (
           <div
@@ -251,17 +289,16 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
                 )}
                 {/* Section toggles */}
                 <div className="flex items-center gap-1 px-2 pt-2">
-                  <SectionTab active={sec === "attributes"} onClick={() => toggleSec("attributes")} icon={ListTree} label={`Attributes (${attrs.length})`} />
-                  <SectionTab active={sec === "thinking"} onClick={() => toggleSec("thinking")} icon={Brain} label={`Thinking (${steps.length})`} />
+                  {prefersSummary && <SectionTab active={sec === "summary"} onClick={() => toggleSec("summary")} icon={Brain} label={`Run Summary (${steps.length})`} />}
+                  {(attrs.length > 0 || !prefersSummary) && <SectionTab active={sec === "attributes"} onClick={() => toggleSec("attributes")} icon={ListTree} label={`Attributes (${attrs.length})`} />}
+                  {!prefersSummary && <SectionTab active={sec === "summary"} onClick={() => toggleSec("summary")} icon={Brain} label={`Run Summary (${steps.length})`} />}
                 </div>
 
                 {sec === "attributes" && (
                   <div className="p-1">
                     {attrs.length === 0 && (
                       <p className="text-[10px] text-muted-foreground italic px-2 py-3 text-center">
-                        {run.agent_slug === "document-processing-flow"
-                          ? "Document processing delegates extraction to a document-specific digitizer. Review that child agent run for extracted values."
-                          : "This run returned no new attribute values."}
+                        {emptyAttributesMessage(run, category)}
                       </p>
                     )}
                     {groups.map(({ source, items }) => (
@@ -284,15 +321,21 @@ export function AgentRunsPanel({ kycRef, focusAgentSlug }: { kycRef: string; foc
                   </div>
                 )}
 
-                {sec === "thinking" && (
-                  <div className="p-3 space-y-1 max-h-72 overflow-y-auto">
+                {sec === "summary" && (
+                  <div className="p-3 max-h-80 overflow-y-auto">
+                    <div className="mb-3 rounded-lg border border-primary/15 bg-primary/[0.04] px-3 py-2.5">
+                      <p className="mb-1 text-[9px] font-bold uppercase tracking-wide text-primary">Execution outcome</p>
+                      <p className="text-[11px] leading-relaxed text-foreground">{runSummary(run, category, attrs.length)}</p>
+                    </div>
                     {steps.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground italic text-center py-2">No thinking log recorded for this run.</p>
+                      <p className="text-[10px] text-muted-foreground italic text-center py-2">No detailed execution steps were recorded for this historical run.</p>
                     )}
-                    {steps.map((s, i) => (
-                      <p key={i} className="text-[10px] text-muted-foreground font-mono leading-snug">
-                        <span className="text-primary/50 mr-1">›</span>{s}
-                      </p>
+                    {steps.map((step, i) => (
+                      <div key={i} className="relative flex gap-2.5 pb-3 last:pb-0">
+                        {i < steps.length - 1 && <span className="absolute left-[6px] top-3 h-full w-px bg-border" />}
+                        <CheckCircle2 className="relative z-[1] mt-0.5 size-3.5 shrink-0 bg-card text-success" />
+                        <p className="text-[10px] leading-relaxed text-muted-foreground">{step}</p>
+                      </div>
                     ))}
                   </div>
                 )}

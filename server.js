@@ -55,6 +55,27 @@ function getAnthropic() {
 // ISO timestamp for structured startup logs.
 const ts = () => new Date().toISOString();
 
+function screeningRunDetails(result) {
+  const subjects = Array.isArray(result?.data?.screening_results) ? result.data.screening_results : [];
+  const matches = subjects.flatMap((subject) => Array.isArray(subject.matches) ? subject.matches : []);
+  const pending = matches.filter((match) => match.disposition_status === 'pending_review').length;
+  const discounted = matches.filter((match) => match.disposition_status === 'discounted').length;
+  const outcome = matches.length > 0 ? (pending > 0 ? 'manual_review' : 'data_found') : 'no_data';
+  return {
+    outcome,
+    outcome_reason: `${subjects.length} ${subjects.length === 1 ? 'party' : 'parties'} screened · ${matches.length} potential ${matches.length === 1 ? 'match' : 'matches'} · ${pending} requiring review`,
+    steps: [
+      `Built the screening scope for ${subjects.length} case ${subjects.length === 1 ? 'party' : 'parties'}.`,
+      'Compared the parties against the configured OpenSanctions datasets using the screening threshold.',
+      matches.length
+        ? `Evaluated ${matches.length} above-threshold ${matches.length === 1 ? 'match' : 'matches'}; ${discounted} discounted and ${pending} retained for analyst review.`
+        : 'No above-threshold potential matches were identified.',
+      'Saved party-level screening results and dispositions to the case.',
+    ],
+    raw_output: { agentSlug: 'screening', metadata: { subjects: subjects.length, matches: matches.length, pending, discounted } },
+  };
+}
+
 // Races a promise against a timeout so DB operations never hang indefinitely.
 function withTimeout(promise, ms, label) {
   return Promise.race([
@@ -736,9 +757,10 @@ async function executeBatchAgent({ agent, kycRef, entityName, initiatedBy }) {
       const { data: child, error } = await sb.from('agent_runs').insert({ kyc_ref: kycRef, agent_slug: item.agent.slug, runner_type: 'api', initiated_by: initiatedBy, status: 'running', parent_run_id: parent.id, run_phase: item.phase }).select().single();
       if (error) throw error;
       try {
-        await runScreening(kycRef, { initiatedBy, modelProfileKey: item.agent.model_profile });
-        await sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString() }).eq('id', child.id);
-        return 'data_found';
+        const screeningResult = await runScreening(kycRef, { initiatedBy, modelProfileKey: item.agent.model_profile });
+        const details = screeningRunDetails(screeningResult);
+        await sb.from('agent_runs').update({ status: 'complete', ...details, completed_at: new Date().toISOString() }).eq('id', child.id);
+        return details.outcome;
       } catch (error) {
         await sb.from('agent_runs').update({ status: 'failed', error: error.message, completed_at: new Date().toISOString() }).eq('id', child.id);
         throw error;
@@ -961,10 +983,11 @@ app.post('/api/agent-run/api/:slug', requireAuth, async (req, res) => {
             if (childError) throw childError;
             try {
               const { runScreening } = getSb();
-              await runScreening(kycRef, { initiatedBy, modelProfileKey: item.agent.model_profile });
-              await getSb().sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString() }).eq('id', childRun.id);
+              const screeningResult = await runScreening(kycRef, { initiatedBy, modelProfileKey: item.agent.model_profile });
+              const details = screeningRunDetails(screeningResult);
+              await getSb().sb.from('agent_runs').update({ status: 'complete', ...details, completed_at: new Date().toISOString() }).eq('id', childRun.id);
               steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
-              return 'data_found';
+              return details.outcome;
             } catch (screeningError) {
               await getSb().sb.from('agent_runs').update({ status: 'failed', error: screeningError.message, completed_at: new Date().toISOString() }).eq('id', childRun.id);
               throw screeningError;
@@ -1501,7 +1524,13 @@ app.post('/api/entity/:kycRef/screening/run', requireAuth, async (req, res) => {
         }
         steps.push(`${item.phase.toUpperCase()} · Completed ${item.agent.display_name}`);
       }
-      await getSb().sb.from('agent_runs').update({ status: 'complete', outcome: 'data_found', completed_at: new Date().toISOString(), steps }).eq('id', parent.id);
+      const screeningDetails = screeningRunDetails(screeningResult);
+      await getSb().sb.from('agent_runs').update({
+        status: 'complete',
+        ...screeningDetails,
+        completed_at: new Date().toISOString(),
+        steps: [...steps, ...screeningDetails.steps],
+      }).eq('id', parent.id);
       return res.json(screeningResult ?? { status: 'complete' });
     } catch (chainError) {
       await getSb().sb.from('agent_runs').update({ status: 'failed', error: chainError.message, completed_at: new Date().toISOString(), steps }).eq('id', parent.id);
