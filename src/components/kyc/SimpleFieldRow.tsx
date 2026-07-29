@@ -300,7 +300,7 @@ export const SimpleFieldRow = ({
           <p className="text-[10px] font-semibold text-warning mb-2 flex items-center gap-1.5">
             <Zap className="size-3" /> Override value — <span className="font-normal text-muted-foreground">{label}</span>
           </p>
-          {ui?.control === "select" ? (
+          {ui?.control === "select" || (ui?.options?.length ?? 0) > 0 ? (
             <select
               className="h-8 w-full rounded-md border border-input bg-background px-3 text-[12px] mb-2"
               value={overrideDraft}
@@ -308,6 +308,9 @@ export const SimpleFieldRow = ({
               autoFocus
             >
               <option value="">Select {ui.label ?? prettifyAttrLabel(label)}</option>
+              {overrideDraft && !(ui.options ?? []).includes(overrideDraft) && (
+                <option value={overrideDraft}>{overrideDraft} (current value)</option>
+              )}
               {(ui.options ?? []).map(option => (
                 <option key={option} value={option}>{option}</option>
               ))}

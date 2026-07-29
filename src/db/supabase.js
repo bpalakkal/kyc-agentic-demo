@@ -603,9 +603,8 @@ export async function getPersons(kycRef) {
           if (field === 'full_name')     { p.full_name     = value ?? null; continue; }
           if (field === 'nationality')   { p.nationality   = value ?? null; continue; }
           if (field === 'ownership_pct') { p.ownership_pct = value != null ? parseFloat(value) : null; continue; }
-          if (p.attributes?.[field] !== undefined) {
-            p.attributes[field] = { ...p.attributes[field], display_value: value, _overridden: true };
-          }
+          p.attributes ??= {};
+          p.attributes[field] = { ...(p.attributes[field] ?? {}), display_value: value, _overridden: true };
         }
       }
     }

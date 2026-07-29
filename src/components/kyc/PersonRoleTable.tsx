@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { prettifyAttrLabel } from "@/lib/attrLabel";
 import type { ForgePersonRow } from "@/types/forgeTypes";
+import { attributeUi } from "@/lib/schemaAttrs";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,42 @@ function rowState(p: ForgePersonRow): RowState {
   if (attrs.some((a) => a.exception_flag)) return "exception";
   if (attrs.some((a) => a.id_flag === false || a.verification_flag === false)) return "pending";
   return "ok";
+}
+
+function fieldUi(role: string, field: string) {
+  if (field === "full_name") return { control: "text", options: [] as string[] };
+  if (field === "ownership_pct") return { control: "number", options: [] as string[] };
+  const short = field.replace(new RegExp(`^${role}_`), "");
+  const child = field.startsWith(`${role}_`) ? field : `${role}_${field}`;
+  return attributeUi(`${role}.${child}`) ?? attributeUi(`${role}.${role}_${short}`);
+}
+
+function EditControl({ role, field, value, onChange }: {
+  role: string;
+  field: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const ui = fieldUi(role, field);
+  const options = ui?.options ?? [];
+  const className = "w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400";
+  if (ui?.control === "select" || options.length > 0) {
+    return (
+      <select className={className} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">Select {ui?.label ?? prettifyAttrLabel(field)}</option>
+        {value && !options.includes(value) && <option value={value}>{value} (current value)</option>}
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    );
+  }
+  return (
+    <input
+      className={className}
+      type={ui?.control === "date" ? "date" : ui?.control === "number" ? "number" : ui?.control === "url" ? "url" : "text"}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  );
 }
 
 const stableKey = (p: ForgePersonRow, role: string) =>
@@ -47,6 +84,7 @@ function SubTable({
     full_name:     person.full_name ?? "",
     ownership_pct: person.ownership_pct != null ? String(person.ownership_pct) : "",
     nationality:   person.nationality ?? "",
+    ...Object.fromEntries(Object.entries(person.attributes ?? {}).map(([key, value]) => [key, value.display_value ?? ""])),
   });
 
   const state = rowState(person);
@@ -55,6 +93,15 @@ function SubTable({
   const attrEntries = Object.entries(person.attributes ?? {}).filter(([key]) =>
     allowed.size === 0 || allowed.has(key) || allowed.has(key.replace(new RegExp(`^${role}_`), ""))
   );
+  const editableAttrEntries = editing && applicableColumns?.length
+    ? [...new Set([
+        ...attrEntries.map(([key]) => key),
+        ...applicableColumns.map((column) => {
+          const existing = attrEntries.find(([key]) => key === column || key.replace(new RegExp(`^${role}_`), "") === column);
+          return existing?.[0] ?? `${role}_${column}`;
+        }),
+      ])].map((key) => [key, person.attributes?.[key] ?? {}] as const)
+    : attrEntries;
 
   const handleSave = () => {
     onSave(draft);
@@ -97,10 +144,11 @@ function SubTable({
           ].filter(({ key }) => key === "full_name" || allowed.size === 0 || allowed.has(key === "ownership_pct" ? "percentage_of_ownership" : key)).map(({ key, label }) => (
             <div key={key}>
               <label className="block text-xs text-gray-500 mb-1">{label}</label>
-              <input
-                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+              <EditControl
+                role={role}
+                field={key}
                 value={draft[key] ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                onChange={(value) => setDraft((current) => ({ ...current, [key]: value }))}
               />
             </div>
           ))}
@@ -121,17 +169,24 @@ function SubTable({
       )}
 
       {/* Attribute cells */}
-      {attrEntries.length > 0 && (
+      {editableAttrEntries.length > 0 && (
         <div className="grid grid-cols-2 gap-2">
-          {attrEntries.map(([key, attr]) => (
+          {editableAttrEntries.map(([key, attr]) => (
             <div key={key} className="text-xs bg-gray-50 rounded p-2 border border-gray-100">
               <span className="text-gray-400 block mb-0.5">{prettifyAttrLabel(key)}</span>
-              <span className="text-gray-700">{attr.display_value ?? "—"}</span>
-              {attr.id_flag === true && (
-                <span className="ml-2 text-emerald-600 font-medium">✓ ID</span>
-              )}
-              {attr.verification_flag === true && (
-                <span className="ml-2 text-blue-600 font-medium">✓ Verified</span>
+              {editing ? (
+                <EditControl
+                  role={role}
+                  field={key}
+                  value={draft[key] ?? ""}
+                  onChange={(value) => setDraft((current) => ({ ...current, [key]: value }))}
+                />
+              ) : (
+                <>
+                  <span className="text-gray-700">{attr.display_value ?? "—"}</span>
+                  {attr.id_flag === true && <span className="ml-2 text-emerald-600 font-medium">✓ ID</span>}
+                  {attr.verification_flag === true && <span className="ml-2 text-blue-600 font-medium">✓ Verified</span>}
+                </>
               )}
             </div>
           ))}
