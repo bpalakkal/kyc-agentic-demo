@@ -488,7 +488,7 @@ async function main() {
     return;
   }
   const { data: drg } = await checked(
-    sb.from('drgs').upsert({ name: 'Demo — Staged KYC Lifecycle' }, { onConflict: 'name' })
+    sb.from('drgs').upsert({ name: 'North America Investment Advisers — 2026 Review' }, { onConflict: 'name' })
       .select('id').single(), 'Create demo DRG',
   );
   await seedDdComplete(drg.id);
