@@ -1,10 +1,16 @@
 # KYC Sentinel — No-Forge Build (Project Context)
 
+> Updated July 29, 2026. Migrations currently run through `032`.
+
 ## Governing Principle
 
 This is the **no-Forge replica** of the Forge KYC platform.
 - **UI behaviour**: identical to the Forge version — same layouts, same agent trigger panels, same attribute grid, same screening flow.
-- **What's different**: no Forge platform dependency. Agents run via direct REST APIs, Firecrawl Browser, or registry-selected Claude models on Amazon Bedrock. No `proposals` / `acceptProposals` / `rejectProposals` proposal system. No Forge registration dialog or `forge_slug` column.
+- **What's different**: no Forge platform dependency. Agents run via direct REST
+  APIs, Firecrawl Browser, or registry-selected Claude models using the
+  administrator-selected Amazon Bedrock or Anthropic provider. No `proposals` /
+  `acceptProposals` / `rejectProposals` proposal system. No Forge registration
+  dialog or `forge_slug` column.
 - **Governing rule**: _"This should behave exactly the same as the Forge version with the exception that the agents run directly through authoritative APIs or the model provider selected in the Agent Register."_
 
 ---
@@ -34,8 +40,11 @@ AI-powered KYC (Know Your Customer) compliance platform for financial analysts. 
 - **Neo4j** — ownership/relationship graph
 
 ### AI
-- **Amazon Bedrock Claude** — registered agent calls. Haiku is the default for LLM-assisted sourcing, document processing, and screening; Sonnet is the default for DD; Opus is available for explicit Agent Register selection.
-- **Direct Anthropic Claude** (`claude-sonnet-4-6`) — floating chat assistant and its tool loop only
+- **Amazon Bedrock or direct Anthropic Claude** — registered agent calls,
+  selected atomically from the Agent Inventory. Haiku is the default for
+  LLM-assisted sourcing, document processing, and screening; Sonnet is the
+  default for DD and exception routing; Opus is available for explicit selection.
+- **Direct Anthropic Claude** — floating chat assistant and its tool loop
 - **Firecrawl Browser** — disposable browser sessions for Delaware Division of Corporations searches
 - No AWS ELB agent runtime or Forge platform
 
@@ -283,11 +292,13 @@ The registry editor persists explicit pre/child/post array order through numbere
 
 Agent Register create/edit controls load their CIP choices from `enumValues('CIPClassification')`; `server.js` validates against the same generated canonical enum. Do not add a free-form classification directly to a registry row.
 
-Agent Register leaf rows may select `bedrock-claude-haiku`,
-`bedrock-claude-sonnet`, or `bedrock-claude-opus`. Orchestrators cannot select
-a model; their leaf children own model configuration. Model IDs and secrets
-remain in Railway. `agents/models/bedrock.js` resolves the logical profile, and
-each model-backed run snapshots the exact provider, profile, and model ID.
+Agent Register leaf rows may select controlled Bedrock or Anthropic Haiku,
+Sonnet, and Opus profiles. The provider switch updates all model-backed leaves
+atomically and writes an audit record. Orchestrators cannot select a model;
+their leaf children own model configuration. Model IDs and secrets remain in
+Railway. `agents/models/claude.js` resolves the logical profile, and every
+model-backed run snapshots the exact provider, profile, and model ID. Direct
+Anthropic requests omit the deprecated `temperature` field.
 
 ### Runner class map (server.js `loadRunnerClass()`)
 Slug → runner class lookup. If a slug isn't in this map, the server returns 404 and the run shows ⚠ in the dock.
@@ -371,7 +382,10 @@ See `.env.example`. All required:
 ```
 SUPABASE_URL, SUPABASE_SERVICE_KEY          — Supabase backend (service key)
 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY  — Supabase frontend (anon key)
-ANTHROPIC_API_KEY                           — Direct Claude API (assistant chat only)
+ANTHROPIC_API_KEY                           — Direct Claude API (assistant and Anthropic-backed agents)
+ANTHROPIC_CLAUDE_HAIKU_MODEL_ID             — Direct Anthropic Haiku model ID
+ANTHROPIC_CLAUDE_SONNET_MODEL_ID            — Direct Anthropic Sonnet model ID
+ANTHROPIC_CLAUDE_OPUS_MODEL_ID              — Direct Anthropic Opus model ID
 AWS_BEARER_TOKEN_BEDROCK                    — Bedrock bearer authentication for registered agents
 AWS_REGION                                  — Bedrock execution region
 BEDROCK_CLAUDE_HAIKU_MODEL_ID               — Haiku model or inference-profile ID
@@ -403,7 +417,8 @@ npm run build    # Production build
 npm run generate # Regenerate schema-meta from master schema
 ```
 
-Migrations — paste each into Supabase SQL Editor and run once, in numeric order through 018:
+Migrations — apply each file in `scripts/migrations` once, in numeric order.
+The current tail is:
 ```
 000_base_schema.sql
 001_agent_runs_and_case_files.sql
@@ -422,6 +437,20 @@ Migrations — paste each into Supabase SQL Editor and run once, in numeric orde
 016_agent_run_manual_review_outcome.sql    ← manual-review outcome
 017_delaware_firecrawl.sql                 ← Delaware Firecrawl readiness
 018_source_agents_do_not_set_idv.sql       ← DD-only ID/V persistence cleanup
+019_source_person_lineage.sql
+020_sourcing_behavior_contract.sql
+021_document_processing_flow.sql
+022_customer_documents_and_digitizers.sql
+023_atomic_exception_number_allocation.sql
+024_source_dd_sequence_guard.sql
+025_work_queue_agent_batches.sql
+026_normalized_exception_assessments.sql
+027_agent_model_profiles.sql
+028_exception_routing_agent.sql
+029_anthropic_model_profiles.sql
+030_full_kyc_refresh.sql
+031_concurrent_exception_allocation.sql    ← concurrency-safe exception numbers
+032_entities_review_type.sql               ← onboarding/periodic-refresh workflow
 ```
 
 ---
@@ -480,9 +509,9 @@ Returns `{ ok: true }` when Supabase is reachable. `ok: false` means DB is down 
 | FCA, UK sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` | `FCA credentials missing` |
 | IAPD, US sourcing | `SEC_API_KEY` | `SEC_API_KEY environment variable is required for the IAPD runner` |
 | Delaware, US sourcing | `FIRECRAWL_API_KEY` | `FIRECRAWL_API_KEY environment variable is required for the Delaware runner` |
-| LLM-assisted sourcing/document agents | Bedrock bearer token, region, Haiku model ID | `Model profile "bedrock-claude-haiku" is unavailable` |
-| All DD agents | Bedrock bearer token, region, Sonnet model ID | `Model profile "bedrock-claude-sonnet" is unavailable` |
-| Screening | `OPENSANCTIONS_API_KEY` plus Bedrock Haiku variables | Missing OpenSanctions or model-profile configuration |
+| LLM-assisted sourcing/document agents | Active provider credential and Haiku model ID | Selected Haiku profile is unavailable |
+| DD and exception-routing agents | Active provider credential and Sonnet model ID | Selected Sonnet profile is unavailable |
+| Screening | `OPENSANCTIONS_API_KEY` plus active-provider Haiku configuration | Missing OpenSanctions or model-profile configuration |
 | Any agent | Supabase down | `agent_runs insert error` or `Supabase unavailable` |
 
 ### 5. Check migrations
@@ -504,6 +533,11 @@ the Sonnet-backed dependency-only `exception-routing` agent, and attaches it as
 a post-agent of `dd-all-in-one`. Each assessment pairs exactly one master
 `ExceptionType` value with its reasoning; an attribute has one overall
 recommendation and a workflow exception has one routing queue.
+
+Migration `031_concurrent_exception_allocation.sql` is required to prevent
+duplicate `exception_number` values during parallel DD, exception routing, or
+reruns. Migration `032_entities_review_type.sql` enables database-backed
+Onboarding and Periodic Refresh tabs.
 
 ### 6. Server restart mid-run
 If Railway restarted between when the run was launched and when the frontend polls for status, the orphan detection marks it `failed` with the message `"Server restarted while run was in progress"`. Re-run the agent — this is expected behaviour.
@@ -529,3 +563,12 @@ Tailwind is compiled into `dist/assets/index-*.css`. If the UI looks unstyled, c
 - **After agent run**: attributes auto-refresh in the Attributes tab via the `wasRunning` ref pattern — no page reload needed.
 - **Compact dock**: groups runs by entity; each run shows dot + name + elapsed time + attr count + status text. No thought log expansion.
 - **Nav order**: Dashboard → Work Queue → Agents → Reports.
+- **Work Queue**: clean per-row Refresh, Source, DD, and Screen controls; real
+  sortable headers; undated cases last in either direction; accessible DRG
+  select-all; no fabricated confidence column.
+- **Agent Runs**: current runs remain prominent; historical runs are collapsed
+  by default.
+- **Dashboard links**: priority cases and recent activity always route to a
+  concrete `:kycRef`.
+- **Performance**: heavy routes and the Cytoscape graph are lazy-loaded;
+  Dashboard and Work Queue share the cached entities query.

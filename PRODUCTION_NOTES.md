@@ -1,10 +1,14 @@
 # KYC Sentinel — Production Handoff Notes
 
+> Updated July 29, 2026. Current database sequence ends at migration `032`.
+
 ## Current production architecture
 
 KYC Sentinel is a no-Forge KYC compliance application. Financial-crime analysts use it to review entities and exceptions, inspect KYC attributes and evidence, run sourcing and due-diligence agents, screen parties, and record resolutions.
 
-The application does not call Forge or an AWS ELB agent runtime. Agents execute in the Express service through direct third-party REST APIs or Claude on Amazon Bedrock.
+The application does not call Forge or an AWS ELB agent runtime. Agents execute
+in the Express service through direct third-party REST APIs or through the
+administrator-selected Amazon Bedrock or direct Anthropic Claude profiles.
 
 ```text
 Browser (GitHub Pages, /kyc-agentic-demo/)
@@ -14,8 +18,8 @@ Browser (GitHub Pages, /kyc-agentic-demo/)
 Express API (Railway)
   |-- Supabase PostgreSQL and private Storage
   |-- Neo4j ownership graph (optional)
-  |-- Amazon Bedrock (registered Claude agent calls)
-  |-- Anthropic Claude API (assistant chat only)
+  |-- Amazon Bedrock or Anthropic API (registered Claude agent calls)
+  |-- Anthropic Claude API (assistant chat)
   |-- Companies House, FCA, JFSC, IAPD, SEC, NYSE, NFA, Delaware, Puerto Rico, GLEIF
   |-- OpenSanctions screening
   `-- Zoom meeting creation
@@ -29,8 +33,8 @@ Express API (Railway)
 | Backend | Railway | Express API and agent execution |
 | Primary data | Supabase | Authentication, PostgreSQL, private file storage |
 | Graph | Neo4j | Optional ownership and relationship graph |
-| Agent AI | Amazon Bedrock | Registry-selected Claude Haiku, Sonnet, or Opus |
-| Assistant AI | Anthropic | SSE assistant chat only |
+| Agent AI | Amazon Bedrock or Anthropic | Admin-selected controlled Claude Haiku, Sonnet, or Opus profiles |
+| Assistant AI | Anthropic | Assistant chat |
 | Screening | OpenSanctions | Sanctions and PEP matching |
 
 ## Application behavior
@@ -196,6 +200,8 @@ Run migrations in `scripts/migrations` in numeric order:
 028_exception_routing_agent.sql
 029_anthropic_model_profiles.sql
 030_full_kyc_refresh.sql
+031_concurrent_exception_allocation.sql
+032_entities_review_type.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.
@@ -229,6 +235,10 @@ configuration.
 
 Migration `029` adds matching direct Anthropic API profiles and the audited,
 atomic provider-switch function used by the Agent Inventory admin control.
+Migration `030` adds jurisdiction-aware full KYC refresh orchestrators.
+Migration `031` provides atomic per-entity exception-number allocation.
+Migration `032` adds `entities.review_type` for real onboarding and
+periodic-refresh Work Queue views.
 
 One-time environment setup:
 
@@ -310,9 +320,9 @@ Check failures in this order:
 | FCA and UK aggregate sourcing | `FCA_AUTH_EMAIL`, `FCA_API_KEY` |
 | IAPD and US aggregate sourcing | `SEC_API_KEY` |
 | Delaware and US aggregate sourcing | `FIRECRAWL_API_KEY` |
-| LLM-assisted sourcing and document agents | Bedrock bearer token, region, and Haiku model ID |
-| DD agents | Bedrock bearer token, region, and Sonnet model ID |
-| Screening | `OPENSANCTIONS_API_KEY` plus the Bedrock Haiku configuration |
+| LLM-assisted sourcing and document agents | Active provider credential and Haiku model ID |
+| DD and exception routing | Active provider credential and Sonnet model ID |
+| Screening | `OPENSANCTIONS_API_KEY` plus the active provider's Haiku configuration |
 | Assistant chat | `ANTHROPIC_API_KEY` |
 | All persisted runs | Supabase backend variables |
 
@@ -321,6 +331,9 @@ Check failures in this order:
 - Uncommitted run output is process-local; durable storage would improve restart resilience and horizontal scaling.
 - Agent availability is computed from the persisted registry, backend runner wiring, and `required_env`. An enabled row can still be reported as unavailable when production credentials are missing.
 - The Agent Register selects a controlled logical model profile rather than accepting arbitrary model IDs. Concrete model IDs and credentials remain in Railway, and each model-backed `agent_run` snapshots `llm_provider`, `llm_profile_key`, and `llm_model_id`.
+- The Work Queue uses `entities.review_type`, real sorting and status views.
+- Reports are explicitly labeled as illustrative and unsuitable for decisions.
+- Heavy routes and the Cytoscape ownership graph are lazy-loaded.
 - Detailed health checks require `HEALTH_SECRET` and an `x-health-token` request header; otherwise the endpoint returns only `{ ok }`.
 - Zoom creation is public at the API layer and should receive authentication or a narrowly scoped authorization policy before wider deployment.
 - CORS currently permits the GitHub Pages origin prefix plus configured origins; keep `CORS_ORIGIN` narrowly scoped.

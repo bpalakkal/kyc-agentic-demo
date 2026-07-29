@@ -2,6 +2,10 @@
 
 KYC Sentinel is a no-Forge KYC compliance platform for financial analysts. It combines entity and exception review, traceable KYC attributes, direct data-sourcing agents, Claude-based due diligence, sanctions and PEP screening, ownership graphs, and analyst resolution workflows.
 
+> Documentation status: updated July 29, 2026 for migrations through `032`, the
+> selectable Bedrock/Anthropic model provider, full KYC refresh, concurrent
+> exception allocation, and the latest Work Queue and dashboard UI.
+
 ## Architecture
 
 ```text
@@ -46,6 +50,10 @@ There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves
 - Optional Neo4j ownership graph
 - Claude-powered KYC assistant chat
 - Compact live agent dock with progress and automatic result persistence
+- Clean Work Queue agent triggers, real sortable columns, DRG select-all, and
+  database-backed onboarding/periodic-refresh views
+- Collapsed historical agent runs and direct exception-to-attribute navigation
+- Route and ownership-graph code splitting for a substantially smaller initial load
 
 ## Quick start
 
@@ -88,6 +96,9 @@ to use `public` because `SUPABASE_DB_SCHEMA` defaults to `public`.
 Migration `009_person_overrides_and_runs_columns.sql` is required by the current agent commit flow.
 Migration `027_agent_model_profiles.sql` is required for model-backed agents, and
 `028_exception_routing_agent.sql` adds the post-DD exception-routing agent.
+Migration `031_concurrent_exception_allocation.sql` prevents duplicate exception
+numbers during concurrent or repeated agent runs. Migration
+`032_entities_review_type.sql` enables the Work Queue's real Onboarding view.
 
 ## Commands
 
@@ -143,6 +154,8 @@ Attribute output must use `attributeGroup: "core"` or `attributeGroup: "wgq"`. P
 ## Data model
 
 - `entities` identifies a case by database-derived `kyc_ref`.
+- `entities.review_type` distinguishes onboarding from periodic refresh; existing
+  cases default to `periodic_refresh`.
 - `entity_attributes` stores scalar values, confidence, flags, and lineage.
 - `entity_persons` stores party records and per-person JSON attributes.
 - `exceptions` stores review exceptions and their resolutions.
@@ -232,6 +245,9 @@ do. Apply migration `029_anthropic_model_profiles.sql` before using the switch.
 Migration `030_full_kyc_refresh.sql` adds jurisdiction-aware full-refresh
 orchestrators that run sourcing, DD, document and exception post-processing,
 and screening in sequence.
+Migration `031_concurrent_exception_allocation.sql` replaces race-prone
+exception numbering with an atomic per-entity allocator. Migration
+`032_entities_review_type.sql` adds the review workflow used by Work Queue tabs.
 
 ## Repository map
 
@@ -263,11 +279,13 @@ server.js                  Express API and runner dispatch
 
 ## Verification
 
-The current checkout passes:
+Release verification includes:
 
 - `node --check server.js`
 - `node ./node_modules/typescript/bin/tsc --noEmit`
-- `npm test` — 11 files, 39 tests
+- `npm run build`, including confirmation that initial HTML does not preload
+  Recharts or Cytoscape
+- `npm test`
 
 See `PRODUCTION_NOTES.md` for the production handoff, operational checks, and
 troubleshooting guide. See `agents.md` for the detailed implementation
