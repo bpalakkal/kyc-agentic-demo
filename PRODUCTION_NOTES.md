@@ -19,7 +19,7 @@ Express API (Railway)
   |-- Supabase PostgreSQL and private Storage
   |-- Neo4j ownership graph (optional)
   |-- Amazon Bedrock or Anthropic API (registered Claude agent calls)
-  |-- Anthropic Claude API (assistant chat)
+  |-- Registry-selected Bedrock or Anthropic Claude (assistant chat)
   |-- Companies House, FCA, JFSC, IAPD, SEC, NYSE, NFA, Delaware, Puerto Rico, GLEIF
   |-- OpenSanctions screening
   `-- Zoom meeting creation
@@ -34,7 +34,7 @@ Express API (Railway)
 | Primary data | Supabase | Authentication, PostgreSQL, private file storage |
 | Graph | Neo4j | Optional ownership and relationship graph |
 | Agent AI | Amazon Bedrock or Anthropic | Admin-selected controlled Claude Haiku, Sonnet, or Opus profiles |
-| Assistant AI | Anthropic | Assistant chat |
+| Assistant AI | Active agent provider | Assistant chat; prefers the active Sonnet profile and uses the same provider credentials as agents |
 | Screening | OpenSanctions | Sanctions and PEP matching |
 
 ## Application behavior
@@ -82,6 +82,9 @@ Run steps and uncommitted output are held in process memory. A Railway restart d
 - DD results are the only source of `id_flag` and `verification_flag`.
 - Sourcing values and lineage are persisted with ID/V flags cleared at the publisher boundary; migration `018` repairs historical sourcing rows.
 - Analyst overrides do not automatically set identification or verification flags.
+- Enum-backed entity and party attributes use options generated from the
+  canonical schema. Related-party overrides can create a previously absent
+  attribute cell and are reapplied by `getPersons()`.
 - `kyc_ref` is database-derived as `entity_id + '_' + case_id`.
 
 Legacy `entity_snapshots` and nullable `snapshot_id` columns remain in the schema for data compatibility. They do not indicate a live Forge dependency; current agents write rows through `agent_run_id`.
@@ -122,16 +125,46 @@ The generated model is consumed by the existing Attribute View and the reusable
 indicators, defaults, enum selects, typed inputs, and add/remove controls for
 repeatable groups.
 
-Current schema handoff as of 2026-07-23:
+Current schema handoff as of 2026-07-29:
 
-- Generated schema version: `a0c73bc14b619b34`
+- Generated schema version: `a4b9d3fecbc992fb`
 - 131 attributes, 11 collections, and 19 enums
 - Required case fields: `entity_name`, `case_id`, `entity_id`, `policy`,
   `risk_rating`
 - `regulator` is a repeatable group with regulator, registration number, and
   regulatory status
 - Master and screening schemas in Git matched the authoritative external copies
-- Validation passed: TypeScript, 9 test files / 25 tests, and production build
+- Validation passed for the July 29 close: TypeScript, server syntax, focused
+  case-progress and screening tests, and production builds
+
+### July 29 operational behavior
+
+- Agent Runs returns up to 200 rows so a full refresh does not hide child runs.
+- DD and screening runs default to an execution-summary timeline rather than an
+  empty Attributes section.
+- Screening child runs persist operational steps and result counts.
+- Screening requires a usable individual name plus DOB or address, normalizes
+  identity keys, suppresses duplicates, and records incomplete/duplicate parties
+  as not screened.
+- The Screening view exposes an auditable per-party trace.
+- NYSE no-match evidence reuses the initial captured screenshot instead of
+  starting a redundant Firecrawl screenshot session.
+- Case progress treats each applicable collection value as one action, with
+  separate identification and verification actions where required.
+- The floating chat selects the active provider from `agent_registry`, prefers
+  that provider's Sonnet profile, and uses `createClaudeClient()` like agents.
+
+### End-of-day deployment state
+
+| Repository | Commit | Pages |
+|---|---|---|
+| `bpalakkal/kyc-agentic-demo` | `b1f8aa2` | Successful |
+| `bpalakkal/kyc-agentic` | `eb0730e` | Successful |
+
+Railway must deploy the latest backend commit for screening normalization,
+screening-run summaries, provider-aligned chat, and creation of missing
+related-party override fields. No new Supabase migration is required; the
+database sequence remains at `032`.
 
 From the `No Forge` directory, refresh both repository schemas with:
 

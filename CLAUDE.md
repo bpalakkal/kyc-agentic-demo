@@ -19,6 +19,22 @@ This is the **no-Forge replica** of the Forge KYC platform.
 
 AI-powered KYC (Know Your Customer) compliance platform for financial analysts. Surfaces KYC exceptions, lets analysts review and resolve them, and dispatches AI agents for investigative due diligence and verification.
 
+### Current UI/runtime behavior (July 29 close)
+
+- DD, screening, and exception-routing Agent Runs open on a concise execution
+  summary; sourcing remains attribute-first and historical batches are collapsed.
+- Screening normalizes identity values and deduplicates people by normalized
+  name plus DOB, or normalized name plus address. Incomplete people are not sent
+  to OpenSanctions and remain visible with a skip reason.
+- Screening results include a per-party trace of submitted inputs, returned
+  matches, dispositions, and rationale.
+- The case header shows schema-driven effort progress. Collection,
+  identification, and verification are separate actions.
+- Entity and related-party enum fields use canonical schema options in active
+  editing surfaces. Legacy out-of-enum values remain visible until changed.
+- Long exception labels and comparison values wrap within their panes.
+- Chat resolves its model profile from the active agent registry provider.
+
 ---
 
 ## Architecture
@@ -44,7 +60,9 @@ AI-powered KYC (Know Your Customer) compliance platform for financial analysts. 
   selected atomically from the Agent Inventory. Haiku is the default for
   LLM-assisted sourcing, document processing, and screening; Sonnet is the
   default for DD and exception routing; Opus is available for explicit selection.
-- **Direct Anthropic Claude** — floating chat assistant and its tool loop
+- **Registry-selected Bedrock or Anthropic Claude** — floating chat assistant
+  and its tool loop use the same active provider family as registered agents,
+  preferring that provider's Sonnet profile
 - **Firecrawl Browser** — disposable browser sessions for Delaware Division of Corporations searches
 - No AWS ELB agent runtime or Forge platform
 

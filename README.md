@@ -4,7 +4,8 @@ KYC Sentinel is a no-Forge KYC compliance platform for financial analysts. It co
 
 > Documentation status: updated July 29, 2026 for migrations through `032`, the
 > selectable Bedrock/Anthropic model provider, full KYC refresh, concurrent
-> exception allocation, and the latest Work Queue and dashboard UI.
+> exception allocation, normalized screening, action-based case progress, and
+> the latest Work Queue, exception, attribute, and Agent Runs UI.
 
 ## Architecture
 
@@ -14,7 +15,7 @@ React/Vite SPA
      -> Supabase PostgreSQL, Auth, and private Storage
      -> direct registry and market-data REST APIs
      -> Amazon Bedrock or Anthropic API (registered agents)
-     -> Anthropic Claude API (assistant chat)
+     -> registry-selected Amazon Bedrock or Anthropic API (assistant chat)
      -> OpenSanctions
      -> Neo4j (optional)
 ```
@@ -29,7 +30,7 @@ There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves
 | Data and auth | Supabase PostgreSQL, Auth, private Storage |
 | Graph | Neo4j with Cytoscape visualization |
 | Agent AI | Admin-selectable Amazon Bedrock or Anthropic API with controlled Claude Haiku, Sonnet, or Opus profiles |
-| Assistant AI | Anthropic Claude API |
+| Assistant AI | Same active Bedrock/Anthropic provider as registered agents; prefers the active Sonnet profile |
 | Screening | OpenSanctions REST API |
 
 ## Features
@@ -45,15 +46,29 @@ There is no Forge platform or AWS ELB agent-runtime dependency. The UI preserves
 - Customer-document upload, classification, and document-specific digitization
 - Durable multi-case Work Queue batches with cancellation and retry
 - Policy-aware exception assessment and routing to Compliance, Analyst, Client, or CRM
-- Sanctions and PEP screening with analyst dispositions
+- Normalized sanctions and PEP screening with duplicate suppression, incomplete-party skip reasons, analyst dispositions, and per-party traces
 - Private evidence-file storage and signed document URLs
 - Optional Neo4j ownership graph
-- Claude-powered KYC assistant chat
+- Claude-powered KYC assistant chat using the same active provider/key family as registered agents
 - Compact live agent dock with progress and automatic result persistence
 - Clean Work Queue agent triggers, real sortable columns, DRG select-all, and
   database-backed onboarding/periodic-refresh views
 - Collapsed historical agent runs and direct exception-to-attribute navigation
+- Category-aware Agent Runs summaries for DD, screening, and exception routing
+- Action-based case progress across collection, identification, and verification
+- Canonical enum dropdowns for entity and related-party attribute editing
 - Route and ownership-graph code splitting for a substantially smaller initial load
+
+## End-of-day status — July 29, 2026
+
+- Demo repository deployed through `b1f8aa2`.
+- No Forge repository deployed through `eb0730e`.
+- Both GitHub Pages workflows completed successfully.
+- TypeScript, server syntax, focused screening/progress tests, and production builds passed during the day.
+- Railway must be on the latest backend commit for normalized screening,
+  screening summaries, provider-aligned chat, and new related-party overrides.
+- No Supabase migration is required for these final UI/runtime changes; the
+  database migration sequence remains at `032`.
 
 ## Quick start
 
