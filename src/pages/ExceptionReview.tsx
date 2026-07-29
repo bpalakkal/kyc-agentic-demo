@@ -169,7 +169,7 @@ function dbRowToExc(row: DbExcRow, entityName: string): Exc {
     attrLabel: row.field_name ?? undefined,
     exceptionQueue: row.exception_queue,
     flagText: reasoning[0] ?? title,
-    narrative: reasoning.slice(1).join(" "),
+    narrative: reasoning.slice(1).join(" ") || reasoning[0] || "No additional reasoning was provided.",
     reasoningSteps: reasoning,
     evidenceRationale: "Based on source data comparison. Refer to the comparison table for field-level evidence.",
     evidence: [],

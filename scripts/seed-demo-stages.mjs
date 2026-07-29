@@ -237,6 +237,10 @@ async function seedRichStage(drgId, entity, config) {
     status: index === config.exceptions.length - 1 ? 'resolved' : 'open',
     severity: item.severity, title: item.title,
     exception_types: item.exception_types, reasoning: item.reasoning,
+    exception_assessments: item.exception_types.map((type, index) => ({
+      exception_type: type,
+      exception_reasoning: item.reasoning[index] ?? item.reasoning[0] ?? item.title,
+    })),
     recommended_actions: item.recommended_actions,
     sources: { source_a: 'Authoritative source', source_b: 'Customer evidence' },
     entity_attribute_id: attributeId(item.attribute_name),
@@ -423,9 +427,9 @@ async function seedSourced(drgId) {
       { role: 'corporate_officer', full_name: 'Mei Tan', ownership_pct: null, nationality: 'Singapore' },
     ],
     exceptions: [
-      { attribute_name: 'legal_registered_address', severity: 'medium', title: 'Registered address purpose requires confirmation', exception_types: ['Address Purpose Ambiguity'], reasoning: ['Registry and Form ADV addresses differ.'], recommended_actions: [{ option: 1, title: 'Confirm address', description: 'Confirm registered and operating address purposes.' }] },
-      { attribute_name: 'source_of_wealth', severity: 'medium', title: 'Source of wealth not independently corroborated', exception_types: ['Insufficient Corroboration'], reasoning: ['Only customer-provided evidence is available.'], recommended_actions: [{ option: 1, title: 'Request financials', description: 'Obtain audited financial statements.' }] },
-      { attribute_name: 'entity_name', severity: 'low', title: 'Legal-name punctuation difference resolved', exception_types: ['Formatting Difference'], reasoning: ['Registration identifiers match.'], recommended_actions: [{ option: 1, title: 'Accept match', description: 'Accept punctuation-only variance.' }] },
+      { attribute_name: 'legal_registered_address', severity: 'medium', title: 'Registered address purpose requires confirmation', exception_types: ['Address Purpose Ambiguity'], reasoning: ['The registry lists a registered-agent address while Form ADV lists the operating office, so the address purpose requires analyst confirmation.'], recommended_actions: [{ option: 1, title: 'Confirm address', description: 'Confirm registered and operating address purposes.' }] },
+      { attribute_name: 'source_of_wealth', severity: 'medium', title: 'Source of wealth not independently corroborated', exception_types: ['Insufficient Corroboration'], reasoning: ['The source-of-wealth description is supported only by customer-provided evidence and has not been independently corroborated.'], recommended_actions: [{ option: 1, title: 'Request financials', description: 'Obtain audited financial statements.' }] },
+      { attribute_name: 'entity_name', severity: 'low', title: 'Legal-name punctuation difference resolved', exception_types: ['Formatting Difference'], reasoning: ['The legal-name variance is limited to punctuation, and matching registration identifiers confirm that both records refer to the same entity.'], recommended_actions: [{ option: 1, title: 'Accept match', description: 'Accept punctuation-only variance.' }] },
     ],
     files: [
       ['public/sample-docs/fca-register-marshall-wace.pdf', 'form-adv.pdf', 'SEC Form ADV', 'SEC Form ADV', 'digitize-sec-form-adv'],
