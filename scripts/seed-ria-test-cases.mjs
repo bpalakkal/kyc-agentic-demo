@@ -4,6 +4,7 @@
  * Dry run (default): node scripts/seed-ria-test-cases.mjs
  * Execute:           node scripts/seed-ria-test-cases.mjs --execute
  * Custom source:     node scripts/seed-ria-test-cases.mjs --source "C:\\path\\to\\RIA Test Cases"
+ * One entity only:   node scripts/seed-ria-test-cases.mjs --entity "POLPO CAPITAL MANAGEMENT LLC" --execute
  *
  * Entity names are compared case-insensitively after whitespace normalization.
  * When the source contains the same name more than once, the lowest numbered
@@ -31,6 +32,8 @@ for (const envPath of [resolve(scriptDir, '../.env'), resolve(scriptDir, '../../
 
 const execute = process.argv.includes('--execute');
 const sourceIndex = process.argv.indexOf('--source');
+const entityIndex = process.argv.indexOf('--entity');
+const requestedEntity = entityIndex >= 0 ? process.argv[entityIndex + 1]?.trim() : null;
 const sourceDir = resolve(sourceIndex >= 0
   ? process.argv[sourceIndex + 1]
   : resolve(scriptDir, '../../../RIA Test Cases'));
@@ -42,6 +45,10 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 }
 if (sourceIndex >= 0 && !process.argv[sourceIndex + 1]) {
   console.error('--source requires a directory path');
+  process.exit(1);
+}
+if (entityIndex >= 0 && !requestedEntity) {
+  console.error('--entity requires an entity name');
   process.exit(1);
 }
 
@@ -131,7 +138,22 @@ async function listStorageFiles(prefix) {
 }
 
 async function main() {
-  const { rows, selected, skipped, normalizedNames } = loadCases();
+  const loaded = loadCases();
+  const requestedKey = requestedEntity ? normalizeName(requestedEntity) : null;
+  const selected = requestedKey
+    ? loaded.selected.filter(row => normalizeName(row.entity_name) === requestedKey)
+    : loaded.selected;
+  if (requestedKey && selected.length === 0) {
+    throw new Error(`No canonical seed case found for entity "${requestedEntity}"`);
+  }
+  const selectedKeys = new Set(selected.map(row => normalizeName(row.entity_name)));
+  const rows = requestedKey
+    ? loaded.rows.filter(row => selectedKeys.has(normalizeName(row.entity_name)))
+    : loaded.rows;
+  const skipped = requestedKey
+    ? loaded.skipped.filter(row => selectedKeys.has(normalizeName(row.entity_name)))
+    : loaded.skipped;
+  const normalizedNames = new Set(selectedKeys);
   const { data: existing } = await checked(
     sb.from('entities').select('kyc_ref,entity_id,case_id,entity_name'),
     'Load existing entities',
