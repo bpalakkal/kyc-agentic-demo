@@ -229,6 +229,9 @@ agent between equivalent Amazon Bedrock and Anthropic API profiles. The target
 provider must be configured in Railway first; every change is written to the
 Agent Register audit log. Orchestrators do not select a model—their leaf agents
 do. Apply migration `029_anthropic_model_profiles.sql` before using the switch.
+Migration `030_full_kyc_refresh.sql` adds jurisdiction-aware full-refresh
+orchestrators that run sourcing, DD, document and exception post-processing,
+and screening in sequence.
 
 ## Repository map
 

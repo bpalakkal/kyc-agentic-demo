@@ -104,8 +104,19 @@ export class ExceptionPublisher {
       entity_person_id:    exc.entityPersonId ?? null,
     }));
 
-    const { error } = await this.sb.from('exceptions').insert(rows);
-    if (error) throw Object.assign(error, { context: 'ExceptionPublisher.publish' });
+    let insertError;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await this.sb.from('exceptions').insert(rows);
+      if (!error) { insertError = null; break; }
+      insertError = error;
+      if (error.code !== '23505' || !/exceptions_kyc_ref_exception_number_key/i.test(error.message ?? '')) break;
+      const { data: retryStart, error: retryError } = await this.sb.rpc('alloc_exception_numbers', {
+        p_kyc_ref: kycRef, p_count: rows.length,
+      });
+      if (retryError) throw retryError;
+      rows.forEach((row, index) => { row.exception_number = retryStart + index; });
+    }
+    if (insertError) throw Object.assign(insertError, { context: 'ExceptionPublisher.publish' });
     return rows.length;
   }
 }

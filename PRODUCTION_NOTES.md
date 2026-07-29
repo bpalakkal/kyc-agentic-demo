@@ -195,6 +195,7 @@ Run migrations in `scripts/migrations` in numeric order:
 027_agent_model_profiles.sql
 028_exception_routing_agent.sql
 029_anthropic_model_profiles.sql
+030_full_kyc_refresh.sql
 ```
 
 Migration `007` truncates entity case data and must be scheduled deliberately. Migration `009` is required for current agent commits and adds persisted run details. Migration `010` creates and seeds the registry golden source; deploy it before the backend version that reads `/api/agents` from Supabase. Migration `013` adds the persistent per-analyst review cursors used by the Documents and Agent Runs unread badges.

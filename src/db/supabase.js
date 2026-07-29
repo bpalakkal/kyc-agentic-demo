@@ -269,8 +269,19 @@ async function syncForgeExceptions(kycRef, forgeData) {
     recommended_actions: c.recommendations,
   }));
 
-  const { error } = await sb.from('exceptions').insert(rows);
-  if (error) throw error;
+  let insertError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await sb.from('exceptions').insert(rows);
+    if (!error) { insertError = null; break; }
+    insertError = error;
+    if (error.code !== '23505' || !/exceptions_kyc_ref_exception_number_key/i.test(error.message ?? '')) break;
+    const { data: retryStart, error: retryError } = await sb.rpc('alloc_exception_numbers', {
+      p_kyc_ref: kycRef, p_count: rows.length,
+    });
+    if (retryError) throw retryError;
+    rows.forEach((row, index) => { row.exception_number = retryStart + index; });
+  }
+  if (insertError) throw insertError;
   return rows.length;
 }
 

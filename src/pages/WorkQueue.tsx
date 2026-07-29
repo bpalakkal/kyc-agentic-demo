@@ -14,7 +14,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle, Database, ClipboardCheck, ShieldCheck } from "lucide-react";
+import { Search, SlidersHorizontal, ChevronDown, ChevronRight, Lock, Loader2, X, Bot, Play, RotateCcw, CheckCircle2, AlertCircle, Database, ClipboardCheck, ShieldCheck, RefreshCw } from "lucide-react";
 import { Chip } from "@/components/Chip";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/apiFetch";
@@ -167,7 +167,7 @@ function buildDisplay(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const COLS = "grid-cols-[40px_minmax(210px,1.5fr)_150px_100px_90px_100px_65px_125px_minmax(280px,1.5fr)]";
+const COLS = "grid-cols-[40px_minmax(210px,1.5fr)_150px_100px_90px_100px_65px_125px_minmax(360px,1.8fr)]";
 
 const statusColor = (s: Row["status"]) => {
   switch (s) {
@@ -207,7 +207,7 @@ const EntityRow = ({
   onToggle: (id: string, checked: boolean) => void;
   indent?: boolean;
   batchStatus?: BatchItem;
-  agentActions: Array<{ category: "sourcing" | "due_diligence" | "screening"; label: string; agent?: RegistryAgent; icon: typeof Database }>;
+  agentActions: Array<{ category: "refresh" | "sourcing" | "due_diligence" | "screening"; label: string; agent?: RegistryAgent; icon: typeof Database }>;
   onTriggerAgent: (agent: RegistryAgent, row: Row) => void;
 }) => (
   <div
@@ -262,6 +262,7 @@ const EntityRow = ({
             onClick={(event) => { event.stopPropagation(); if (agent) onTriggerAgent(agent, r); }}
             className={cn(
               "inline-flex h-7 min-w-0 items-center gap-1 rounded-md border px-2 text-[10px] font-semibold transition-colors",
+              category === "refresh" && "border-foreground/20 bg-foreground/[0.04] text-foreground hover:bg-foreground/[0.08]",
               category === "sourcing" && "border-primary/25 bg-primary/5 text-primary hover:bg-primary/10",
               category === "due_diligence" && "border-warning/30 bg-warning-soft text-warning-foreground hover:brightness-95",
               category === "screening" && "border-success/25 bg-success-soft text-success hover:brightness-95",
@@ -353,7 +354,8 @@ const WorkQueue = () => {
   const selectedCount = selectedEntities.length;
   const batchItemsByKyc = useMemo(() => new Map((batch?.items ?? []).map((item) => [item.kyc_ref, item])), [batch]);
   const topAgentForRow = (category: "sourcing" | "due_diligence" | "screening", row: Row) => {
-    const candidates = registeredTopAgents.filter((agent) => agent.category === category);
+    const candidates = registeredTopAgents.filter((agent) =>
+      agent.category === category && (category !== "sourcing" || !agent.slug.startsWith("kyc-refresh-")));
     if (category !== "sourcing") return candidates[0];
     const jurisdiction = row.jurisdiction.toLowerCase();
     if (/united kingdom|england|scotland|wales|jersey|guernsey|\buk\b/.test(jurisdiction)) {
@@ -364,7 +366,15 @@ const WorkQueue = () => {
     }
     return candidates.find((agent) => !agent.jurisdiction || /global|all/i.test(agent.jurisdiction));
   };
+  const refreshAgentForRow = (row: Row) => {
+    const jurisdiction = row.jurisdiction.toLowerCase();
+    const suffix = /united kingdom|england|scotland|wales|jersey|guernsey|\buk\b/.test(jurisdiction)
+      ? "uk"
+      : /united states|usa|u\.s\.|puerto rico|\bus\b/.test(jurisdiction) ? "us" : null;
+    return suffix ? registeredTopAgents.find((agent) => agent.slug === `kyc-refresh-${suffix}`) : undefined;
+  };
   const agentActionsForRow = (row: Row) => [
+    { category: "refresh" as const, label: "Refresh", agent: refreshAgentForRow(row), icon: RefreshCw },
     { category: "sourcing" as const, label: "Source", agent: topAgentForRow("sourcing", row), icon: Database },
     { category: "due_diligence" as const, label: "DD", agent: topAgentForRow("due_diligence", row), icon: ClipboardCheck },
     { category: "screening" as const, label: "Screen", agent: topAgentForRow("screening", row), icon: ShieldCheck },
